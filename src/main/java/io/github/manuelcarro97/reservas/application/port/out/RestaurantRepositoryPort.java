@@ -34,6 +34,12 @@ public interface RestaurantRepositoryPort {
 
 	void addClosure(long restaurantId, LocalDate date, String reason);
 
+	/** Fechas cerradas del plano desde {@code from} (incluida), en orden. */
+	List<LocalDate> closuresFrom(long restaurantId, LocalDate from);
+
+	/** Quita el cierre de esa fecha; si no hay ninguno no hace nada. */
+	void removeClosure(long restaurantId, LocalDate date);
+
 	boolean isClosed(long restaurantId, LocalDate date);
 
 	int maxCapacity(long restaurantId);

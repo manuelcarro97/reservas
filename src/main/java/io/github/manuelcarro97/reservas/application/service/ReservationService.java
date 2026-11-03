@@ -59,7 +59,12 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	@Override
 	public Reservation create(String slug, CreateReservationCommand command) {
 		Restaurant restaurant = RestaurantAccess.published(restaurants, slug);
-		Shift shift = shifts.findById(restaurant.id(), command.shiftId()).orElseThrow(ShiftNotFoundException::new);
+		// findAll y no findById: un turno oculto (borrado lógico) no admite reservas nuevas.
+		Shift shift = shifts.findAll(restaurant.id())
+			.stream()
+			.filter(candidate -> candidate.id() == command.shiftId())
+			.findFirst()
+			.orElseThrow(ShiftNotFoundException::new);
 		bookingPolicy.requireWithinWindow(restaurant, command.date(), clock);
 		bookingPolicy.validate(restaurant, shift, command.date(), command.partySize(),
 				restaurants.maxCapacity(restaurant.id()), restaurants.isClosed(restaurant.id(), command.date()), clock);

@@ -14,6 +14,8 @@ interface ReservationJpaRepository extends JpaRepository<ReservationEntity, Long
 
 	Optional<ReservationEntity> findByCode(String code);
 
+	boolean existsByShiftId(long shiftId);
+
 	List<ReservationEntity> findByRestaurantIdAndDateOrderById(long restaurantId, LocalDate date);
 
 	List<ReservationEntity> findByRestaurantIdAndDateGreaterThanEqualAndStatusInOrderByDateAscIdAsc(long restaurantId,

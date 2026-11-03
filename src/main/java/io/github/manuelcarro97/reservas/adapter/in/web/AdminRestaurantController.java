@@ -4,23 +4,17 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import jakarta.validation.Valid;
 
 import io.github.manuelcarro97.reservas.application.port.in.GetOccupancyUseCase;
-import io.github.manuelcarro97.reservas.application.port.in.ManageRestaurantUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.TableOccupancy;
 
 @RestController
@@ -28,27 +22,10 @@ import io.github.manuelcarro97.reservas.application.port.in.TableOccupancy;
 @SecurityRequirement(name = "firebase")
 class AdminRestaurantController {
 
-	private final ManageRestaurantUseCase manageRestaurant;
 	private final GetOccupancyUseCase occupancy;
 
-	AdminRestaurantController(ManageRestaurantUseCase manageRestaurant, GetOccupancyUseCase occupancy) {
-		this.manageRestaurant = manageRestaurant;
+	AdminRestaurantController(GetOccupancyUseCase occupancy) {
 		this.occupancy = occupancy;
-	}
-
-	@PostMapping("/{slug}/shifts")
-	@ResponseStatus(HttpStatus.CREATED)
-	ShiftResponse addShift(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug,
-			@Valid @RequestBody CreateShiftRequest request) {
-		return ShiftResponse.from(manageRestaurant.addShift(jwt.getSubject(), slug, request.name(), request.start(),
-				request.end(), request.days()));
-	}
-
-	@PostMapping("/{slug}/closures")
-	@ResponseStatus(HttpStatus.CREATED)
-	void addClosure(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug,
-			@Valid @RequestBody CreateClosureRequest request) {
-		manageRestaurant.addClosure(jwt.getSubject(), slug, request.date(), request.reason());
 	}
 
 	@GetMapping("/{slug}/occupancy")

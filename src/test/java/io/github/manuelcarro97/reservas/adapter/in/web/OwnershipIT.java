@@ -1,6 +1,7 @@
 package io.github.manuelcarro97.reservas.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -91,6 +92,26 @@ class OwnershipIT extends PostgresIT {
 					.content("""
 							{"date":"2026-12-25","reason":"Navidad"}
 							"""), RESTAURANT_NOT_FOUND),
+				new Route("GET shifts", it -> get("/api/v1/admin/restaurants/plano-a/shifts"), RESTAURANT_NOT_FOUND),
+				new Route("PATCH shift", it -> patch(it.shiftPath())
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{"name":"Otro nombre"}
+							"""), RESTAURANT_NOT_FOUND),
+				// Mover o borrar el turno exige que no tenga reservas activas futuras: se cancela la del escenario.
+				new Route("PUT shift", it -> put(it.shiftPath())
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{"start":"21:00","end":"23:00","days":["MONDAY"]}
+							"""), RESTAURANT_NOT_FOUND, it -> it.manageReservation.cancel("owner-a", it.reservation.id())),
+				new Route("DELETE shift", it -> delete(it.shiftPath()), RESTAURANT_NOT_FOUND,
+						it -> it.manageReservation.cancel("owner-a", it.reservation.id())),
+				new Route("GET closures",
+						it -> get("/api/v1/admin/restaurants/plano-a/closures").param("from", "2026-12-01"),
+						RESTAURANT_NOT_FOUND),
+				new Route("DELETE closure", it -> delete("/api/v1/admin/restaurants/plano-a/closures/2026-12-25"),
+						RESTAURANT_NOT_FOUND,
+						it -> it.restaurants.addClosure(it.restaurant.id(), LocalDate.of(2026, 12, 25), "Navidad")),
 				new Route("GET reservations",
 						it -> get("/api/v1/admin/restaurants/plano-a/reservations").param("date", DATE.toString()),
 						RESTAURANT_NOT_FOUND),
@@ -122,6 +143,10 @@ class OwnershipIT extends PostgresIT {
 		restaurant = givenRestaurant("plano-a", "owner-a");
 		shift = givenDinnerShift(restaurant);
 		reservation = givenReservation(restaurant, shift, givenTable(restaurant, "M2", 2), DATE, 2);
+	}
+
+	private String shiftPath() {
+		return "/api/v1/admin/restaurants/plano-a/shifts/" + shift.id();
 	}
 
 	private String reservationPath(String action) {
@@ -166,8 +191,12 @@ class OwnershipIT extends PostgresIT {
 		state.addAll(jdbc.sql("SELECT status || '/' || version FROM reservation ORDER BY id")
 			.query(String.class)
 			.list());
-		state.add("shifts=" + jdbc.sql("SELECT count(*) FROM shift").query(Integer.class).single());
-		state.add("closures=" + jdbc.sql("SELECT count(*) FROM closure").query(Integer.class).single());
+		state.addAll(jdbc.sql("SELECT id || '/' || name || '/' || start_time || '/' || end_time || '/' "
+				+ "|| array_to_string(days_of_week, ',') || '/' || coalesce(deleted_at::text, '-') FROM shift "
+				+ "ORDER BY id").query(String.class).list());
+		state.addAll(jdbc.sql("SELECT restaurant_id || '/' || date FROM closure ORDER BY id")
+			.query(String.class)
+			.list());
 		return state;
 	}
 

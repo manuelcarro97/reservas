@@ -94,6 +94,16 @@ class RestaurantPersistenceAdapter implements RestaurantRepositoryPort {
 	}
 
 	@Override
+	public List<LocalDate> closuresFrom(long restaurantId, LocalDate from) {
+		return closures.datesFrom(restaurantId, from);
+	}
+
+	@Override
+	public void removeClosure(long restaurantId, LocalDate date) {
+		closures.deleteByRestaurantIdAndDate(restaurantId, date);
+	}
+
+	@Override
 	public boolean isClosed(long restaurantId, LocalDate date) {
 		return closures.existsByRestaurantIdAndDate(restaurantId, date);
 	}

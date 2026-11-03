@@ -54,12 +54,17 @@ class ShiftEntity {
 		entity.name = shift.name();
 		entity.startTime = shift.start();
 		entity.endTime = shift.end();
-		entity.daysOfWeek = new short[shift.days().size()];
-		int index = 0;
-		for (DayOfWeek day : shift.days()) {
-			entity.daysOfWeek[index++] = (short) day.getValue();
-		}
+		entity.daysOfWeek = daysOf(shift.days());
 		return entity;
+	}
+
+	static short[] daysOf(Set<DayOfWeek> days) {
+		short[] values = new short[days.size()];
+		int index = 0;
+		for (DayOfWeek day : days) {
+			values[index++] = (short) day.getValue();
+		}
+		return values;
 	}
 
 	Shift toDomain() {
