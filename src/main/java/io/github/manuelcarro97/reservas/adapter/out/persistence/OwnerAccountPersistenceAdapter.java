@@ -32,6 +32,16 @@ class OwnerAccountPersistenceAdapter implements OwnerAccountRepositoryPort {
 	}
 
 	@Override
+	public boolean hasPendingLink(Instant now) {
+		return accounts.hasPendingLink(now);
+	}
+
+	@Override
+	public boolean hasPendingLink(String ownerUid, Instant now) {
+		return accounts.hasPendingLinkOf(ownerUid, now);
+	}
+
+	@Override
 	public void unlink(String ownerUid) {
 		accounts.unlink(ownerUid);
 	}

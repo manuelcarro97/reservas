@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import io.github.manuelcarro97.reservas.application.port.in.TelegramLinkUseCase;
+import io.github.manuelcarro97.reservas.application.port.in.TelegramStatus;
 import io.github.manuelcarro97.reservas.application.port.out.OwnerAccountRepositoryPort;
 import io.github.manuelcarro97.reservas.config.TelegramEnabled;
 import io.github.manuelcarro97.reservas.domain.exception.TelegramUnavailableException;
@@ -19,7 +20,7 @@ import io.github.manuelcarro97.reservas.domain.exception.TelegramUnavailableExce
 class TelegramLinkService implements TelegramLinkUseCase {
 
 	private static final Duration LINK_VALIDITY = Duration.ofMinutes(15);
-	private static final int TOKEN_LENGTH = 32;
+	private static final int TOKEN_LENGTH = LINK_TOKEN_LENGTH;
 	/** Alfabeto de URL sin codificar; es también el que Telegram admite en el parámetro de {@code ?start=}. */
 	private static final String TOKEN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -37,12 +38,19 @@ class TelegramLinkService implements TelegramLinkUseCase {
 		this.clock = clock;
 		// El mismo criterio que activa los beans de Telegram: token y nombre de bot.
 		this.available = TelegramEnabled.configured(botToken, botUsername);
-		this.botUsername = botUsername;
+		this.botUsername = TelegramEnabled.clean(botUsername);
 	}
 
 	@Override
 	public boolean available() {
 		return available;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public TelegramStatus status(String ownerUid) {
+		return new TelegramStatus(available, accounts.findChatId(ownerUid).isPresent(),
+				accounts.hasPendingLink(ownerUid, clock.instant()));
 	}
 
 	@Override
@@ -61,12 +69,19 @@ class TelegramLinkService implements TelegramLinkUseCase {
 
 	@Override
 	public boolean handleStart(long chatId, String token) {
-		if (!StringUtils.hasText(token)) {
+		// Lo que no tiene el formato de un enlace nuestro no puede existir: ni se consulta (y un 0x00, por ejemplo, haría
+		// fallar a la base de datos).
+		if (!TelegramLinkUseCase.isWellFormedLinkToken(token)) {
 			return false;
 		}
 		// Una sola sentencia: valida (existe, no ha caducado) y gasta el enlace a la vez. Caducado, usado e inexistente
 		// dan el mismo false.
 		return accounts.consumeLinkToken(token, chatId, clock.instant());
+	}
+
+	@Override
+	public boolean hasPendingLinks() {
+		return accounts.hasPendingLink(clock.instant());
 	}
 
 	private void requireAvailable() {

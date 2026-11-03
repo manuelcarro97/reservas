@@ -47,6 +47,39 @@ class TelegramEnabledTest {
 		assertThat(enabled(null, null)).isFalse();
 	}
 
+	/** Un salto de línea o espacios pegados al valor en el hosting no deben quitar Telegram. */
+	@Test
+	void surroundingWhitespaceIsIgnored() {
+		assertThat(enabled(TOKEN + "\n", "reservas_test_bot")).isTrue();
+		assertThat(enabled("  " + TOKEN + "\r\n", " reservas_test_bot\n")).isTrue();
+		assertThat(enabled("\n", "reservas_test_bot")).isFalse();
+		assertThat(enabled(TOKEN, "\n")).isFalse();
+	}
+
+	/** Un token con otro formato no tumba el arranque: Telegram queda desactivado. */
+	@Test
+	void tokenWithUnexpectedFormatDisablesTelegram() {
+		assertThat(enabled("no es un token", "reservas_test_bot")).isFalse();
+		assertThat(enabled("123456:TEST/FAKE", "reservas_test_bot")).isFalse();
+		assertThat(enabled("123456:TEST\nFAKE", "reservas_test_bot")).isFalse();
+		assertThat(enabled("123456:TÉST", "reservas_test_bot")).isFalse();
+	}
+
+	@Test
+	void warnsOnceForATokenWithUnexpectedFormatWithoutPrintingIt(CapturedOutput output) {
+		new TelegramConfigurationCheck("no es un token SECRETO", "reservas_test_bot");
+
+		assertThat(output.getAll()).containsOnlyOnce("TELEGRAM_BOT_TOKEN has an unexpected format");
+		assertThat(output.getAll()).doesNotContain("SECRETO").doesNotContain("reservas_test_bot");
+	}
+
+	@Test
+	void whitespaceOnlyValuesCountAsEmptyInTheStartupWarning(CapturedOutput output) {
+		new TelegramConfigurationCheck(TOKEN + "\n", " \n");
+
+		assertThat(output.getAll()).containsOnlyOnce("TELEGRAM_BOT_USERNAME is empty").doesNotContain(TOKEN);
+	}
+
 	@Test
 	void warnsOnceWhichVariableIsMissingWithoutPrintingValues(CapturedOutput output) {
 		new TelegramConfigurationCheck(TOKEN, "");

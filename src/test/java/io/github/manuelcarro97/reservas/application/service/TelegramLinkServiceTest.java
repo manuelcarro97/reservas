@@ -34,6 +34,29 @@ class TelegramLinkServiceTest {
 	}
 
 	@Test
+	void surroundingWhitespaceInTheConfigurationIsIgnored() {
+		TelegramLinkService padded = service(TOKEN + "\n", " reservas_test_bot\r\n");
+
+		assertThat(padded.available()).isTrue();
+		assertThat(padded.link("owner-a")).startsWith("https://t.me/reservas_test_bot?start=")
+			.doesNotContainAnyWhitespaces();
+		// Un token con formato raro no activa nada, y no lanza al construir el servicio.
+		assertThat(service("no es un token", "reservas_test_bot").available()).isFalse();
+	}
+
+	@Test
+	void malformedLinkTokensNeverReachTheAccounts() {
+		TelegramLinkService service = service(TOKEN, "reservas_test_bot");
+
+		assertThat(service.handleStart(1, "ab\u0000cd")).isFalse();
+		assertThat(service.handleStart(1, "corto")).isFalse();
+		assertThat(service.handleStart(1, "a".repeat(33))).isFalse();
+		assertThat(service.handleStart(1, "a".repeat(31) + "/")).isFalse();
+		assertThat(service.handleStart(1, null)).isFalse();
+		verifyNoInteractions(accounts);
+	}
+
+	@Test
 	void unavailableServiceNeverTouchesTheAccounts() {
 		TelegramLinkService unavailable = service("", "");
 

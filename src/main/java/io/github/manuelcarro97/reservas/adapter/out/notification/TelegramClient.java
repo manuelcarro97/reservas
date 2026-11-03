@@ -4,7 +4,6 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,8 +33,6 @@ public class TelegramClient {
 	/** Más que la espera larga de {@code getUpdates}, para que Telegram conteste antes de que venza. */
 	private static final Duration READ_TIMEOUT = Duration.ofSeconds(35);
 	private static final int LONG_POLL_SECONDS = 30;
-	/** Lo que usa un token de BotFather; se exige porque el token va dentro de la ruta de la URL. */
-	private static final Pattern TOKEN_FORMAT = Pattern.compile("[A-Za-z0-9:_-]+");
 
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	private record UpdatesResponse(boolean ok, List<Update> result) {
@@ -51,12 +48,14 @@ public class TelegramClient {
 
 	/** El constructor de los tests: reciben el {@code Builder} para enlazarlo a un servidor simulado. */
 	public TelegramClient(RestClient.Builder builder, String token) {
-		if (token == null || !TOKEN_FORMAT.matcher(token).matches()) {
+		// Sin espacios ni saltos de línea de alrededor, que un hosting puede pegar al valor.
+		String cleanToken = TelegramEnabled.clean(token);
+		if (!TelegramEnabled.isValidBotToken(cleanToken)) {
 			// Sin el valor: es un secreto.
 			throw new IllegalArgumentException("Telegram bot token is missing or has unexpected characters");
 		}
 		this.http = builder.baseUrl(API).build();
-		this.botPath = "/bot" + token;
+		this.botPath = "/bot" + cleanToken;
 	}
 
 	private static JdkClientHttpRequestFactory requestFactory() {

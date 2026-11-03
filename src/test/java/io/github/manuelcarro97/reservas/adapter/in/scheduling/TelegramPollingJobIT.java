@@ -64,6 +64,11 @@ class TelegramPollingJobIT extends PostgresIT {
 		return url.substring(url.indexOf("?start=") + "?start=".length());
 	}
 
+	/** El job solo consulta mientras haya algún enlace pendiente: otro dueño mantiene uno vivo mientras se prueba el resto. */
+	private void keepAnotherLinkPending() {
+		telegram.link("owner-b");
+	}
+
 	private Long chatOfOwnerA() {
 		return jdbc.sql("SELECT telegram_chat_id FROM owner_account WHERE uid = 'owner-a'")
 			.query(Long.class)
@@ -96,6 +101,7 @@ class TelegramPollingJobIT extends PostgresIT {
 	void expiredLinkRepliesInvalid() {
 		String token = newToken();
 		clock.set(MutableClock.START.plus(Duration.ofMinutes(15)));
+		keepAnotherLinkPending();
 
 		startWith(7, token);
 
@@ -107,6 +113,7 @@ class TelegramPollingJobIT extends PostgresIT {
 	void alreadyUsedLinkRepliesInvalid() {
 		String token = newToken();
 		telegram.handleStart(7, token);
+		keepAnotherLinkPending();
 
 		startWith(8, token);
 
@@ -114,8 +121,51 @@ class TelegramPollingJobIT extends PostgresIT {
 		assertThat(chatOfOwnerA()).isEqualTo(7L);
 	}
 
+	/** Con la base de datos real: un enlace con 0x00 (que Postgres rechaza) no bloquea al legítimo que va detrás. */
+	@Test
+	void malformedLinkDoesNotBlockTheLegitimateOneBehindIt() {
+		String token = newToken();
+		client.queue(new Update(UPDATE_IDS.incrementAndGet(),
+				new Update.Message(new Update.Chat(6), "/start ab\u0000cd")));
+		startWith(7, token);
+
+		Awaitility.await()
+			.atMost(Duration.ofSeconds(5))
+			.untilAsserted(() -> assertThat(client.sent()).containsExactly(new Sent(6, INVALID), new Sent(7, LINKED)));
+		assertThat(chatOfOwnerA()).isEqualTo(7L);
+	}
+
+	@Test
+	void withoutPendingLinksTelegramIsNotCalled() {
+		client.queue(new Update(UPDATE_IDS.incrementAndGet(),
+				new Update.Message(new Update.Chat(7), "/start no-existe-no-existe-no-existe-12")));
+
+		job.poll();
+
+		assertThat(client.requestedOffsets()).isEmpty();
+		assertThat(client.sent()).isEmpty();
+	}
+
+	@Test
+	void pendingLinkMakesTheJobCallTelegramAndExpiryStopsIt() {
+		newToken();
+
+		job.poll();
+		assertThat(client.requestedOffsets()).isNotEmpty();
+
+		// Caducado el enlace, deja de consultar. (Se avanza el reloj antes de vaciar el registro: el job programado
+		// también consulta mientras el enlace vale.)
+		clock.set(MutableClock.START.plus(Duration.ofMinutes(15)));
+		client.reset();
+		job.poll();
+
+		assertThat(client.requestedOffsets()).isEmpty();
+	}
+
 	@Test
 	void unknownLinkRepliesInvalid() {
+		keepAnotherLinkPending();
+
 		startWith(7, "no-existe-no-existe-no-existe-12");
 
 		awaitReply(7, INVALID);

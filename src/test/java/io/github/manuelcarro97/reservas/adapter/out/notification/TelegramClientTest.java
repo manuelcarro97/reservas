@@ -53,6 +53,27 @@ class TelegramClientTest {
 		server.verify();
 	}
 
+	/** Un salto de línea pegado al token en el hosting no cambia la URL ni rompe el cliente. */
+	@Test
+	void tokenWithSurroundingWhitespaceIsTrimmed() {
+		RestClient.Builder builder = RestClient.builder();
+		MockRestServiceServer padded = MockRestServiceServer.bindTo(builder).build();
+		TelegramClient paddedClient = new TelegramClient(builder, "  " + TOKEN + "\r\n");
+		padded.expect(requestTo(BASE + "/sendMessage"))
+			.andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
+
+		paddedClient.sendMessage(1, "hola");
+
+		padded.verify();
+	}
+
+	@Test
+	void tokenWithUnexpectedFormatIsRejectedWithoutPrintingIt() {
+		assertThatThrownBy(() -> new TelegramClient(RestClient.builder(), "no es/un token SECRETO"))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageNotContaining("SECRETO");
+	}
+
 	@Test
 	void getUpdatesParsesStartCommand() {
 		server.expect(requestTo(BASE + "/getUpdates?offset=7&timeout=30"))

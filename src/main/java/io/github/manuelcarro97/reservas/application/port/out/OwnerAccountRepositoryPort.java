@@ -19,6 +19,12 @@ public interface OwnerAccountRepositoryPort {
 	 */
 	boolean consumeLinkToken(String token, long chatId, Instant now);
 
+	/** Hay algún enlace sin usar que no ha caducado en {@code now} (de cualquier dueño). */
+	boolean hasPendingLink(Instant now);
+
+	/** Ese dueño tiene un enlace sin usar que no ha caducado en {@code now}. */
+	boolean hasPendingLink(String ownerUid, Instant now);
+
 	/** Borra el chat y el enlace pendiente del dueño. No falla si no tiene cuenta. */
 	void unlink(String ownerUid);
 

@@ -54,4 +54,18 @@ class AsyncConfigTest {
 		assertThat(droppedTaskRan).isFalse();
 	}
 
+	/** Un executor ya parado (cierre de la app) rechaza por eso, no por cola llena: el log no debe mentir. */
+	@Test
+	void shutDownExecutorSaysSoInsteadOfQueueFull(CapturedOutput output) {
+		ThreadPoolTaskExecutor executor = new AsyncConfig().notificationExecutor();
+		executor.initialize();
+		executor.shutdown();
+
+		assertThatCode(() -> executor.execute(() -> {
+		})).doesNotThrowAnyException();
+
+		assertThat(output.getAll()).contains("Owner notification executor is shut down, alert dropped")
+			.doesNotContain("queue is full");
+	}
+
 }

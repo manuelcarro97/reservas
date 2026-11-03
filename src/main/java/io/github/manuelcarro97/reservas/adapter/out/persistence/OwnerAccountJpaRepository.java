@@ -29,6 +29,21 @@ interface OwnerAccountJpaRepository extends JpaRepository<OwnerAccountEntity, St
 			""")
 	int consumeLinkToken(String token, long chatId, Instant now);
 
+	@Query(nativeQuery = true, value = """
+			SELECT EXISTS (
+				SELECT 1 FROM owner_account WHERE link_token IS NOT NULL AND link_token_expires_at > :now
+			)
+			""")
+	boolean hasPendingLink(Instant now);
+
+	@Query(nativeQuery = true, value = """
+			SELECT EXISTS (
+				SELECT 1 FROM owner_account
+				WHERE uid = :uid AND link_token IS NOT NULL AND link_token_expires_at > :now
+			)
+			""")
+	boolean hasPendingLinkOf(String uid, Instant now);
+
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query(nativeQuery = true, value = """
 			UPDATE owner_account

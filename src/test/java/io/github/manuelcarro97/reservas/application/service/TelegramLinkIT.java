@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -54,7 +55,8 @@ import io.github.manuelcarro97.reservas.support.PostgresIT;
 		"app.telegram.bot-username=reservas_test_bot" })
 class TelegramLinkIT extends PostgresIT {
 
-	private static final String LINK = "/api/v1/admin/telegram/link";
+	private static final String TELEGRAM = "/api/v1/admin/telegram";
+	private static final String LINK = TELEGRAM + "/link";
 	private static final String DATE = "2026-12-02";
 	private static final long WAIT_MS = 5000;
 
@@ -165,6 +167,100 @@ class TelegramLinkIT extends PostgresIT {
 		assertThat(jdbc.sql("SELECT link_token FROM owner_account WHERE uid = 'owner-a'")
 			.query(String.class)
 			.optional()).isEmpty();
+	}
+
+	private String statusOf(String ownerUid) throws Exception {
+		return mvc.perform(get(TELEGRAM).with(AuthRequests.owner(ownerUid)))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+	}
+
+	private void expectStatus(String ownerUid, boolean linked, boolean linkPending) throws Exception {
+		mvc.perform(get(TELEGRAM).with(AuthRequests.owner(ownerUid)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.available").value(true))
+			.andExpect(jsonPath("$.linked").value(linked))
+			.andExpect(jsonPath("$.linkPending").value(linkPending));
+	}
+
+	@Test
+	void statusFollowsTheLinkLifecycle() throws Exception {
+		expectStatus("owner-a", false, false);
+
+		String token = tokenOf(linkUrl("owner-a"));
+		expectStatus("owner-a", false, true);
+
+		telegram.handleStart(424242L, token);
+		expectStatus("owner-a", true, false);
+
+		// Vinculado y con un enlace nuevo pendiente a la vez.
+		String second = tokenOf(linkUrl("owner-a"));
+		expectStatus("owner-a", true, true);
+
+		// Un enlace caducado ya no está pendiente.
+		clock.set(MutableClock.START.plus(Duration.ofMinutes(15)));
+		expectStatus("owner-a", true, false);
+
+		mvc.perform(delete(LINK).with(AuthRequests.owner("owner-a"))).andExpect(status().isNoContent());
+		expectStatus("owner-a", false, false);
+		assertThat(second).isNotBlank();
+	}
+
+	@Test
+	void eachOwnerOnlySeesTheirOwnStatus() throws Exception {
+		telegram.handleStart(7, tokenOf(linkUrl("owner-a")));
+		linkUrl("owner-b");
+
+		expectStatus("owner-a", true, false);
+		expectStatus("owner-b", false, true);
+		expectStatus("owner-c", false, false);
+	}
+
+	@Test
+	void statusNeverExposesChatTokenOrOwner() throws Exception {
+		String token = tokenOf(linkUrl("owner-a"));
+		telegram.handleStart(424242L, token);
+		String pending = tokenOf(linkUrl("owner-a"));
+
+		String body = statusOf("owner-a");
+
+		assertThat(body).doesNotContain("424242").doesNotContain(token).doesNotContain(pending)
+			.doesNotContain("owner-a")
+			.doesNotContain("chat")
+			.doesNotContain("token");
+		assertThat(JsonPath.<java.util.Map<String, Object>>read(body, "$")).containsOnlyKeys("available", "linked",
+				"linkPending");
+	}
+
+	@Test
+	void statusRequiresAuthentication() throws Exception {
+		mvc.perform(get(TELEGRAM)).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void pendingLinksFollowTheLifecycleOfTheLink() throws Exception {
+		assertThat(telegram.hasPendingLinks()).isFalse();
+
+		String token = tokenOf(linkUrl("owner-a"));
+		assertThat(telegram.hasPendingLinks()).isTrue();
+
+		// Usado: ya no queda pendiente.
+		telegram.handleStart(7, token);
+		assertThat(telegram.hasPendingLinks()).isFalse();
+
+		// Sin usar pero caducado: tampoco.
+		linkUrl("owner-a");
+		assertThat(telegram.hasPendingLinks()).isTrue();
+		clock.set(MutableClock.START.plus(Duration.ofMinutes(15)));
+		assertThat(telegram.hasPendingLinks()).isFalse();
+
+		// Desvincular borra el pendiente.
+		clock.set(MutableClock.START);
+		assertThat(telegram.hasPendingLinks()).isTrue();
+		telegram.unlink("owner-a");
+		assertThat(telegram.hasPendingLinks()).isFalse();
 	}
 
 	@Test
