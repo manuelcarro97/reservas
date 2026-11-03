@@ -39,6 +39,9 @@ import io.github.manuelcarro97.reservas.support.PostgresIT;
  * Frontera de seguridad entre dueños: cada ruta de administración responde 2xx a su dueño y 404 con el código del
  * recurso a cualquier otro, sin tocar nada. Cada tarea que añada rutas de administración añade su fila a
  * {@link #routes()}.
+ * <p>
+ * Quedan fuera las rutas por dueño y no por plano ({@code GET /admin/me}, {@code DELETE /admin/account}, las de
+ * Telegram): no hay recurso ajeno que dé 404. Las cubren {@code AccountApiIT} y {@code TelegramLinkIT}.
  */
 @AutoConfigureMockMvc
 class OwnershipIT extends PostgresIT {
@@ -132,7 +135,10 @@ class OwnershipIT extends PostgresIT {
 						it -> {
 							it.manageReservation.confirm("owner-a", it.reservation.id());
 							it.clock.set(AFTER_DINNER_STARTS);
-						}));
+						}),
+				// Borrar el plano exige que no tenga reservas activas futuras: se cancela la del escenario.
+				new Route("DELETE plan", it -> delete("/api/v1/admin/restaurants/plano-a"), RESTAURANT_NOT_FOUND,
+						it -> it.manageReservation.cancel("owner-a", it.reservation.id())));
 	}
 
 	static Stream<Arguments> routeCases() {
@@ -208,7 +214,7 @@ class OwnershipIT extends PostgresIT {
 	private List<String> fingerprint() {
 		List<String> state = new java.util.ArrayList<>();
 		state.addAll(jdbc.sql("SELECT name || '/' || status || '/' || theme || '/' || cancellation_deadline_hours "
-				+ "FROM restaurant ORDER BY id").query(String.class).list());
+				+ "|| '/' || coalesce(deleted_at::text, '-') FROM restaurant ORDER BY id").query(String.class).list());
 		state.addAll(jdbc.sql("SELECT room_shape || '/' || room_width || '/' || room_height || '/' || room_cut_width "
 				+ "|| '/' || room_cut_depth || '/' || room_rotation FROM restaurant ORDER BY id")
 			.query(String.class)
@@ -218,7 +224,7 @@ class OwnershipIT extends PostgresIT {
 			.query(String.class)
 			.list());
 		state.addAll(jdbc.sql("SELECT status || '/' || version || '/' || coalesce(table_id::text, '-') "
-				+ "FROM reservation ORDER BY id")
+				+ "|| '/' || customer_name FROM reservation ORDER BY id")
 			.query(String.class)
 			.list());
 		state.addAll(jdbc.sql("SELECT id || '/' || name || '/' || start_time || '/' || end_time || '/' "

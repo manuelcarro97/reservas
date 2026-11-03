@@ -19,9 +19,10 @@ class TelegramLinkServiceTest {
 	private static final String TOKEN = "123456:TEST-FAKE-TOKEN";
 
 	private final OwnerAccountRepositoryPort accounts = mock(OwnerAccountRepositoryPort.class);
+	private final DemoAccount demoAccount = new DemoAccount();
 
 	private TelegramLinkService service(String botToken, String botUsername) {
-		return new TelegramLinkService(accounts, Clock.systemUTC(), botToken, botUsername);
+		return new TelegramLinkService(accounts, demoAccount, Clock.systemUTC(), botToken, botUsername);
 	}
 
 	@Test

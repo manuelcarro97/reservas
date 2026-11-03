@@ -4,6 +4,9 @@ server:
 app:
   firebase:
     project-id: ${FIREBASE_PROJECT_ID:reservas-6d51b}
+    # Solo por variable de entorno, nunca en el repo. Sin ella, borrar una cuenta no borra su usuario de Firebase
+    # (solo queda en el log).
+    service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
   telegram:

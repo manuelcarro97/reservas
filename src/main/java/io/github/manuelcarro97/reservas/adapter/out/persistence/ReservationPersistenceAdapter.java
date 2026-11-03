@@ -45,6 +45,13 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 			  AND (r.reservation_date + s.start_time) AT TIME ZONE rest.zone_id <= :now
 			""";
 
+	// version + 1: el @Version protege assignTable, y una entidad leída antes no puede pisar los datos ya anonimizados.
+	private static final String ANONYMIZE_RESTAURANT = """
+			UPDATE reservation
+			SET customer_name = 'Anonimizado', customer_phone = '-', customer_email = NULL, version = version + 1
+			WHERE restaurant_id = :restaurantId
+			""";
+
 	private final ReservationJpaRepository reservations;
 	private final JdbcClient jdbc;
 
@@ -145,6 +152,11 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 	@Override
 	public int cancelPendingStartedBefore(Instant now) {
 		return jdbc.sql(CANCEL_EXPIRED_PENDING).param("now", Timestamp.from(now)).update();
+	}
+
+	@Override
+	public int anonymizeRestaurant(long restaurantId) {
+		return jdbc.sql(ANONYMIZE_RESTAURANT).param("restaurantId", restaurantId).update();
 	}
 
 	@Override

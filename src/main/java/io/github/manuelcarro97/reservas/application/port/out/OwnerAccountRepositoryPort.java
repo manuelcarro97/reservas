@@ -28,4 +28,7 @@ public interface OwnerAccountRepositoryPort {
 	/** Borra el chat y el enlace pendiente del dueño. No falla si no tiene cuenta. */
 	void unlink(String ownerUid);
 
+	/** Borra la cuenta del dueño entera (chat y enlace incluidos). No falla si no tiene cuenta. */
+	void delete(String ownerUid);
+
 }

@@ -14,4 +14,9 @@ public final class AuthRequests {
 		return jwt().jwt(token -> token.subject(uid));
 	}
 
+	/** Como {@link #owner(String)}, con el claim {@code email} que Firebase añade al token. */
+	public static RequestPostProcessor owner(String uid, String email) {
+		return jwt().jwt(token -> token.subject(uid).claim("email", email));
+	}
+
 }

@@ -1,5 +1,6 @@
 package io.github.manuelcarro97.reservas.application.port.out;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -31,6 +32,12 @@ public interface RestaurantRepositoryPort {
 	void lockOwner(String ownerUid);
 
 	Restaurant save(Restaurant restaurant);
+
+	/**
+	 * Borrado lógico del plano con un UPDATE dirigido: desaparece de las consultas y su slug sigue ocupado para siempre.
+	 * Si ya estaba borrado no hace nada.
+	 */
+	void softDelete(long id, Instant at);
 
 	void addClosure(long restaurantId, LocalDate date, String reason);
 

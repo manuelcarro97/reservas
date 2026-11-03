@@ -1,5 +1,6 @@
 package io.github.manuelcarro97.reservas.adapter.out.persistence;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -81,6 +82,11 @@ class RestaurantPersistenceAdapter implements RestaurantRepositoryPort {
 		catch (DataIntegrityViolationException slugTaken) {
 			throw new AlreadyExistsException();
 		}
+	}
+
+	@Override
+	public void softDelete(long id, Instant at) {
+		restaurants.softDelete(id, at);
 	}
 
 	@Override

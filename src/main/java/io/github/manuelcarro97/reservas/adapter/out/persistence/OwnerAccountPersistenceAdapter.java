@@ -46,4 +46,9 @@ class OwnerAccountPersistenceAdapter implements OwnerAccountRepositoryPort {
 		accounts.unlink(ownerUid);
 	}
 
+	@Override
+	public void delete(String ownerUid) {
+		accounts.deleteAccount(ownerUid);
+	}
+
 }

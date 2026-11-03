@@ -39,8 +39,10 @@ import io.github.manuelcarro97.reservas.domain.model.Theme;
 @SpringBootTest
 @Import({ TestcontainersConfiguration.class, TestClockConfiguration.class })
 // Sin bot de Telegram salvo que el test lo ponga: una TELEGRAM_BOT_TOKEN del entorno de quien corre los tests no debe
-// cambiar los beans (avisos por log, sin job de consulta).
-@TestPropertySource(properties = { "app.telegram.bot-token=", "app.telegram.bot-username=" })
+// cambiar los beans (avisos por log, sin job de consulta). Igual con la cuenta de servicio de Firebase: nunca se llama
+// a Firebase real desde los tests.
+@TestPropertySource(properties = { "app.telegram.bot-token=", "app.telegram.bot-username=",
+		"app.firebase.service-account-json=" })
 public abstract class PostgresIT {
 
 	@Autowired

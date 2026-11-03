@@ -52,4 +52,8 @@ interface OwnerAccountJpaRepository extends JpaRepository<OwnerAccountEntity, St
 			""")
 	int unlink(String uid);
 
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query(nativeQuery = true, value = "DELETE FROM owner_account WHERE uid = :uid")
+	int deleteAccount(String uid);
+
 }

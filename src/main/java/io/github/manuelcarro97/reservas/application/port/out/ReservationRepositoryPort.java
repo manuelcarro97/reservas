@@ -42,6 +42,13 @@ public interface ReservationRepositoryPort {
 
 	int cancelPendingStartedBefore(Instant now);
 
+	/**
+	 * Anonimiza los datos del cliente de todas las reservas del plano (nombre "Anonimizado", teléfono "-", sin email) y
+	 * sube su versión, para que una actualización concurrente con la versión vieja falle. Devuelve cuántas cambió. No
+	 * mira el estado: quien llama decide si hay reservas activas que respetar.
+	 */
+	int anonymizeRestaurant(long restaurantId);
+
 	Set<Long> occupiedTableIds(long restaurantId, long shiftId, LocalDate date);
 
 }

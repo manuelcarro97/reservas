@@ -13,6 +13,7 @@ import io.github.manuelcarro97.reservas.application.port.in.TelegramLinkUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.TelegramStatus;
 import io.github.manuelcarro97.reservas.application.port.out.OwnerAccountRepositoryPort;
 import io.github.manuelcarro97.reservas.config.TelegramEnabled;
+import io.github.manuelcarro97.reservas.domain.exception.DemoReadOnlyException;
 import io.github.manuelcarro97.reservas.domain.exception.TelegramUnavailableException;
 
 @Service
@@ -25,16 +26,18 @@ class TelegramLinkService implements TelegramLinkUseCase {
 	private static final String TOKEN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 	private final OwnerAccountRepositoryPort accounts;
+	private final DemoAccount demoAccount;
 	private final Clock clock;
 	private final boolean available;
 	private final String botUsername;
 	private final SecureRandom random = new SecureRandom();
 
 	/** El token del bot solo se mira para saber si hay bot; este servicio no lo guarda. */
-	TelegramLinkService(OwnerAccountRepositoryPort accounts, Clock clock,
+	TelegramLinkService(OwnerAccountRepositoryPort accounts, DemoAccount demoAccount, Clock clock,
 			@Value("${app.telegram.bot-token:}") String botToken,
 			@Value("${app.telegram.bot-username:}") String botUsername) {
 		this.accounts = accounts;
+		this.demoAccount = demoAccount;
 		this.clock = clock;
 		// El mismo criterio que activa los beans de Telegram: token y nombre de bot.
 		this.available = TelegramEnabled.configured(botToken, botUsername);
@@ -55,6 +58,10 @@ class TelegramLinkService implements TelegramLinkUseCase {
 
 	@Override
 	public String link(String ownerUid) {
+		// Antes que el bot: a la demo se le niega aunque no haya bot configurado.
+		if (demoAccount.isDemo(ownerUid)) {
+			throw new DemoReadOnlyException();
+		}
 		requireAvailable();
 		String token = newToken();
 		accounts.saveLinkToken(ownerUid, token, clock.instant().plus(LINK_VALIDITY));
