@@ -2,7 +2,9 @@ package io.github.manuelcarro97.reservas.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -32,6 +34,7 @@ import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUse
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
+import io.github.manuelcarro97.reservas.support.AuthRequests;
 import io.github.manuelcarro97.reservas.support.PostgresIT;
 
 @AutoConfigureMockMvc
@@ -61,7 +64,7 @@ class AdminApiIT extends PostgresIT {
 	}
 
 	private ResultActions asAdmin(MockHttpServletRequestBuilder request) throws Exception {
-		return mvc.perform(request.header(HttpHeaders.AUTHORIZATION, basic("test-password")));
+		return mvc.perform(request.with(AuthRequests.owner("owner-a")));
 	}
 
 	private ResultActions adminPost(String path, String json) throws Exception {
@@ -78,16 +81,31 @@ class AdminApiIT extends PostgresIT {
 	}
 
 	@Test
-	void adminEndpointWithoutCredentialsReturns401() throws Exception {
+	void adminWithoutTokenReturns401() throws Exception {
 		mvc.perform(get("/api/v1/admin/restaurants/demo/reservations").param("date", DATE.toString()))
 			.andExpect(status().isUnauthorized());
 	}
 
 	@Test
-	void wrongPasswordReturns401() throws Exception {
+	void adminWithBasicAuthReturns401() throws Exception {
 		mvc.perform(get("/api/v1/admin/restaurants/demo/reservations").param("date", DATE.toString())
-			.header(HttpHeaders.AUTHORIZATION, basic("mala")))
+			.header(HttpHeaders.AUTHORIZATION, basic("test-password")))
 			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void corsAllowsConfiguredOrigin() throws Exception {
+		mvc.perform(options("/api/v1/admin/restaurants").header(HttpHeaders.ORIGIN, "http://localhost:4200")
+			.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+			.andExpect(status().isOk())
+			.andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:4200"));
+	}
+
+	@Test
+	void corsRejectsOtherOrigin() throws Exception {
+		mvc.perform(options("/api/v1/admin/restaurants").header(HttpHeaders.ORIGIN, "https://evil.example")
+			.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+			.andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
 	}
 
 	@Test

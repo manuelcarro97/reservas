@@ -15,7 +15,7 @@ import io.github.manuelcarro97.reservas.application.port.in.ShiftAvailability;
 import io.github.manuelcarro97.reservas.support.TestcontainersConfiguration;
 
 // No hereda de PostgresIT: su limpieza entre tests borraría los datos de demo.
-@SpringBootTest(properties = { "ADMIN_USERNAME=admin", "ADMIN_PASSWORD=test-password" })
+@SpringBootTest
 @Import(TestcontainersConfiguration.class)
 @ActiveProfiles("demo")
 class DemoProfileIT {

@@ -23,7 +23,7 @@ class OpenApiIT extends PostgresIT {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.paths['/api/v1/restaurants/{slug}/reservations']").exists())
 			.andExpect(jsonPath("$.paths['/api/v1/admin/reservations/{id}/confirm']").exists())
-			.andExpect(jsonPath("$.components.securitySchemes.basicAuth.scheme").value("basic"));
+			.andExpect(jsonPath("$.components.securitySchemes.firebase.scheme").value("bearer"));
 	}
 
 }

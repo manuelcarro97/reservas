@@ -19,7 +19,7 @@ import io.github.manuelcarro97.reservas.application.port.in.ReservationDetails;
 
 @RestController
 @RequestMapping("/api/v1/admin")
-@SecurityRequirement(name = "basicAuth")
+@SecurityRequirement(name = "firebase")
 class AdminReservationController {
 
 	private final ManageReservationUseCase manageReservation;

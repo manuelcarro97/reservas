@@ -19,7 +19,7 @@ import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
 
-@SpringBootTest(properties = { "ADMIN_USERNAME=admin", "ADMIN_PASSWORD=test-password" })
+@SpringBootTest
 @Import({ TestcontainersConfiguration.class, TestClockConfiguration.class })
 public abstract class PostgresIT {
 

@@ -26,7 +26,7 @@ import io.github.manuelcarro97.reservas.domain.model.Shift;
 
 @RestController
 @RequestMapping("/api/v1/admin/restaurants")
-@SecurityRequirement(name = "basicAuth")
+@SecurityRequirement(name = "firebase")
 class AdminRestaurantController {
 
 	private final ManageRestaurantUseCase manageRestaurant;
