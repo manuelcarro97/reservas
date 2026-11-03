@@ -70,9 +70,11 @@ class ReservationEvents {
 			notifications.notifyOwner(alert.ownerUid(), alert.text());
 		}
 		catch (RuntimeException failure) {
-			// Solo la clase: el mensaje de un canal externo puede traer URLs con credenciales.
-			log.warn("Owner notification failed: {}", failure.getClass().getName());
-			log.debug("Owner notification failure detail", failure);
+			// Nunca el mensaje ni la traza completa: el de un canal externo puede traer URLs con credenciales.
+			// Clase y primer frame bastan para saber dónde falló.
+			StackTraceElement[] frames = failure.getStackTrace();
+			log.warn("Owner notification failed: {} at {}", failure.getClass().getName(),
+					frames.length > 0 ? frames[0] : "unknown");
 		}
 	}
 

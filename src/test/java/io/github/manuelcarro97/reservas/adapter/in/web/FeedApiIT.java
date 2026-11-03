@@ -285,16 +285,22 @@ class FeedApiIT extends PostgresIT {
 
 		book("demo", shift, table).andExpect(status().isCreated());
 
+		// Se intentó el aviso (si el listener no se invocara, el test no probaría nada).
+		verify(notifications).notifyOwner(any(), any());
 		assertThat(jdbc.sql("SELECT count(*) FROM reservation").query(Long.class).single()).isEqualTo(1L);
 	}
 
 	@Test
 	void failedNotificationDoesNotBreakCancellation() throws Exception {
 		String code = bookAndGetCode();
+		org.mockito.Mockito.clearInvocations(notifications);
 		doThrow(new IllegalStateException("telegram caído")).when(notifications).notifyOwner(any(), any());
 
 		mvc.perform(post("/api/v1/reservations/" + code + "/cancel")).andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("CANCELLED"));
+
+		// Se intentó el aviso de cancelación (el de la reserva ya se descartó arriba).
+		verify(notifications).notifyOwner(any(), any());
 	}
 
 }
