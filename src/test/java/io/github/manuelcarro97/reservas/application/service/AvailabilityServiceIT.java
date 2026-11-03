@@ -18,9 +18,11 @@ import io.github.manuelcarro97.reservas.application.port.in.GetAvailabilityUseCa
 import io.github.manuelcarro97.reservas.application.port.in.GetOccupancyUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ShiftAvailability;
 import io.github.manuelcarro97.reservas.application.port.in.TableOccupancy;
+import io.github.manuelcarro97.reservas.domain.model.BookingMode;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
+import io.github.manuelcarro97.reservas.domain.model.Theme;
 import io.github.manuelcarro97.reservas.support.PostgresIT;
 
 class AvailabilityServiceIT extends PostgresIT {
@@ -110,6 +112,37 @@ class AvailabilityServiceIT extends PostgresIT {
 		assertThat(result).extracting(TableOccupancy::tableId, TableOccupancy::occupied).containsExactly(
 				org.assertj.core.groups.Tuple.tuple(table.id(), true),
 				org.assertj.core.groups.Tuple.tuple(free.id(), false));
+	}
+
+	@Test
+	void assignedModeCountsReservationsWithoutTable() {
+		restaurants.save(restaurant.withSettings(restaurant.name(), Theme.AZUL, BookingMode.ASSIGNED, 2));
+		givenReservation(restaurant, dinner, null, WEDNESDAY, 2);
+
+		// La única mesa de 2 ya la necesita la reserva sin mesa.
+		assertThat(availability.availability("demo", WEDNESDAY, 2)).extracting(ShiftAvailability::available)
+				.containsExactly(false);
+	}
+
+	@Test
+	void assignedModeStaysAvailableWhileEveryGroupFits() {
+		restaurants.save(restaurant.withSettings(restaurant.name(), Theme.AZUL, BookingMode.ASSIGNED, 2));
+		givenTable(restaurant, "M4", 4);
+		givenReservation(restaurant, dinner, null, WEDNESDAY, 4);
+
+		assertThat(availability.availability("demo", WEDNESDAY, 2)).extracting(ShiftAvailability::available)
+				.containsExactly(true);
+		assertThat(availability.availability("demo", WEDNESDAY, 4)).extracting(ShiftAvailability::available)
+				.containsExactly(false);
+	}
+
+	@Test
+	void freeChoiceAlsoCountsLeftoverReservationsWithoutTable() {
+		givenReservation(restaurant, dinner, null, WEDNESDAY, 2);
+
+		assertThat(restaurant.bookingMode()).isEqualTo(BookingMode.FREE_CHOICE);
+		assertThat(availability.availability("demo", WEDNESDAY, 2)).extracting(ShiftAvailability::available)
+				.containsExactly(false);
 	}
 
 }

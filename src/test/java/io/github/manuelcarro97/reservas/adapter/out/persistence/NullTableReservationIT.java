@@ -65,6 +65,20 @@ class NullTableReservationIT extends PostgresIT {
 	}
 
 	@Test
+	void findActiveForReturnsActiveReservationsOfTheSlotWithAndWithoutTable() {
+		Reservation withTable = givenReservation(restaurant, dinner, first, tomorrow, 2);
+		Reservation cancelled = givenReservation(restaurant, dinner, second, tomorrow, 2);
+		cancelled.cancel();
+		reservations.update(cancelled);
+		givenReservation(restaurant, dinner, second, tomorrow.plusDays(1), 2);
+
+		assertThat(reservations.findActiveFor(restaurant.id(), dinner.id(), tomorrow))
+			.extracting(Reservation::code, Reservation::tableId)
+			.containsExactly(org.assertj.core.groups.Tuple.tuple(NULL_TABLE_CODE, null),
+					org.assertj.core.groups.Tuple.tuple(withTable.code(), first.id()));
+	}
+
+	@Test
 	void detailsOfReservationWithoutTable() {
 		assertThat(getReservation.byCode(NULL_TABLE_CODE).tableLabel()).isNull();
 	}
