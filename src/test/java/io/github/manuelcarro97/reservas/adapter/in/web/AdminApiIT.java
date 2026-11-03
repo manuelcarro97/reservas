@@ -29,8 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
-import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
+import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
@@ -46,17 +45,15 @@ class AdminApiIT extends PostgresIT {
 	@Autowired
 	private MockMvc mvc;
 
-	@Autowired
-	private CreateReservationUseCase createReservation;
-
 	private Restaurant restaurant;
 	private Shift shift;
+	private DiningTable table;
 
 	@BeforeEach
 	void seed() {
 		restaurant = givenRestaurant("demo");
 		shift = givenDinnerShift(restaurant);
-		givenTable(restaurant, "M2", 2);
+		table = givenTable(restaurant, "M2", 2);
 	}
 
 	private static String basic(String password) {
@@ -72,8 +69,7 @@ class AdminApiIT extends PostgresIT {
 	}
 
 	private Reservation givenReservation() {
-		return createReservation.create("demo",
-				new CreateReservationCommand(DATE, shift.id(), 2, "Ana", "600000000", null));
+		return givenReservation(restaurant, shift, table, DATE, 2);
 	}
 
 	private String reservationPath(Reservation reservation, String action) {

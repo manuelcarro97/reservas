@@ -9,10 +9,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
-import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ExpirePendingReservationsUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ManageReservationUseCase;
+import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
@@ -28,24 +27,22 @@ class ExpirePendingReservationsIT extends PostgresIT {
 	private ExpirePendingReservationsUseCase expirePending;
 
 	@Autowired
-	private CreateReservationUseCase createReservation;
-
-	@Autowired
 	private ManageReservationUseCase manageReservation;
 
+	private Restaurant restaurant;
 	private Shift shift;
+	private DiningTable table;
 
 	@BeforeEach
 	void seed() {
-		Restaurant restaurant = givenRestaurant("demo");
+		restaurant = givenRestaurant("demo");
 		shift = givenDinnerShift(restaurant);
-		givenTable(restaurant, "M1", 2);
+		table = givenTable(restaurant, "M1", 2);
 		givenTable(restaurant, "M2", 2);
 	}
 
 	private Reservation reserve() {
-		return createReservation.create("demo",
-				new CreateReservationCommand(DATE, shift.id(), 2, "Ana", "600000000", null));
+		return givenReservation(restaurant, shift, table, DATE, 2);
 	}
 
 	private String statusOf(Reservation reservation) {

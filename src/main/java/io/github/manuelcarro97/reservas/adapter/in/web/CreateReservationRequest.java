@@ -14,10 +14,12 @@ import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCom
 record CreateReservationRequest(@NotNull LocalDate date, @NotNull Long shiftId, @Min(1) int partySize,
 		@NotBlank @Size(max = 100) @Pattern(regexp = TextRules.NO_NUL) String customerName,
 		@NotBlank @Size(max = 30) @Pattern(regexp = TextRules.NO_NUL) String customerPhone,
-		@Email @Size(max = 254) @Pattern(regexp = TextRules.NO_NUL) String customerEmail) {
+		@Email @Size(max = 254) @Pattern(regexp = TextRules.NO_NUL) String customerEmail,
+		Long tableId) {
 
 	CreateReservationCommand toCommand() {
-		return new CreateReservationCommand(date, shiftId, partySize, customerName, customerPhone, customerEmail);
+		return new CreateReservationCommand(date, shiftId, partySize, customerName, customerPhone, customerEmail,
+				tableId);
 	}
 
 }

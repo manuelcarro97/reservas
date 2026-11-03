@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
+import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
 import io.github.manuelcarro97.reservas.support.PostgresIT;
@@ -33,18 +34,19 @@ class PublicApiIT extends PostgresIT {
 	private MockMvc mvc;
 
 	private Shift shift;
+	private DiningTable table;
 
 	@BeforeEach
 	void seed() {
 		Restaurant restaurant = givenRestaurant("demo");
 		shift = givenDinnerShift(restaurant);
-		givenTable(restaurant, "M2", 2);
+		table = givenTable(restaurant, "M2", 2);
 	}
 
 	private String body(int partySize) {
 		return """
-				{"date":"%s","shiftId":%d,"partySize":%d,"customerName":"Ana","customerPhone":"600000000"}
-				""".formatted(DATE, shift.id(), partySize);
+				{"date":"%s","shiftId":%d,"partySize":%d,"customerName":"Ana","customerPhone":"600000000","tableId":%d}
+				""".formatted(DATE, shift.id(), partySize, table.id());
 	}
 
 	private ResultActions postReservation(String json) throws Exception {
@@ -187,11 +189,27 @@ class PublicApiIT extends PostgresIT {
 	}
 
 	@Test
-	void noTableReturns409NoTableAvailable() throws Exception {
+	void takenTableReturns409TableTaken() throws Exception {
 		createReservation();
 
 		postReservation(body(2)).andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("NO_TABLE_AVAILABLE"));
+			.andExpect(jsonPath("$.code").value("TABLE_TAKEN"));
+	}
+
+	@Test
+	void missingTableInFreeChoiceReturns422TableRequired() throws Exception {
+		postReservation("""
+				{"date":"%s","shiftId":%d,"partySize":2,"customerName":"Ana","customerPhone":"600000000"}
+				""".formatted(DATE, shift.id()))
+			.andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.code").value("TABLE_REQUIRED"));
+	}
+
+	@Test
+	void unknownTableReturns404TableNotFound() throws Exception {
+		postReservation(body(2).replace("\"tableId\":" + table.id(), "\"tableId\":999999"))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("TABLE_NOT_FOUND"));
 	}
 
 	@Test

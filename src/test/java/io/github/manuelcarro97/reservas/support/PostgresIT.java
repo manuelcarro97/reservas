@@ -71,6 +71,12 @@ public abstract class PostgresIT {
 				PlanStatus.PUBLISHED, RoomLayout.defaultRoom(), Theme.AZUL, BookingMode.FREE_CHOICE));
 	}
 
+	/** Deja el plano en el modo indicado; devuelve el plano guardado. */
+	protected Restaurant givenBookingMode(Restaurant restaurant, BookingMode mode) {
+		return restaurants.save(restaurant.withSettings(restaurant.name(), restaurant.theme(), mode,
+				restaurant.cancellationDeadlineHours()));
+	}
+
 	/** Mesa cuadrada sin giro; la n-ésima del restaurante cae en la rejilla de 1200x800 sin solaparse con las demás. */
 	protected DiningTable givenTable(Restaurant restaurant, String label, int seats) {
 		int n = jdbc.sql("SELECT count(*) FROM dining_table WHERE restaurant_id = :restaurantId")
@@ -85,7 +91,7 @@ public abstract class PostgresIT {
 	protected Reservation givenReservation(Restaurant restaurant, Shift shift, DiningTable table, LocalDate date,
 			int party) {
 		Long tableId = table == null ? null : table.id();
-		String code = ReservationCode.generate();
+		String code = ReservationCode.generate(restaurant.slug());
 		return reservations
 			.tryInsert(Reservation.newPending(code, restaurant.id(), shift.id(), tableId, date, party, "Ana",
 					"600000000", null, clock.instant()))

@@ -17,7 +17,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
+import io.github.manuelcarro97.reservas.domain.exception.DomainException;
 import io.github.manuelcarro97.reservas.domain.exception.NoTableAvailableException;
+import io.github.manuelcarro97.reservas.domain.exception.TableTakenException;
+import io.github.manuelcarro97.reservas.domain.model.BookingMode;
+import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
@@ -31,33 +35,40 @@ class OverbookingConcurrencyIT extends PostgresIT {
 	@Autowired
 	private CreateReservationUseCase createReservation;
 
-	private List<Reservation> reserveInParallel(long shiftId) throws InterruptedException, ExecutionException {
+	/** Resultado de cada intento: la reserva creada o el error de dominio que lo rechazó. */
+	private record Attempt(Reservation created, DomainException rejected) {
+	}
+
+	private List<Attempt> reserveInParallel(long shiftId, Long tableId, int partySize)
+			throws InterruptedException, ExecutionException {
 		CountDownLatch start = new CountDownLatch(1);
-		Callable<Reservation> attempt = () -> {
+		Callable<Attempt> attempt = () -> {
 			start.await();
 			try {
-				return createReservation.create("demo",
-						new CreateReservationCommand(DATE, shiftId, 2, "Ana", "600000000", null));
+				return new Attempt(createReservation.create("demo",
+						new CreateReservationCommand(DATE, shiftId, partySize, "Ana", "600000000", null, tableId)),
+						null);
 			}
-			catch (NoTableAvailableException noTable) {
-				return null;
+			catch (TableTakenException | NoTableAvailableException rejected) {
+				return new Attempt(null, rejected);
 			}
 		};
 		try (ExecutorService executor = Executors.newFixedThreadPool(THREADS)) {
-			List<Future<Reservation>> futures = new ArrayList<>();
+			List<Future<Attempt>> futures = new ArrayList<>();
 			for (int i = 0; i < THREADS; i++) {
 				futures.add(executor.submit(attempt));
 			}
 			start.countDown();
-			List<Reservation> created = new ArrayList<>();
-			for (Future<Reservation> future : futures) {
-				Reservation reservation = future.get();
-				if (reservation != null) {
-					created.add(reservation);
-				}
+			List<Attempt> attempts = new ArrayList<>();
+			for (Future<Attempt> future : futures) {
+				attempts.add(future.get());
 			}
-			return created;
+			return attempts;
 		}
+	}
+
+	private static List<Reservation> created(List<Attempt> attempts) {
+		return attempts.stream().map(Attempt::created).filter(java.util.Objects::nonNull).toList();
 	}
 
 	private long activeRows() {
@@ -67,28 +78,48 @@ class OverbookingConcurrencyIT extends PostgresIT {
 	}
 
 	@Test
-	void onlyOneWinsLastTable() throws Exception {
+	void onlyOneWinsChosenTable() throws Exception {
 		Restaurant restaurant = givenRestaurant("demo");
 		Shift shift = givenDinnerShift(restaurant);
-		givenTable(restaurant, "M1", 2);
+		DiningTable table = givenTable(restaurant, "M1", 2);
 
-		assertThat(reserveInParallel(shift.id())).hasSize(1);
+		List<Attempt> attempts = reserveInParallel(shift.id(), table.id(), 2);
+
+		assertThat(created(attempts)).hasSize(1);
+		assertThat(attempts).filteredOn(attempt -> attempt.rejected() != null)
+			.hasSize(THREADS - 1)
+			.allSatisfy(attempt -> assertThat(attempt.rejected()).isInstanceOf(TableTakenException.class));
 		assertThat(activeRows()).isEqualTo(1);
 	}
 
 	@Test
-	void neverExceedsTableCount() throws Exception {
+	void assignedModeNeverExceedsCapacity() throws Exception {
+		Restaurant restaurant = givenBookingMode(givenRestaurant("demo"), BookingMode.ASSIGNED);
+		Shift shift = givenDinnerShift(restaurant);
+		givenTable(restaurant, "M1", 4);
+		givenTable(restaurant, "M2", 4);
+		givenTable(restaurant, "M3", 4);
+
+		List<Attempt> attempts = reserveInParallel(shift.id(), null, 4);
+
+		assertThat(created(attempts)).hasSize(3);
+		assertThat(attempts).filteredOn(attempt -> attempt.rejected() != null)
+			.hasSize(THREADS - 3)
+			.allSatisfy(attempt -> assertThat(attempt.rejected()).isInstanceOf(NoTableAvailableException.class));
+		assertThat(activeRows()).isEqualTo(3);
+	}
+
+	@Test
+	void indexStillRejectsDuplicateActiveSlot() {
 		Restaurant restaurant = givenRestaurant("demo");
 		Shift shift = givenDinnerShift(restaurant);
-		givenTable(restaurant, "M1", 2);
-		givenTable(restaurant, "M2", 2);
-		givenTable(restaurant, "M3", 2);
+		DiningTable table = givenTable(restaurant, "M1", 2);
+		givenReservation(restaurant, shift, table, DATE, 2);
 
-		List<Reservation> created = reserveInParallel(shift.id());
-
-		assertThat(created).hasSize(3);
-		assertThat(created).extracting(Reservation::tableId).doesNotHaveDuplicates();
-		assertThat(activeRows()).isEqualTo(3);
+		// Sin pasar por el servicio ni por el bloqueo: solo el índice parcial único impide el duplicado.
+		assertThat(reservations.tryInsert(Reservation.newPending("DEMO-DUPLICADA0001", restaurant.id(), shift.id(),
+				table.id(), DATE, 2, "Ana", "600000000", null, clock.instant()))).isEmpty();
+		assertThat(activeRows()).isEqualTo(1);
 	}
 
 }

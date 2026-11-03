@@ -11,14 +11,14 @@ import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.support.TransactionTemplate;
 
+import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
+import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ManagePlanUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.TableChange;
 import io.github.manuelcarro97.reservas.domain.exception.TableHasReservationsException;
+import io.github.manuelcarro97.reservas.domain.exception.TableNotFoundException;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
-import io.github.manuelcarro97.reservas.domain.model.Reservation;
-import io.github.manuelcarro97.reservas.domain.model.ReservationCode;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
 import io.github.manuelcarro97.reservas.support.PostgresIT;
@@ -36,7 +36,7 @@ class LayoutSaveConcurrencyIT extends PostgresIT {
 	private ManagePlanUseCase managePlan;
 
 	@Autowired
-	private TransactionTemplate transaction;
+	private CreateReservationUseCase createReservation;
 
 	@Test
 	void removingATableAndBookingItNeverLeavesAnActiveReservationOnADeletedTable() throws Exception {
@@ -62,7 +62,7 @@ class LayoutSaveConcurrencyIT extends PostgresIT {
 				});
 				Future<Boolean> booking = executor.submit(() -> {
 					start.await();
-					return transaction.execute(status -> book(plan, shift, first));
+					return book(plan, shift, first);
 				});
 				start.countDown();
 
@@ -86,16 +86,16 @@ class LayoutSaveConcurrencyIT extends PostgresIT {
 				table.y());
 	}
 
-	/** Lo que hará la creación de reserva con mesa elegida: bloquear el plano y comprobar que la mesa sigue viva. */
+	/** Reserva real con mesa elegida; falla con TABLE_NOT_FOUND si el guardado del plano ya quitó la mesa. */
 	private boolean book(Restaurant plan, Shift shift, DiningTable table) {
-		restaurants.lock(plan.id());
-		boolean alive = tables.findAll(plan.id()).stream().anyMatch(candidate -> candidate.id().equals(table.id()));
-		if (!alive) {
+		try {
+			createReservation.create(plan.slug(),
+					new CreateReservationCommand(DATE, shift.id(), 2, "Ana", "600000000", null, table.id()));
+			return true;
+		}
+		catch (TableNotFoundException saveWon) {
 			return false;
 		}
-		Reservation reservation = Reservation.newPending(ReservationCode.generate(), plan.id(), shift.id(),
-				table.id(), DATE, 2, "Ana", "600000000", null, clock.instant());
-		return reservations.tryInsert(reservation).isPresent();
 	}
 
 }

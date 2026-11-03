@@ -3,12 +3,13 @@ package io.github.manuelcarro97.reservas.application.service;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import io.github.manuelcarro97.reservas.application.port.in.AdminReservation;
 import io.github.manuelcarro97.reservas.application.port.in.CancelReservationUseCase;
@@ -26,13 +27,19 @@ import io.github.manuelcarro97.reservas.domain.exception.NoTableAvailableExcepti
 import io.github.manuelcarro97.reservas.domain.exception.ReservationNotFoundException;
 import io.github.manuelcarro97.reservas.domain.exception.RestaurantNotFoundException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftNotFoundException;
+import io.github.manuelcarro97.reservas.domain.exception.TableNotAllowedException;
+import io.github.manuelcarro97.reservas.domain.exception.TableNotFoundException;
+import io.github.manuelcarro97.reservas.domain.exception.TableRequiredException;
+import io.github.manuelcarro97.reservas.domain.exception.TableTakenException;
+import io.github.manuelcarro97.reservas.domain.exception.TableTooSmallException;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
+import io.github.manuelcarro97.reservas.domain.model.PlanStatus;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.ReservationCode;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
 import io.github.manuelcarro97.reservas.domain.service.BookingPolicy;
-import io.github.manuelcarro97.reservas.domain.service.TableAssigner;
+import io.github.manuelcarro97.reservas.domain.service.SeatingCapacity;
 
 @Service
 class ReservationService implements CreateReservationUseCase, GetReservationUseCase, CancelReservationUseCase,
@@ -44,7 +51,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	private final ReservationRepositoryPort reservations;
 	private final Clock clock;
 	private final BookingPolicy bookingPolicy = new BookingPolicy();
-	private final TableAssigner tableAssigner = new TableAssigner();
+	private final SeatingCapacity seatingCapacity = new SeatingCapacity();
 
 	ReservationService(RestaurantRepositoryPort restaurants, ShiftRepositoryPort shifts, TableRepositoryPort tables,
 			ReservationRepositoryPort reservations, Clock clock) {
@@ -55,10 +62,20 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 		this.clock = clock;
 	}
 
-	// Sin @Transactional: cada tryInsert confirma por sí mismo, y perder una mesa debe pasar a la siguiente.
+	/**
+	 * Todo el alta va bajo el bloqueo del plano: la regla de capacidad del modo asignado y la carrera con guardar el
+	 * plano o editar turnos son atómicas. El {@code ON CONFLICT} de {@code tryInsert} sigue siendo la garantía dura
+	 * contra el doble reparto de una mesa.
+	 */
 	@Override
+	@Transactional
 	public Reservation create(String slug, CreateReservationCommand command) {
-		Restaurant restaurant = RestaurantAccess.published(restaurants, slug);
+		// La lectura sin bloqueo solo da el id; el estado que vale es el de la fila ya bloqueada.
+		long restaurantId = RestaurantAccess.published(restaurants, slug).id();
+		Restaurant restaurant = restaurants.lock(restaurantId);
+		if (restaurant.status() != PlanStatus.PUBLISHED) {
+			throw new RestaurantNotFoundException();
+		}
 		// findAll y no findById: un turno oculto (borrado lógico) no admite reservas nuevas.
 		Shift shift = shifts.findAll(restaurant.id())
 			.stream()
@@ -70,13 +87,62 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 				restaurants.maxCapacity(restaurant.id()), restaurants.isClosed(restaurant.id(), command.date()), clock);
 
 		List<DiningTable> free = tables.findFree(restaurant.id(), shift.id(), command.date());
-		for (DiningTable table : tableAssigner.candidates(free, command.partySize())) {
-			Optional<Reservation> inserted = reservations.tryInsert(pendingReservation(restaurant, table, command));
-			if (inserted.isPresent()) {
-				return inserted.get();
-			}
+		List<Integer> unassignedParties = reservations.findActiveFor(restaurant.id(), shift.id(), command.date())
+			.stream()
+			.filter(reservation -> reservation.tableId() == null)
+			.map(Reservation::partySize)
+			.toList();
+		return switch (restaurant.bookingMode()) {
+			case FREE_CHOICE -> createOnChosenTable(restaurant, free, unassignedParties, command);
+			case ASSIGNED -> createWithoutTable(restaurant, free, unassignedParties, command);
+		};
+	}
+
+	private Reservation createOnChosenTable(Restaurant restaurant, List<DiningTable> free,
+			List<Integer> unassignedParties, CreateReservationCommand command) {
+		if (command.tableId() == null) {
+			throw new TableRequiredException();
 		}
-		throw new NoTableAvailableException();
+		// findAll y no findById: este solo trae las mesas vivas del plano, y findById también las borradas y ajenas.
+		DiningTable table = tables.findAll(restaurant.id())
+			.stream()
+			.filter(candidate -> candidate.id().equals(command.tableId()))
+			.findFirst()
+			.orElseThrow(TableNotFoundException::new);
+		if (table.seats() < command.partySize()) {
+			throw new TableTooSmallException();
+		}
+		if (free.stream().noneMatch(candidate -> candidate.id().equals(table.id()))) {
+			throw new TableTakenException();
+		}
+		// Un resto de cambio de modo (reserva sin mesa) sigue necesitando la suya: la elegida no puede quitársela.
+		boolean leavesRoomForUnassigned = unassignedParties.isEmpty()
+				|| seatingCapacity.canSeatAll(seatsOfOthers(free, table), unassignedParties);
+		if (!leavesRoomForUnassigned) {
+			throw new NoTableAvailableException();
+		}
+		return reservations.tryInsert(pendingReservation(restaurant, table.id(), command))
+			.orElseThrow(TableTakenException::new);
+	}
+
+	private Reservation createWithoutTable(Restaurant restaurant, List<DiningTable> free,
+			List<Integer> unassignedParties, CreateReservationCommand command) {
+		if (command.tableId() != null) {
+			throw new TableNotAllowedException();
+		}
+		List<Integer> parties = new ArrayList<>(unassignedParties);
+		parties.add(command.partySize());
+		List<Integer> freeSeats = free.stream().map(DiningTable::seats).toList();
+		if (!seatingCapacity.canSeatAll(freeSeats, parties)) {
+			throw new NoTableAvailableException();
+		}
+		// Sin mesa no hay clave en el índice único, así que el insert no puede chocar.
+		return reservations.tryInsert(pendingReservation(restaurant, null, command))
+			.orElseThrow(NoTableAvailableException::new);
+	}
+
+	private static List<Integer> seatsOfOthers(List<DiningTable> free, DiningTable chosen) {
+		return free.stream().filter(candidate -> !candidate.id().equals(chosen.id())).map(DiningTable::seats).toList();
 	}
 
 	@Override
@@ -172,9 +238,9 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 				reservation.shiftId(), reservation.partySize(), tableLabel(reservation));
 	}
 
-	private Reservation pendingReservation(Restaurant restaurant, DiningTable table, CreateReservationCommand command) {
-		return Reservation.newPending(ReservationCode.generate(), restaurant.id(), command.shiftId(), table.id(),
-				command.date(), command.partySize(), command.customerName(), command.customerPhone(),
+	private Reservation pendingReservation(Restaurant restaurant, Long tableId, CreateReservationCommand command) {
+		return Reservation.newPending(ReservationCode.generate(restaurant.slug()), restaurant.id(), command.shiftId(),
+				tableId, command.date(), command.partySize(), command.customerName(), command.customerPhone(),
 				command.customerEmail(), clock.instant());
 	}
 

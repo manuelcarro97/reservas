@@ -12,8 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
-import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.GetAvailabilityUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.GetOccupancyUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ShiftAvailability;
@@ -36,9 +34,6 @@ class AvailabilityServiceIT extends PostgresIT {
 	@Autowired
 	private GetOccupancyUseCase occupancy;
 
-	@Autowired
-	private CreateReservationUseCase createReservation;
-
 	private Restaurant restaurant;
 	private Shift dinner;
 	private DiningTable table;
@@ -51,8 +46,7 @@ class AvailabilityServiceIT extends PostgresIT {
 	}
 
 	private void reserve() {
-		createReservation.create("demo",
-				new CreateReservationCommand(WEDNESDAY, dinner.id(), 2, "Ana", "600000000", null));
+		givenReservation(restaurant, dinner, table, WEDNESDAY, 2);
 	}
 
 	@Test
