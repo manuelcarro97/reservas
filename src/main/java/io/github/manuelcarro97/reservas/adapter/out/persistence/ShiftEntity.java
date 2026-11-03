@@ -1,6 +1,7 @@
 package io.github.manuelcarro97.reservas.adapter.out.persistence;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.Set;
@@ -39,6 +40,9 @@ class ShiftEntity {
 	@JdbcTypeCode(SqlTypes.ARRAY)
 	@Column(name = "days_of_week", columnDefinition = "smallint[]")
 	private short[] daysOfWeek;
+
+	@Column(name = "deleted_at")
+	private Instant deletedAt;
 
 	protected ShiftEntity() {
 	}

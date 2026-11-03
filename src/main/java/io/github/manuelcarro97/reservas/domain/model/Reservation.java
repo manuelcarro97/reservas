@@ -13,7 +13,7 @@ public class Reservation {
 	private final String code;
 	private final long restaurantId;
 	private final long shiftId;
-	private final long tableId;
+	private final Long tableId;
 	private final LocalDate date;
 	private final int partySize;
 	private final String customerName;
@@ -22,10 +22,11 @@ public class Reservation {
 	private ReservationStatus status;
 	private final long version;
 	private final Instant createdAt;
+	private Instant cancelledByCustomerAt;
 
-	public Reservation(Long id, String code, long restaurantId, long shiftId, long tableId, LocalDate date,
+	public Reservation(Long id, String code, long restaurantId, long shiftId, Long tableId, LocalDate date,
 			int partySize, String customerName, String customerPhone, String customerEmail, ReservationStatus status,
-			long version, Instant createdAt) {
+			long version, Instant createdAt, Instant cancelledByCustomerAt) {
 		this.id = id;
 		this.code = code;
 		this.restaurantId = restaurantId;
@@ -39,12 +40,13 @@ public class Reservation {
 		this.status = status;
 		this.version = version;
 		this.createdAt = createdAt;
+		this.cancelledByCustomerAt = cancelledByCustomerAt;
 	}
 
-	public static Reservation newPending(String code, long restaurantId, long shiftId, long tableId, LocalDate date,
+	public static Reservation newPending(String code, long restaurantId, long shiftId, Long tableId, LocalDate date,
 			int partySize, String customerName, String customerPhone, String customerEmail, Instant createdAt) {
 		return new Reservation(null, code, restaurantId, shiftId, tableId, date, partySize, customerName,
-				customerPhone, customerEmail, ReservationStatus.PENDING, 0, createdAt);
+				customerPhone, customerEmail, ReservationStatus.PENDING, 0, createdAt, null);
 	}
 
 	public void confirm(Instant now, Instant shiftStart) {
@@ -66,6 +68,7 @@ public class Reservation {
 			throw new CancellationDeadlinePassedException();
 		}
 		status = ReservationStatus.CANCELLED;
+		cancelledByCustomerAt = now;
 	}
 
 	public void markNoShow(Instant now, Instant shiftStart) {
@@ -101,7 +104,7 @@ public class Reservation {
 		return shiftId;
 	}
 
-	public long tableId() {
+	public Long tableId() {
 		return tableId;
 	}
 
@@ -135,6 +138,10 @@ public class Reservation {
 
 	public Instant createdAt() {
 		return createdAt;
+	}
+
+	public Instant cancelledByCustomerAt() {
+		return cancelledByCustomerAt;
 	}
 
 }

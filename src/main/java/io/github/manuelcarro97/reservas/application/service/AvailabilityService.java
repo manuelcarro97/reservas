@@ -63,7 +63,7 @@ class AvailabilityService implements GetAvailabilityUseCase, GetOccupancyUseCase
 		Set<Long> occupied = reservations.occupiedTableIds(restaurant.id(), shift.id(), date);
 		return tables.findAll(restaurant.id())
 			.stream()
-			.map(table -> new TableOccupancy(table.id(), table.label(), table.capacity(), table.posX(), table.posY(),
+			.map(table -> new TableOccupancy(table.id(), table.label(), table.seats(), table.x(), table.y(),
 					occupied.contains(table.id())))
 			.toList();
 	}

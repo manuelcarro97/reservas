@@ -30,7 +30,7 @@ class ReservationEntity {
 	private long shiftId;
 
 	@Column(name = "table_id")
-	private long tableId;
+	private Long tableId;
 
 	@Column(name = "reservation_date")
 	private LocalDate date;
@@ -56,6 +56,9 @@ class ReservationEntity {
 	@Column(name = "created_at")
 	private Instant createdAt;
 
+	@Column(name = "cancelled_by_customer_at")
+	private Instant cancelledByCustomerAt;
+
 	protected ReservationEntity() {
 	}
 
@@ -74,12 +77,13 @@ class ReservationEntity {
 		entity.status = reservation.status();
 		entity.version = reservation.version();
 		entity.createdAt = reservation.createdAt();
+		entity.cancelledByCustomerAt = reservation.cancelledByCustomerAt();
 		return entity;
 	}
 
 	Reservation toDomain() {
 		return new Reservation(id, code, restaurantId, shiftId, tableId, date, partySize, customerName, customerPhone,
-				customerEmail, status, version, createdAt);
+				customerEmail, status, version, createdAt, cancelledByCustomerAt);
 	}
 
 }

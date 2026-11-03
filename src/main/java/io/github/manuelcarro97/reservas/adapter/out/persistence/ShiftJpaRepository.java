@@ -9,6 +9,6 @@ interface ShiftJpaRepository extends JpaRepository<ShiftEntity, Long> {
 
 	Optional<ShiftEntity> findByIdAndRestaurantId(long id, long restaurantId);
 
-	List<ShiftEntity> findByRestaurantIdOrderByStartTime(long restaurantId);
+	List<ShiftEntity> findByRestaurantIdAndDeletedAtIsNullOrderByStartTime(long restaurantId);
 
 }

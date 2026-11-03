@@ -18,9 +18,14 @@ import io.github.manuelcarro97.reservas.domain.exception.ClosureHasReservationsE
 import io.github.manuelcarro97.reservas.domain.exception.InvalidZoneException;
 import io.github.manuelcarro97.reservas.domain.exception.RestaurantNotFoundException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftOverlapException;
+import io.github.manuelcarro97.reservas.domain.model.BookingMode;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
+import io.github.manuelcarro97.reservas.domain.model.PlanStatus;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
+import io.github.manuelcarro97.reservas.domain.model.RoomLayout;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
+import io.github.manuelcarro97.reservas.domain.model.TableShape;
+import io.github.manuelcarro97.reservas.domain.model.Theme;
 
 @Service
 class RestaurantAdminService implements ManageRestaurantUseCase {
@@ -40,12 +45,13 @@ class RestaurantAdminService implements ManageRestaurantUseCase {
 
 	@Override
 	public Restaurant createRestaurant(String slug, String name, String zoneId, int cancellationDeadlineHours) {
-		return restaurants.save(new Restaurant(null, slug, name, parseZone(zoneId), cancellationDeadlineHours));
+		return restaurants.save(new Restaurant(null, slug, name, parseZone(zoneId), cancellationDeadlineHours, null,
+				PlanStatus.PUBLISHED, RoomLayout.defaultRoom(), Theme.AZUL, BookingMode.FREE_CHOICE));
 	}
 
 	@Override
-	public DiningTable addTable(String slug, String label, int capacity, int posX, int posY) {
-		return tables.save(new DiningTable(null, findRestaurant(slug).id(), label, capacity, posX, posY));
+	public DiningTable addTable(String slug, String label, int seats, int x, int y) {
+		return tables.save(new DiningTable(null, findRestaurant(slug).id(), label, TableShape.SQUARE, seats, 0, x, y));
 	}
 
 	@Override

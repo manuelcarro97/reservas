@@ -13,7 +13,7 @@ public interface ManageRestaurantUseCase {
 
 	Restaurant createRestaurant(String slug, String name, String zoneId, int cancellationDeadlineHours);
 
-	DiningTable addTable(String slug, String label, int capacity, int posX, int posY);
+	DiningTable addTable(String slug, String label, int seats, int x, int y);
 
 	Shift addShift(String slug, String name, LocalTime start, LocalTime end, Set<DayOfWeek> days);
 

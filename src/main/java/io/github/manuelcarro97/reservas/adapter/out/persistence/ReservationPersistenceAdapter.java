@@ -1,11 +1,14 @@
 package io.github.manuelcarro97.reservas.adapter.out.persistence;
 
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -53,7 +56,7 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 			.param("code", reservation.code())
 			.param("restaurantId", reservation.restaurantId())
 			.param("shiftId", reservation.shiftId())
-			.param("tableId", reservation.tableId())
+			.param("tableId", reservation.tableId(), Types.BIGINT)
 			.param("date", reservation.date())
 			.param("partySize", reservation.partySize())
 			.param("customerName", reservation.customerName())
@@ -66,7 +69,7 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 			.map(id -> new Reservation(id, reservation.code(), reservation.restaurantId(), reservation.shiftId(),
 					reservation.tableId(), reservation.date(), reservation.partySize(), reservation.customerName(),
 					reservation.customerPhone(), reservation.customerEmail(), reservation.status(), 0,
-					reservation.createdAt()));
+					reservation.createdAt(), reservation.cancelledByCustomerAt()));
 	}
 
 	@Override
@@ -110,7 +113,11 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 
 	@Override
 	public Set<Long> occupiedTableIds(long restaurantId, long shiftId, LocalDate date) {
-		return Set.copyOf(reservations.occupiedTableIds(restaurantId, shiftId, date));
+		// Una reserva sin mesa (modo asignado) devuelve null y Set.copyOf no admite nulos.
+		return reservations.occupiedTableIds(restaurantId, shiftId, date)
+			.stream()
+			.filter(Objects::nonNull)
+			.collect(Collectors.toUnmodifiableSet());
 	}
 
 }

@@ -8,17 +8,21 @@ import org.springframework.data.jpa.repository.Query;
 
 interface DiningTableJpaRepository extends JpaRepository<DiningTableEntity, Long> {
 
-	List<DiningTableEntity> findByRestaurantIdOrderById(long restaurantId);
+	List<DiningTableEntity> findByRestaurantIdAndDeletedAtIsNullOrderById(long restaurantId);
 
-	@Query("select coalesce(max(t.capacity), 0) from DiningTableEntity t where t.restaurantId = :restaurantId")
-	int maxCapacity(long restaurantId);
+	@Query("""
+			select coalesce(max(t.seats), 0) from DiningTableEntity t
+			where t.restaurantId = :restaurantId and t.deletedAt is null
+			""")
+	int maxSeats(long restaurantId);
 
 	@Query("""
 			select t from DiningTableEntity t
-			where t.restaurantId = :restaurantId
+			where t.restaurantId = :restaurantId and t.deletedAt is null
 			  and t.id not in (
 			    select r.tableId from ReservationEntity r
 			    where r.restaurantId = :restaurantId and r.shiftId = :shiftId and r.date = :date
+			      and r.tableId is not null
 			      and r.status in (io.github.manuelcarro97.reservas.domain.model.ReservationStatus.PENDING,
 			                       io.github.manuelcarro97.reservas.domain.model.ReservationStatus.CONFIRMED))
 			order by t.id

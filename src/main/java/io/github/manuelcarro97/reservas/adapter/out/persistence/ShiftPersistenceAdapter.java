@@ -24,7 +24,7 @@ class ShiftPersistenceAdapter implements ShiftRepositoryPort {
 
 	@Override
 	public List<Shift> findAll(long restaurantId) {
-		return shifts.findByRestaurantIdOrderByStartTime(restaurantId).stream().map(ShiftEntity::toDomain).toList();
+		return shifts.findByRestaurantIdAndDeletedAtIsNullOrderByStartTime(restaurantId).stream().map(ShiftEntity::toDomain).toList();
 	}
 
 	@Override

@@ -27,7 +27,7 @@ class TablePersistenceAdapter implements TableRepositoryPort {
 
 	@Override
 	public List<DiningTable> findAll(long restaurantId) {
-		return tables.findByRestaurantIdOrderById(restaurantId).stream().map(DiningTableEntity::toDomain).toList();
+		return tables.findByRestaurantIdAndDeletedAtIsNullOrderById(restaurantId).stream().map(DiningTableEntity::toDomain).toList();
 	}
 
 	@Override

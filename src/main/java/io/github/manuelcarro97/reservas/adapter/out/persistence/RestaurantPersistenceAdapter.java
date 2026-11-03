@@ -26,7 +26,7 @@ class RestaurantPersistenceAdapter implements RestaurantRepositoryPort {
 
 	@Override
 	public Optional<Restaurant> findBySlug(String slug) {
-		return restaurants.findBySlug(slug).map(RestaurantEntity::toDomain);
+		return restaurants.findBySlugAndDeletedAtIsNull(slug).map(RestaurantEntity::toDomain);
 	}
 
 	@Override
@@ -61,7 +61,7 @@ class RestaurantPersistenceAdapter implements RestaurantRepositoryPort {
 
 	@Override
 	public int maxCapacity(long restaurantId) {
-		return tables.maxCapacity(restaurantId);
+		return tables.maxSeats(restaurantId);
 	}
 
 }

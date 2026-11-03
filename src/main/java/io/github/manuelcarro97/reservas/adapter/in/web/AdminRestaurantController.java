@@ -47,7 +47,7 @@ class AdminRestaurantController {
 	@PostMapping("/{slug}/tables")
 	@ResponseStatus(HttpStatus.CREATED)
 	DiningTable addTable(@PathVariable String slug, @Valid @RequestBody CreateTableRequest request) {
-		return manageRestaurant.addTable(slug, request.label(), request.capacity(), request.posX(), request.posY());
+		return manageRestaurant.addTable(slug, request.label(), request.seats(), request.x(), request.y());
 	}
 
 	@PostMapping("/{slug}/shifts")

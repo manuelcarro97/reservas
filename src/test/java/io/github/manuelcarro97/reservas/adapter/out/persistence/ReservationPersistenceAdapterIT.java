@@ -12,22 +12,22 @@ import java.util.EnumSet;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 
-import io.github.manuelcarro97.reservas.application.port.out.ReservationRepositoryPort;
 import io.github.manuelcarro97.reservas.domain.exception.ConcurrentUpdateException;
+import io.github.manuelcarro97.reservas.domain.model.BookingMode;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
+import io.github.manuelcarro97.reservas.domain.model.PlanStatus;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
+import io.github.manuelcarro97.reservas.domain.model.RoomLayout;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
+import io.github.manuelcarro97.reservas.domain.model.TableShape;
+import io.github.manuelcarro97.reservas.domain.model.Theme;
 import io.github.manuelcarro97.reservas.support.PostgresIT;
 
 class ReservationPersistenceAdapterIT extends PostgresIT {
 
 	private static final LocalDate DATE = LocalDate.of(2026, 12, 1);
-
-	@Autowired
-	private ReservationRepositoryPort reservations;
 
 	private Restaurant restaurant;
 	private DiningTable table;
@@ -35,8 +35,9 @@ class ReservationPersistenceAdapterIT extends PostgresIT {
 
 	@BeforeEach
 	void seed() {
-		restaurant = restaurants.save(new Restaurant(null, "demo", "Demo", ZoneId.of("Europe/Madrid"), 2));
-		table = tables.save(new DiningTable(null, restaurant.id(), "M1", 4, 10, 20));
+		restaurant = restaurants.save(new Restaurant(null, "demo", "Demo", ZoneId.of("Europe/Madrid"), 2, "owner-a",
+				PlanStatus.PUBLISHED, RoomLayout.defaultRoom(), Theme.AZUL, BookingMode.FREE_CHOICE));
+		table = tables.save(new DiningTable(null, restaurant.id(), "M1", TableShape.SQUARE, 4, 0, 10, 20));
 		shift = shifts.save(new Shift(null, restaurant.id(), "Cena", LocalTime.of(20, 0), LocalTime.of(22, 0),
 				EnumSet.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY)));
 	}
@@ -102,7 +103,7 @@ class ReservationPersistenceAdapterIT extends PostgresIT {
 
 	@Test
 	void maxCapacityIsTheBiggestTable() {
-		tables.save(new DiningTable(null, restaurant.id(), "M2", 8, 0, 0));
+		tables.save(new DiningTable(null, restaurant.id(), "M2", TableShape.SQUARE, 8, 0, 0, 0));
 
 		assertThat(restaurants.maxCapacity(restaurant.id())).isEqualTo(8);
 	}

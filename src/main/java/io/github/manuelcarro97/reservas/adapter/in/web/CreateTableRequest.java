@@ -5,5 +5,5 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-record CreateTableRequest(@NotBlank @Size(max = 40) @Pattern(regexp = TextRules.NO_NUL) String label, @Min(1) int capacity, int posX, int posY) {
+record CreateTableRequest(@NotBlank @Size(max = 40) @Pattern(regexp = TextRules.NO_NUL) String label, @Min(1) int seats, int x, int y) {
 }

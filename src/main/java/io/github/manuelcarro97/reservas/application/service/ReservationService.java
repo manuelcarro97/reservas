@@ -147,7 +147,10 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	}
 
 	private String tableLabel(Reservation reservation) {
-		return tables.findById(reservation.tableId()).map(DiningTable::label).orElseThrow();
+		if (reservation.tableId() == null) {
+			return null;
+		}
+		return tables.findById(reservation.tableId()).map(DiningTable::label).orElse(null);
 	}
 
 	private Reservation findByCode(String code) {

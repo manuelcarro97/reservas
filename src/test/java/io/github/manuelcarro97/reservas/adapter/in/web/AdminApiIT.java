@@ -114,7 +114,7 @@ class AdminApiIT extends PostgresIT {
 				{"slug":"nuevo","name":"Nuevo","zoneId":"Europe/Madrid","cancellationDeadlineHours":3}
 				""").andExpect(status().isCreated());
 		adminPost("/api/v1/admin/restaurants/nuevo/tables", """
-				{"label":"T1","capacity":4,"posX":10,"posY":20}
+				{"label":"T1","seats":4,"x":10,"y":20}
 				""").andExpect(status().isCreated());
 		adminPost("/api/v1/admin/restaurants/nuevo/shifts", """
 				{"name":"Comida","start":"13:00","end":"15:00","days":["MONDAY","SUNDAY"]}
@@ -265,8 +265,8 @@ class AdminApiIT extends PostgresIT {
 		asAdmin(get("/api/v1/admin/restaurants/demo/occupancy").param("date", DATE.toString())
 			.param("shiftId", shift.id().toString()))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$[0].posX").value(1))
-			.andExpect(jsonPath("$[0].posY").value(2))
+			.andExpect(jsonPath("$[0].x").value(120))
+			.andExpect(jsonPath("$[0].y").value(120))
 			.andExpect(jsonPath("$[0].occupied").value(true));
 	}
 

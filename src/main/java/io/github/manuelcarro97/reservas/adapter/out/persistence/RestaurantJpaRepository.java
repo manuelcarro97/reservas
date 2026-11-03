@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 interface RestaurantJpaRepository extends JpaRepository<RestaurantEntity, Long> {
 
-	Optional<RestaurantEntity> findBySlug(String slug);
+	Optional<RestaurantEntity> findBySlugAndDeletedAtIsNull(String slug);
 
 }
