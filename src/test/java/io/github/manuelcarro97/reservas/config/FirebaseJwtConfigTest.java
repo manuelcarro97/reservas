@@ -54,6 +54,22 @@ class FirebaseJwtConfigTest {
 	}
 
 	@Test
+	void rejectsFutureIssuedAt() {
+		Instant now = Instant.now();
+		Jwt jwt = validToken().issuedAt(now.plus(Duration.ofHours(1))).expiresAt(now.plus(Duration.ofHours(2)))
+			.build();
+
+		assertThat(validator.validate(jwt).hasErrors()).isTrue();
+	}
+
+	@Test
+	void rejectsMissingIssuedAt() {
+		Jwt jwt = validToken().claims(claims -> claims.remove("iat")).build();
+
+		assertThat(validator.validate(jwt).hasErrors()).isTrue();
+	}
+
+	@Test
 	void rejectsExpired() {
 		// El validador por defecto tolera 60 s de desfase: 5 min queda fuera.
 		Instant now = Instant.now();

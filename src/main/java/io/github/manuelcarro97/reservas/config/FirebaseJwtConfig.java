@@ -1,5 +1,8 @@
 package io.github.manuelcarro97.reservas.config;
 
+import java.time.Clock;
+import java.time.Duration;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +23,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 class FirebaseJwtConfig {
 
 	private static final String ISSUER_PREFIX = "https://securetoken.google.com/";
+	private static final Duration CLOCK_SKEW = Duration.ofSeconds(60);
 	private static final String JWK_SET_URI = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 
 	// withJwkSetUri descarga las claves en la primera petición: arrancar no necesita red.
@@ -32,7 +36,15 @@ class FirebaseJwtConfig {
 	}
 
 	static OAuth2TokenValidator<Jwt> validator(String projectId) {
+		return validator(projectId, Clock.systemUTC());
+	}
+
+	static OAuth2TokenValidator<Jwt> validator(String projectId, Clock clock) {
 		return new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(ISSUER_PREFIX + projectId),
+				// Los validadores por defecto no miran iat; Firebase exige que sea pasado (misma tolerancia que exp).
+				jwt -> jwt.getIssuedAt() != null && !jwt.getIssuedAt().isAfter(clock.instant().plus(CLOCK_SKEW))
+						? OAuth2TokenValidatorResult.success()
+						: failure("El token no tiene fecha de emisión válida"),
 				jwt -> jwt.getAudience() != null && jwt.getAudience().contains(projectId)
 						? OAuth2TokenValidatorResult.success()
 						: failure("El token no es para este proyecto de Firebase"),
