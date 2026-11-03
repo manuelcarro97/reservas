@@ -58,7 +58,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	// Sin @Transactional: cada tryInsert confirma por sí mismo, y perder una mesa debe pasar a la siguiente.
 	@Override
 	public Reservation create(String slug, CreateReservationCommand command) {
-		Restaurant restaurant = restaurants.findBySlug(slug).orElseThrow(RestaurantNotFoundException::new);
+		Restaurant restaurant = RestaurantAccess.published(restaurants, slug);
 		Shift shift = shifts.findById(restaurant.id(), command.shiftId()).orElseThrow(ShiftNotFoundException::new);
 		bookingPolicy.requireWithinWindow(restaurant, command.date(), clock);
 		bookingPolicy.validate(restaurant, shift, command.date(), command.partySize(),
@@ -89,8 +89,8 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	}
 
 	@Override
-	public List<AdminReservation> listByDate(String slug, LocalDate date) {
-		Restaurant restaurant = restaurants.findBySlug(slug).orElseThrow(RestaurantNotFoundException::new);
+	public List<AdminReservation> listByDate(String ownerUid, String slug, LocalDate date) {
+		Restaurant restaurant = RestaurantAccess.owned(restaurants, slug, ownerUid);
 		Map<Long, String> labels = tables.findAll(restaurant.id())
 			.stream()
 			.collect(Collectors.toMap(DiningTable::id, DiningTable::label));
@@ -101,28 +101,33 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	}
 
 	@Override
-	public ReservationDetails confirm(long id) {
-		Reservation reservation = findById(id);
+	public ReservationDetails confirm(String ownerUid, long id) {
+		Reservation reservation = ownedReservation(id, ownerUid);
 		reservation.confirm(clock.instant(), shiftStart(reservation, restaurantOf(reservation)));
 		return details(reservations.update(reservation));
 	}
 
 	@Override
-	public ReservationDetails cancel(long id) {
-		Reservation reservation = findById(id);
+	public ReservationDetails cancel(String ownerUid, long id) {
+		Reservation reservation = ownedReservation(id, ownerUid);
 		reservation.cancel();
 		return details(reservations.update(reservation));
 	}
 
 	@Override
-	public ReservationDetails markNoShow(long id) {
-		Reservation reservation = findById(id);
+	public ReservationDetails markNoShow(String ownerUid, long id) {
+		Reservation reservation = ownedReservation(id, ownerUid);
 		reservation.markNoShow(clock.instant(), shiftStart(reservation, restaurantOf(reservation)));
 		return details(reservations.update(reservation));
 	}
 
-	private Reservation findById(long id) {
-		return reservations.findById(id).orElseThrow(ReservationNotFoundException::new);
+	/** Reserva de un plano del dueño; la de un plano ajeno o borrado da el mismo error que una que no existe. */
+	private Reservation ownedReservation(long id, String ownerUid) {
+		Reservation reservation = reservations.findById(id).orElseThrow(ReservationNotFoundException::new);
+		restaurants.findById(reservation.restaurantId())
+			.filter(restaurant -> restaurant.isOwnedBy(ownerUid))
+			.orElseThrow(ReservationNotFoundException::new);
+		return reservation;
 	}
 
 	@Override

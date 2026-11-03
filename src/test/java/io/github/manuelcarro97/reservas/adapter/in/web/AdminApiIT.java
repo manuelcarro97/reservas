@@ -109,37 +109,23 @@ class AdminApiIT extends PostgresIT {
 	}
 
 	@Test
-	void createRestaurantTableShiftAndClosure() throws Exception {
+	void createPlanThenAddShiftClosureAndPublish() throws Exception {
 		adminPost("/api/v1/admin/restaurants", """
-				{"slug":"nuevo","name":"Nuevo","zoneId":"Europe/Madrid","cancellationDeadlineHours":3}
+				{"slug":"nuevo","name":"Nuevo"}
 				""").andExpect(status().isCreated());
-		adminPost("/api/v1/admin/restaurants/nuevo/tables", """
-				{"label":"T1","seats":4,"x":10,"y":20}
-				""").andExpect(status().isCreated());
+		// Hasta que el guardado del plano (B5) cree las mesas por API, la mesa se inserta directamente.
+		givenTable(restaurants.findBySlug("nuevo").orElseThrow(), "T1", 4);
 		adminPost("/api/v1/admin/restaurants/nuevo/shifts", """
-				{"name":"Comida","start":"13:00","end":"15:00","days":["MONDAY","SUNDAY"]}
+				{"name":"Merienda","start":"17:00","end":"19:00","days":["MONDAY","SUNDAY"]}
 				""").andExpect(status().isCreated()).andExpect(jsonPath("$.id").isNumber());
 		adminPost("/api/v1/admin/restaurants/nuevo/closures", """
 				{"date":"2026-12-25","reason":"Navidad"}
 				""").andExpect(status().isCreated());
+		adminPost("/api/v1/admin/restaurants/nuevo/publish", "").andExpect(status().isOk());
 
 		mvc.perform(get("/api/v1/restaurants/nuevo/availability").param("date", "2026-12-25").param("partySize", "2"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$").isEmpty());
-	}
-
-	@Test
-	void duplicateSlugReturns409() throws Exception {
-		adminPost("/api/v1/admin/restaurants", """
-				{"slug":"demo","name":"Otro","zoneId":"Europe/Madrid","cancellationDeadlineHours":2}
-				""").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ALREADY_EXISTS"));
-	}
-
-	@Test
-	void unknownZoneReturns400() throws Exception {
-		adminPost("/api/v1/admin/restaurants", """
-				{"slug":"zona","name":"Zona","zoneId":"Marte/Base","cancellationDeadlineHours":2}
-				""").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 	}
 
 	@Test

@@ -22,7 +22,9 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(DomainException.class)
 	ProblemDetail handleDomain(DomainException exception) {
-		return problem(statusOf(exception.kind()), exception.getMessage(), exception.code());
+		ProblemDetail problem = problem(statusOf(exception.kind()), exception.getMessage(), exception.code());
+		exception.details().forEach(problem::setProperty);
+		return problem;
 	}
 
 	@ExceptionHandler(Exception.class)

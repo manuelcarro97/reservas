@@ -5,12 +5,12 @@ import java.util.List;
 
 public interface ManageReservationUseCase {
 
-	List<AdminReservation> listByDate(String slug, LocalDate date);
+	List<AdminReservation> listByDate(String ownerUid, String slug, LocalDate date);
 
-	ReservationDetails confirm(long id);
+	ReservationDetails confirm(String ownerUid, long id);
 
-	ReservationDetails cancel(long id);
+	ReservationDetails cancel(String ownerUid, long id);
 
-	ReservationDetails markNoShow(long id);
+	ReservationDetails markNoShow(String ownerUid, long id);
 
 }

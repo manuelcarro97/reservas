@@ -105,7 +105,7 @@ class AvailabilityServiceIT extends PostgresIT {
 		DiningTable free = givenTable(restaurant, "M4", 4);
 		reserve();
 
-		List<TableOccupancy> result = occupancy.occupancy("demo", dinner.id(), WEDNESDAY);
+		List<TableOccupancy> result = occupancy.occupancy("owner-a", "demo", dinner.id(), WEDNESDAY);
 
 		assertThat(result).extracting(TableOccupancy::tableId, TableOccupancy::occupied).containsExactly(
 				org.assertj.core.groups.Tuple.tuple(table.id(), true),

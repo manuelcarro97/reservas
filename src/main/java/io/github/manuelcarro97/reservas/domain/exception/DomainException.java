@@ -1,5 +1,7 @@
 package io.github.manuelcarro97.reservas.domain.exception;
 
+import java.util.Map;
+
 public abstract class DomainException extends RuntimeException {
 
 	private final String code;
@@ -17,6 +19,11 @@ public abstract class DomainException extends RuntimeException {
 
 	public ErrorKind kind() {
 		return kind;
+	}
+
+	/** Datos extra que la respuesta de error añade como propiedades; vacío salvo que la excepción los aporte. */
+	public Map<String, Object> details() {
+		return Map.of();
 	}
 
 }

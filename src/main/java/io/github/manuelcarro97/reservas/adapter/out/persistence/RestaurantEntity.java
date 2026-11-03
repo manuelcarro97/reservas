@@ -95,6 +95,10 @@ class RestaurantEntity {
 		return entity;
 	}
 
+	boolean isDeleted() {
+		return deletedAt != null;
+	}
+
 	Restaurant toDomain() {
 		RoomLayout room = new RoomLayout(roomShape, roomWidth, roomHeight, roomCutWidth, roomCutDepth, roomRotation);
 		return new Restaurant(id, slug, name, ZoneId.of(zoneId), cancellationDeadlineHours, ownerUid, status, room,

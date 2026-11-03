@@ -15,7 +15,6 @@ import io.github.manuelcarro97.reservas.application.port.out.ReservationReposito
 import io.github.manuelcarro97.reservas.application.port.out.RestaurantRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.ShiftRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.TableRepositoryPort;
-import io.github.manuelcarro97.reservas.domain.exception.RestaurantNotFoundException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftNotFoundException;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
@@ -44,7 +43,7 @@ class AvailabilityService implements GetAvailabilityUseCase, GetOccupancyUseCase
 
 	@Override
 	public List<ShiftAvailability> availability(String slug, LocalDate date, int partySize) {
-		Restaurant restaurant = findRestaurant(slug);
+		Restaurant restaurant = RestaurantAccess.published(restaurants, slug);
 		if (!bookingPolicy.isWithinWindow(restaurant, date, clock) || restaurants.isClosed(restaurant.id(), date)) {
 			return List.of();
 		}
@@ -57,8 +56,8 @@ class AvailabilityService implements GetAvailabilityUseCase, GetOccupancyUseCase
 	}
 
 	@Override
-	public List<TableOccupancy> occupancy(String slug, long shiftId, LocalDate date) {
-		Restaurant restaurant = findRestaurant(slug);
+	public List<TableOccupancy> occupancy(String ownerUid, String slug, long shiftId, LocalDate date) {
+		Restaurant restaurant = RestaurantAccess.owned(restaurants, slug, ownerUid);
 		Shift shift = shifts.findById(restaurant.id(), shiftId).orElseThrow(ShiftNotFoundException::new);
 		Set<Long> occupied = reservations.occupiedTableIds(restaurant.id(), shift.id(), date);
 		return tables.findAll(restaurant.id())
@@ -73,10 +72,6 @@ class AvailabilityService implements GetAvailabilityUseCase, GetOccupancyUseCase
 			return false;
 		}
 		return !tableAssigner.candidates(tables.findFree(restaurant.id(), shift.id(), date), partySize).isEmpty();
-	}
-
-	private Restaurant findRestaurant(String slug) {
-		return restaurants.findBySlug(slug).orElseThrow(RestaurantNotFoundException::new);
 	}
 
 }

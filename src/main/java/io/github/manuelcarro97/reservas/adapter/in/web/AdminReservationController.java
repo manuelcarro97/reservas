@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,24 +31,24 @@ class AdminReservationController {
 	}
 
 	@GetMapping("/restaurants/{slug}/reservations")
-	List<AdminReservation> list(@PathVariable String slug,
+	List<AdminReservation> list(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug,
 			@RequestParam @SupportedDate @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-		return manageReservation.listByDate(slug, date);
+		return manageReservation.listByDate(jwt.getSubject(), slug, date);
 	}
 
 	@PostMapping("/reservations/{id}/confirm")
-	ReservationDetails confirm(@PathVariable long id) {
-		return manageReservation.confirm(id);
+	ReservationDetails confirm(@AuthenticationPrincipal Jwt jwt, @PathVariable long id) {
+		return manageReservation.confirm(jwt.getSubject(), id);
 	}
 
 	@PostMapping("/reservations/{id}/cancel")
-	ReservationDetails cancel(@PathVariable long id) {
-		return manageReservation.cancel(id);
+	ReservationDetails cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable long id) {
+		return manageReservation.cancel(jwt.getSubject(), id);
 	}
 
 	@PostMapping("/reservations/{id}/no-show")
-	ReservationDetails markNoShow(@PathVariable long id) {
-		return manageReservation.markNoShow(id);
+	ReservationDetails markNoShow(@AuthenticationPrincipal Jwt jwt, @PathVariable long id) {
+		return manageReservation.markNoShow(jwt.getSubject(), id);
 	}
 
 }

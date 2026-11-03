@@ -76,7 +76,7 @@ class ExpirePendingReservationsIT extends PostgresIT {
 	@Test
 	void confirmedIsNotTouched() {
 		Reservation reservation = reserve();
-		manageReservation.confirm(reservation.id());
+		manageReservation.confirm("owner-a", reservation.id());
 		clock.set(SHIFT_START);
 
 		assertThat(expirePending.expire()).isZero();
