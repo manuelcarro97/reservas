@@ -5,13 +5,15 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -20,7 +22,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -46,6 +52,10 @@ import io.github.manuelcarro97.reservas.support.PostgresIT;
  * Avisos al dueño: el feed del panel y el puerto de avisos. La frontera entre dueños del feed no cabe en la tabla de
  * {@code OwnershipIT} (allí el ajeno recibe 404; el feed es por dueño y al ajeno le da 200 con su lista, vacía): la
  * cubren {@link #feedOnlyShowsMyPlans()} y {@link #ownerWithoutPlansGetsEmptyFeed()}.
+ * <p>
+ * Los avisos salen en segundo plano: lo que se espera se verifica con {@code timeout}. Lo que no debe salir no se
+ * puede esperar sin más (pasaría en vacío): se manda después una reserva marcador, que el hilo de avisos entrega por
+ * orden, y se comprueba que no ha llegado nada más.
  */
 @AutoConfigureMockMvc
 class FeedApiIT extends PostgresIT {
@@ -53,6 +63,7 @@ class FeedApiIT extends PostgresIT {
 	private static final String DATE = "2026-12-02";
 	private static final String FEED = "/api/v1/admin/feed";
 	private static final Instant BEFORE_START = MutableClock.START.minusSeconds(60);
+	private static final long WAIT_MS = 5000;
 
 	@Autowired
 	private MockMvc mvc;
@@ -85,6 +96,17 @@ class FeedApiIT extends PostgresIT {
 			.getResponse()
 			.getContentAsString();
 		return JsonPath.read(response, "$.code");
+	}
+
+	/** Espera a que el puerto haya recibido exactamente {@code count} avisos. */
+	private void awaitNotifications(int count) {
+		verify(notifications, timeout(WAIT_MS).times(count)).notifyOwner(any(), any());
+	}
+
+	/** Reserva en otra mesa cuyo aviso llega el último: cuando llega, los anteriores ya se entregaron. */
+	private void bookMarkerAndAwaitItsNotification() throws Exception {
+		book("demo", shift, givenTable(restaurant, "MARCADOR", 2)).andExpect(status().isCreated());
+		verify(notifications, timeout(WAIT_MS)).notifyOwner(eq("owner-a"), contains("mesa MARCADOR"));
 	}
 
 	private ResultActions feed(String ownerUid, Instant since) throws Exception {
@@ -152,7 +174,9 @@ class FeedApiIT extends PostgresIT {
 
 		feed("owner-a", BEFORE_START).andExpect(jsonPath("$.events", hasSize(1)))
 			.andExpect(jsonPath("$.events[0].kind").value("NEW"));
-		verify(notifications, times(1)).notifyOwner(anyString(), anyString());
+		// Solo el aviso de la reserva y el del marcador: la cancelación del dueño no avisa.
+		bookMarkerAndAwaitItsNotification();
+		awaitNotifications(2);
 	}
 
 	@Test
@@ -235,7 +259,7 @@ class FeedApiIT extends PostgresIT {
 		bookAndGetCode();
 
 		ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
-		verify(notifications, times(1)).notifyOwner(eq("owner-a"), text.capture());
+		verify(notifications, timeout(WAIT_MS).times(1)).notifyOwner(eq("owner-a"), text.capture());
 		assertThat(text.getValue()).isEqualTo("[demo] Nueva reserva: Ana, 2 personas, cena del miércoles 2, mesa M2");
 	}
 
@@ -246,7 +270,7 @@ class FeedApiIT extends PostgresIT {
 		mvc.perform(post("/api/v1/reservations/" + code + "/cancel")).andExpect(status().isOk());
 
 		ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
-		verify(notifications, times(2)).notifyOwner(eq("owner-a"), text.capture());
+		verify(notifications, timeout(WAIT_MS).times(2)).notifyOwner(eq("owner-a"), text.capture());
 		assertThat(text.getAllValues().get(1))
 			.isEqualTo("[demo] Reserva cancelada por el cliente: Ana, 2 personas, cena del miércoles 2");
 	}
@@ -254,7 +278,8 @@ class FeedApiIT extends PostgresIT {
 	@Test
 	void noNotificationWhenBookingIsRejected() throws Exception {
 		bookAndGetCode();
-		org.mockito.Mockito.clearInvocations(notifications);
+		awaitNotifications(1);
+		clearInvocations(notifications);
 
 		// La mesa ya está cogida: 409 y rollback, sin aviso.
 		book("demo", shift, table).andExpect(status().isConflict());
@@ -265,18 +290,22 @@ class FeedApiIT extends PostgresIT {
 					 "tableId":%d}
 					""".formatted(DATE, shift.id(), table.id()))).andExpect(status().is4xxClientError());
 
-		verifyNoInteractions(notifications);
+		bookMarkerAndAwaitItsNotification();
+		// Solo el marcador: los dos rechazos no avisaron.
+		verifyNoMoreInteractions(notifications);
 	}
 
 	@Test
 	void noNotificationWhenCancellationIsRejected() throws Exception {
 		String code = bookAndGetCode();
-		org.mockito.Mockito.clearInvocations(notifications);
+		awaitNotifications(1);
+		clearInvocations(notifications);
 		clock.set(Instant.parse("2026-12-02T18:30:00Z"));
 
 		mvc.perform(post("/api/v1/reservations/" + code + "/cancel")).andExpect(status().isConflict());
 
-		verify(notifications, never()).notifyOwner(any(), any());
+		// Con el reloj ya pasado el plazo no se puede reservar otro marcador: se deja un margen para que llegara.
+		verify(notifications, after(500).never()).notifyOwner(any(), any());
 	}
 
 	@Test
@@ -286,21 +315,52 @@ class FeedApiIT extends PostgresIT {
 		book("demo", shift, table).andExpect(status().isCreated());
 
 		// Se intentó el aviso (si el listener no se invocara, el test no probaría nada).
-		verify(notifications).notifyOwner(any(), any());
+		verify(notifications, timeout(WAIT_MS)).notifyOwner(any(), any());
 		assertThat(jdbc.sql("SELECT count(*) FROM reservation").query(Long.class).single()).isEqualTo(1L);
 	}
 
 	@Test
 	void failedNotificationDoesNotBreakCancellation() throws Exception {
 		String code = bookAndGetCode();
-		org.mockito.Mockito.clearInvocations(notifications);
+		awaitNotifications(1);
+		clearInvocations(notifications);
 		doThrow(new IllegalStateException("telegram caído")).when(notifications).notifyOwner(any(), any());
 
 		mvc.perform(post("/api/v1/reservations/" + code + "/cancel")).andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("CANCELLED"));
 
 		// Se intentó el aviso de cancelación (el de la reserva ya se descartó arriba).
-		verify(notifications).notifyOwner(any(), any());
+		verify(notifications, timeout(WAIT_MS)).notifyOwner(any(), any());
+	}
+
+	/** Una llamada lenta a Telegram no retrasa la respuesta al cliente: el aviso sale en otro hilo. */
+	@Test
+	void slowNotificationDoesNotDelayTheResponse() throws Exception {
+		CountDownLatch release = new CountDownLatch(1);
+		CountDownLatch finished = new CountDownLatch(1);
+		AtomicReference<String> notifyingThread = new AtomicReference<>();
+		doAnswer(invocation -> {
+			notifyingThread.set(Thread.currentThread().getName());
+			// El canal tarda hasta que el test lo libera (como mucho 10 s).
+			release.await(10, TimeUnit.SECONDS);
+			finished.countDown();
+			return null;
+		}).when(notifications).notifyOwner(any(), any());
+
+		try {
+			long start = System.nanoTime();
+			book("demo", shift, table).andExpect(status().isCreated());
+			Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+			assertThat(elapsed).isLessThan(Duration.ofSeconds(2));
+			// El aviso sí se está enviando, en el hilo propio de avisos y no en el de la petición.
+			Awaitility.await().atMost(Duration.ofSeconds(5)).until(() -> notifyingThread.get() != null);
+			assertThat(notifyingThread.get()).startsWith("owner-alert-");
+		}
+		finally {
+			release.countDown();
+		}
+		assertThat(finished.await(5, TimeUnit.SECONDS)).isTrue();
 	}
 
 }

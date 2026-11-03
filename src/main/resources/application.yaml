@@ -6,6 +6,10 @@ app:
     project-id: ${FIREBASE_PROJECT_ID:reservas-6d51b}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  telegram:
+    # Solo por variable de entorno, nunca en el repo. Sin token no hay Telegram: los avisos van al log.
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    bot-username: ${TELEGRAM_BOT_USERNAME:}
 
 spring:
   application:

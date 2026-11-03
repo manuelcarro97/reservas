@@ -5,19 +5,21 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import io.github.manuelcarro97.reservas.application.port.in.FeedEvent;
 import io.github.manuelcarro97.reservas.application.port.out.NotificationPort;
+import io.github.manuelcarro97.reservas.config.AsyncConfig;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 
 /**
  * Avisos al dueño por acciones del cliente. El servicio publica el aviso dentro de su transacción y este listener lo
  * envía solo si la transacción se confirma: un 409 o un 422 que hace rollback no avisa. Las acciones del propio dueño
- * no pasan por aquí.
+ * no pasan por aquí. El envío es asíncrono.
  */
 @Component
 class ReservationEvents {
@@ -64,6 +66,11 @@ class ReservationEvents {
 		}
 	}
 
+	/**
+	 * Después del commit y en segundo plano: una llamada lenta al canal no retrasa la respuesta al cliente. Si la cola de
+	 * avisos está llena, el aviso se descarta y se registra (ver {@link AsyncConfig}).
+	 */
+	@Async(AsyncConfig.NOTIFICATION_EXECUTOR)
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	void send(OwnerAlert alert) {
 		try {

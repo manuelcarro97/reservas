@@ -1,19 +1,27 @@
 package io.github.manuelcarro97.reservas.support;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.concurrent.ThreadPoolExecutor;
 
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.manuelcarro97.reservas.application.port.out.ReservationRepositoryPort;
+import io.github.manuelcarro97.reservas.config.AsyncConfig;
 import io.github.manuelcarro97.reservas.application.port.out.RestaurantRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.ShiftRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.TableRepositoryPort;
@@ -30,10 +38,17 @@ import io.github.manuelcarro97.reservas.domain.model.Theme;
 
 @SpringBootTest
 @Import({ TestcontainersConfiguration.class, TestClockConfiguration.class })
+// Sin bot de Telegram salvo que el test lo ponga: una TELEGRAM_BOT_TOKEN del entorno de quien corre los tests no debe
+// cambiar los beans (avisos por log, sin job de consulta).
+@TestPropertySource(properties = { "app.telegram.bot-token=", "app.telegram.bot-username=" })
 public abstract class PostgresIT {
 
 	@Autowired
 	protected JdbcClient jdbc;
+
+	@Autowired
+	@Qualifier(AsyncConfig.NOTIFICATION_EXECUTOR)
+	private ThreadPoolTaskExecutor notificationExecutor;
 
 	@Autowired
 	protected MutableClock clock;
@@ -49,6 +64,16 @@ public abstract class PostgresIT {
 
 	@Autowired
 	protected ReservationRepositoryPort reservations;
+
+	/**
+	 * Los avisos al dueño salen en segundo plano: un aviso que sigue en cola al acabar el test caería sobre el mock
+	 * (o la tabla) del siguiente. Se espera a que el hilo de avisos quede libre.
+	 */
+	@AfterEach
+	void awaitPendingAlerts() {
+		ThreadPoolExecutor pool = notificationExecutor.getThreadPoolExecutor();
+		Awaitility.await().atMost(Duration.ofSeconds(10)).until(() -> pool.getTaskCount() == pool.getCompletedTaskCount());
+	}
 
 	@BeforeEach
 	void cleanDatabase() {
