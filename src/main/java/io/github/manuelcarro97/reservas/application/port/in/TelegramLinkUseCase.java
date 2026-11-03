@@ -17,8 +17,11 @@ public interface TelegramLinkUseCase {
 
 	/**
 	 * El usuario abrió el enlace en Telegram ({@code /start <token>}): vincula ese chat al dueño del enlace y gasta el
-	 * enlace. Un enlace desconocido, caducado o ya usado no hace nada y no dice cuál de los tres es.
+	 * enlace. Un enlace desconocido, caducado o ya usado no hace nada y devuelve {@code false}: el mismo resultado para
+	 * los tres, no dice cuál es.
+	 *
+	 * @return {@code true} solo si vinculó el chat
 	 */
-	void handleStart(long chatId, String token);
+	boolean handleStart(long chatId, String token);
 
 }

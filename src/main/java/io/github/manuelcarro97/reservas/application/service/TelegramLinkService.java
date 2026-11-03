@@ -11,6 +11,7 @@ import org.springframework.util.StringUtils;
 
 import io.github.manuelcarro97.reservas.application.port.in.TelegramLinkUseCase;
 import io.github.manuelcarro97.reservas.application.port.out.OwnerAccountRepositoryPort;
+import io.github.manuelcarro97.reservas.config.TelegramEnabled;
 import io.github.manuelcarro97.reservas.domain.exception.TelegramUnavailableException;
 
 @Service
@@ -34,8 +35,8 @@ class TelegramLinkService implements TelegramLinkUseCase {
 			@Value("${app.telegram.bot-username:}") String botUsername) {
 		this.accounts = accounts;
 		this.clock = clock;
-		// Sin nombre de bot el enlace saldría como t.me/?start=…
-		this.available = StringUtils.hasText(botToken) && StringUtils.hasText(botUsername);
+		// El mismo criterio que activa los beans de Telegram: token y nombre de bot.
+		this.available = TelegramEnabled.configured(botToken, botUsername);
 		this.botUsername = botUsername;
 	}
 
@@ -59,13 +60,13 @@ class TelegramLinkService implements TelegramLinkUseCase {
 	}
 
 	@Override
-	public void handleStart(long chatId, String token) {
+	public boolean handleStart(long chatId, String token) {
 		if (!StringUtils.hasText(token)) {
-			return;
+			return false;
 		}
-		// Una sola sentencia: valida (existe, no ha caducado) y gasta el enlace a la vez. El resultado no se usa: un
-		// enlace que no sirve no se distingue de uno que sirve para quien lo manda.
-		accounts.consumeLinkToken(token, chatId, clock.instant());
+		// Una sola sentencia: valida (existe, no ha caducado) y gasta el enlace a la vez. Caducado, usado e inexistente
+		// dan el mismo false.
+		return accounts.consumeLinkToken(token, chatId, clock.instant());
 	}
 
 	private void requireAvailable() {

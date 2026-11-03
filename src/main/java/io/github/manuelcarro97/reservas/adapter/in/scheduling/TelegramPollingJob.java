@@ -29,6 +29,8 @@ class TelegramPollingJob {
 	private static final Logger log = LoggerFactory.getLogger(TelegramPollingJob.class);
 
 	static final String LINKED_REPLY = "Avisos de reservas vinculados.";
+	/** El mismo texto para un enlace caducado, ya usado o inexistente: no revela cuál de los tres es. */
+	static final String INVALID_LINK_REPLY = "Enlace caducado o no válido. Genera uno nuevo desde el panel.";
 	private static final String START = "/start";
 
 	private final TelegramClient client;
@@ -41,9 +43,12 @@ class TelegramPollingJob {
 		this.telegram = telegram;
 	}
 
-	/** Una espera larga de hasta 30 s por ejecución; {@code fixedDelay} impide que dos ejecuciones se solapen. */
+	/**
+	 * Una espera larga de hasta 30 s por ejecución; {@code fixedDelay} impide que dos ejecuciones programadas se solapen y
+	 * {@code synchronized} lo garantiza también frente a una llamada directa (los tests).
+	 */
 	@Scheduled(fixedDelayString = "PT5S")
-	void poll() {
+	synchronized void poll() {
 		List<Update> updates;
 		try {
 			updates = client.getUpdates(offset);
@@ -74,21 +79,24 @@ class TelegramPollingJob {
 			return;
 		}
 		long chatId = update.message().chat().id();
-		telegram.handleStart(chatId, token);
-		reply(chatId);
+		boolean linked = telegram.handleStart(chatId, token);
+		reply(chatId, linked ? LINKED_REPLY : INVALID_LINK_REPLY);
 	}
 
 	/** El aviso es un extra: si falla, la vinculación ya está hecha y la actualización no se reintenta. */
-	private void reply(long chatId) {
+	private void reply(long chatId, String text) {
 		try {
-			client.sendMessage(chatId, LINKED_REPLY);
+			client.sendMessage(chatId, text);
 		}
 		catch (RuntimeException failure) {
 			log.warn("Telegram reply failed: {}", describe(failure));
 		}
 	}
 
-	/** El token de {@code /start <token>} o {@code /start@bot <token>}; nulo si el texto no es un /start con token. */
+	/**
+	 * El token de {@code /start <token>} o {@code /start@bot <token>}. Nulo si el texto no es un /start con token (un
+	 * /start a secas, otro comando o cualquier texto): se ignora sin responder, no hay nada que vincular.
+	 */
 	private static String startToken(String text) {
 		if (text == null) {
 			return null;

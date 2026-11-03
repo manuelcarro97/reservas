@@ -148,7 +148,7 @@ class TelegramLinkIT extends PostgresIT {
 		String second = tokenOf(linkUrl("owner-a"));
 
 		assertThat(second).isNotEqualTo(first);
-		telegram.handleStart(1, first);
+		assertThat(telegram.handleStart(1, first)).isFalse();
 		assertThat(chatOf("owner-a")).isNull();
 		telegram.handleStart(2, second);
 		assertThat(chatOf("owner-a")).isEqualTo(2L);
@@ -158,7 +158,7 @@ class TelegramLinkIT extends PostgresIT {
 	void startWithValidTokenStoresChatId() throws Exception {
 		String token = tokenOf(linkUrl("owner-a"));
 
-		telegram.handleStart(424242L, token);
+		assertThat(telegram.handleStart(424242L, token)).isTrue();
 
 		assertThat(chatOf("owner-a")).isEqualTo(424242L);
 		// El token queda gastado.
@@ -172,7 +172,7 @@ class TelegramLinkIT extends PostgresIT {
 		String token = tokenOf(linkUrl("owner-a"));
 		clock.set(MutableClock.START.plus(Duration.ofMinutes(15)).minusSeconds(1));
 
-		telegram.handleStart(7, token);
+		assertThat(telegram.handleStart(7, token)).isTrue();
 
 		assertThat(chatOf("owner-a")).isEqualTo(7L);
 	}
@@ -182,7 +182,7 @@ class TelegramLinkIT extends PostgresIT {
 		String token = tokenOf(linkUrl("owner-a"));
 		clock.set(MutableClock.START.plus(Duration.ofMinutes(15)));
 
-		telegram.handleStart(7, token);
+		assertThat(telegram.handleStart(7, token)).isFalse();
 
 		assertThat(chatOf("owner-a")).isNull();
 	}
@@ -190,10 +190,10 @@ class TelegramLinkIT extends PostgresIT {
 	@Test
 	void tokenIsSingleUse() throws Exception {
 		String token = tokenOf(linkUrl("owner-a"));
-		telegram.handleStart(7, token);
+		assertThat(telegram.handleStart(7, token)).isTrue();
 
 		// Otro chat con el mismo enlace ya usado no se lleva los avisos.
-		telegram.handleStart(8, token);
+		assertThat(telegram.handleStart(8, token)).isFalse();
 
 		assertThat(chatOf("owner-a")).isEqualTo(7L);
 	}
@@ -202,9 +202,9 @@ class TelegramLinkIT extends PostgresIT {
 	void unknownOrBlankTokenIsIgnored() throws Exception {
 		linkUrl("owner-a");
 
-		telegram.handleStart(7, "no-existe-no-existe-no-existe-12");
-		telegram.handleStart(7, "");
-		telegram.handleStart(7, "   ");
+		assertThat(telegram.handleStart(7, "no-existe-no-existe-no-existe-12")).isFalse();
+		assertThat(telegram.handleStart(7, "")).isFalse();
+		assertThat(telegram.handleStart(7, "   ")).isFalse();
 
 		assertThat(chatOf("owner-a")).isNull();
 	}

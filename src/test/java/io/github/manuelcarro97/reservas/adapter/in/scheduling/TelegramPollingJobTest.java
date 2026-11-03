@@ -11,6 +11,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import io.github.manuelcarro97.reservas.support.FakeTelegramClient;
 class TelegramPollingJobTest {
 
 	private static final String REPLY = "Avisos de reservas vinculados.";
+	private static final String INVALID_REPLY = "Enlace caducado o no válido. Genera uno nuevo desde el panel.";
 
 	private final FakeTelegramClient client = FakeTelegramClient.create();
 	private final TelegramLinkUseCase telegram = mock(TelegramLinkUseCase.class);
@@ -43,12 +45,34 @@ class TelegramPollingJobTest {
 
 	@Test
 	void startCommandLinksTheChatAndReplies() {
+		when(telegram.handleStart(42, "abc-DEF_123")).thenReturn(true);
 		client.queue(message(5, 42, "/start abc-DEF_123"));
 
 		job.poll();
 
 		verify(telegram).handleStart(42, "abc-DEF_123");
 		assertThat(client.sent()).containsExactly(new FakeTelegramClient.Sent(42, REPLY));
+	}
+
+	@Test
+	void startCommandThatDidNotLinkRepliesWithTheInvalidLinkText() {
+		when(telegram.handleStart(42, "abc")).thenReturn(false);
+		client.queue(message(5, 42, "/start abc"));
+
+		job.poll();
+
+		assertThat(client.sent()).containsExactly(new FakeTelegramClient.Sent(42, INVALID_REPLY));
+	}
+
+	/** Un /start sin enlace (quien abre el bot a mano) o cualquier otro texto: no vincula nada y no se contesta. */
+	@Test
+	void startWithoutTokenAndOtherCommandsAreIgnoredWithoutReply() {
+		client.queue(message(1, 42, "/start"), message(2, 42, "/help"), message(3, 42, "hola"));
+
+		job.poll();
+
+		verifyNoInteractions(telegram);
+		assertThat(client.sent()).isEmpty();
 	}
 
 	@Test
