@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -69,6 +70,13 @@ class OwnershipIT extends PostgresIT {
 							"""), RESTAURANT_NOT_FOUND),
 				new Route("POST publish", it -> post("/api/v1/admin/restaurants/plano-a/publish"),
 						RESTAURANT_NOT_FOUND),
+				// Mueve M2 (con reserva activa) sin tocar el local: lo que cambia es solo su posición.
+				new Route("PUT layout", it -> put("/api/v1/admin/restaurants/plano-a/layout")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{"room":{"shape":"RECTANGLE","width":1200,"height":800,"cutWidth":0,"cutDepth":0,"rotation":0},
+							 "tables":[{"id":%d,"label":"M2","shape":"SQUARE","seats":2,"rotation":0,"x":200,"y":200}]}
+							""".formatted(it.reservation.tableId())), RESTAURANT_NOT_FOUND),
 				new Route("GET occupancy",
 						it -> get("/api/v1/admin/restaurants/plano-a/occupancy").param("date", DATE.toString())
 							.param("shiftId", it.shift.id().toString()),
@@ -147,6 +155,14 @@ class OwnershipIT extends PostgresIT {
 		List<String> state = new java.util.ArrayList<>();
 		state.addAll(jdbc.sql("SELECT name || '/' || status || '/' || theme || '/' || cancellation_deadline_hours "
 				+ "FROM restaurant ORDER BY id").query(String.class).list());
+		state.addAll(jdbc.sql("SELECT room_shape || '/' || room_width || '/' || room_height || '/' || room_cut_width "
+				+ "|| '/' || room_cut_depth || '/' || room_rotation FROM restaurant ORDER BY id")
+			.query(String.class)
+			.list());
+		state.addAll(jdbc.sql("SELECT id || '/' || label || '/' || shape || '/' || seats || '/' || rotation || '/' "
+				+ "|| x || '/' || y || '/' || coalesce(deleted_at::text, '-') FROM dining_table ORDER BY id")
+			.query(String.class)
+			.list());
 		state.addAll(jdbc.sql("SELECT status || '/' || version FROM reservation ORDER BY id")
 			.query(String.class)
 			.list());

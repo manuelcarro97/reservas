@@ -21,6 +21,9 @@ public interface ReservationRepositoryPort {
 
 	List<Reservation> findByDate(long restaurantId, LocalDate date);
 
+	/** Reservas PENDING o CONFIRMED del plano con fecha {@code from} o posterior, por fecha e id. */
+	List<Reservation> findActiveFrom(long restaurantId, LocalDate from);
+
 	boolean hasActive(long restaurantId, LocalDate date);
 
 	int cancelPendingStartedBefore(Instant now);

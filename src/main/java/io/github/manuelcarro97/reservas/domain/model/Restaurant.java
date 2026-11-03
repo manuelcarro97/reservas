@@ -15,6 +15,12 @@ public record Restaurant(Long id, String slug, String name, ZoneId zone, int can
 				theme, bookingMode);
 	}
 
+	/** Cambia la forma del local; el plano vuelve a borrador para que el dueño lo revise antes de publicarlo. */
+	public Restaurant withRoomAsDraft(RoomLayout newRoom) {
+		return new Restaurant(id, slug, name, zone, cancellationDeadlineHours, ownerUid, PlanStatus.DRAFT, newRoom,
+				theme, bookingMode);
+	}
+
 	public boolean isOwnedBy(String uid) {
 		return uid != null && uid.equals(ownerUid);
 	}

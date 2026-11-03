@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -66,6 +67,12 @@ class AdminPlanController {
 	PlanResponse publish(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug) {
 		managePlan.publish(jwt.getSubject(), slug);
 		return view(jwt, slug);
+	}
+
+	@PutMapping("/{slug}/layout")
+	PlanResponse saveLayout(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug,
+			@Valid @RequestBody LayoutRequest request) {
+		return PlanResponse.from(managePlan.saveLayout(jwt.getSubject(), slug, request.toRoom(), request.toChanges()));
 	}
 
 	private PlanResponse view(Jwt jwt, String slug) {

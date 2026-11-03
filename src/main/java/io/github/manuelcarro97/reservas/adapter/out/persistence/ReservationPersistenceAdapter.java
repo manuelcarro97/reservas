@@ -101,6 +101,16 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 	}
 
 	@Override
+	public List<Reservation> findActiveFrom(long restaurantId, LocalDate from) {
+		return reservations
+			.findByRestaurantIdAndDateGreaterThanEqualAndStatusInOrderByDateAscIdAsc(restaurantId, from,
+					List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED))
+			.stream()
+			.map(ReservationEntity::toDomain)
+			.toList();
+	}
+
+	@Override
 	public boolean hasActive(long restaurantId, LocalDate date) {
 		return reservations.existsByRestaurantIdAndDateAndStatusIn(restaurantId, date,
 				List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED));
