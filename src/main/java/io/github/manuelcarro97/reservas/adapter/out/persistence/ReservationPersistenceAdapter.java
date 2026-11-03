@@ -4,6 +4,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -125,6 +126,14 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 			.stream()
 			.map(ReservationEntity::toDomain)
 			.toList();
+	}
+
+	@Override
+	public List<Reservation> changedSince(Collection<Long> restaurantIds, Instant since) {
+		if (restaurantIds.isEmpty()) {
+			return List.of();
+		}
+		return reservations.changedSince(restaurantIds, since).stream().map(ReservationEntity::toDomain).toList();
 	}
 
 	@Override

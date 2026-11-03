@@ -1,5 +1,6 @@
 package io.github.manuelcarro97.reservas.adapter.out.persistence;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -23,6 +24,14 @@ interface ReservationJpaRepository extends JpaRepository<ReservationEntity, Long
 
 	List<ReservationEntity> findByRestaurantIdAndShiftIdAndDateAndStatusInOrderById(long restaurantId, long shiftId,
 			LocalDate date, Collection<ReservationStatus> statuses);
+
+	@Query("""
+			select r from ReservationEntity r
+			where r.restaurantId in :restaurantIds
+			  and (r.createdAt >= :since or r.cancelledByCustomerAt >= :since)
+			order by r.id
+			""")
+	List<ReservationEntity> changedSince(Collection<Long> restaurantIds, Instant since);
 
 	boolean existsByRestaurantIdAndDateAndStatusIn(long restaurantId, LocalDate date,
 			Collection<ReservationStatus> statuses);

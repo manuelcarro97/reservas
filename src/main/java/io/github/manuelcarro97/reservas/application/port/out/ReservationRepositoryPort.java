@@ -2,6 +2,7 @@ package io.github.manuelcarro97.reservas.application.port.out;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -30,6 +31,12 @@ public interface ReservationRepositoryPort {
 
 	/** Reservas PENDING o CONFIRMED del turno en esa fecha, con o sin mesa, por id. */
 	List<Reservation> findActiveFor(long restaurantId, long shiftId, LocalDate date);
+
+	/**
+	 * Reservas de esos planos creadas o canceladas por el cliente en {@code since} o después, por id. Vacío si no hay
+	 * planos.
+	 */
+	List<Reservation> changedSince(Collection<Long> restaurantIds, Instant since);
 
 	boolean hasActive(long restaurantId, LocalDate date);
 

@@ -60,17 +60,19 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	private final TableRepositoryPort tables;
 	private final ReservationRepositoryPort reservations;
 	private final Clock clock;
+	private final ReservationEvents events;
 	private final BookingPolicy bookingPolicy = new BookingPolicy();
 	private final SeatingCapacity seatingCapacity = new SeatingCapacity();
 	private final TableAssigner tableAssigner = new TableAssigner();
 
 	ReservationService(RestaurantRepositoryPort restaurants, ShiftRepositoryPort shifts, TableRepositoryPort tables,
-			ReservationRepositoryPort reservations, Clock clock) {
+			ReservationRepositoryPort reservations, Clock clock, ReservationEvents events) {
 		this.restaurants = restaurants;
 		this.shifts = shifts;
 		this.tables = tables;
 		this.reservations = reservations;
 		this.clock = clock;
+		this.events = events;
 	}
 
 	/**
@@ -103,10 +105,13 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 			.filter(reservation -> reservation.tableId() == null)
 			.map(Reservation::partySize)
 			.toList();
-		return switch (restaurant.bookingMode()) {
+		Reservation created = switch (restaurant.bookingMode()) {
 			case FREE_CHOICE -> createOnChosenTable(restaurant, free, unassignedParties, command);
 			case ASSIGNED -> createWithoutTable(restaurant, free, unassignedParties, command);
 		};
+		// El listener lo envía al confirmarse la transacción: un rollback (409, 422) no avisa.
+		events.newReservation(restaurant, shift.name(), tableLabel(created), created);
+		return created;
 	}
 
 	private Reservation createOnChosenTable(Restaurant restaurant, List<DiningTable> free,
@@ -161,13 +166,18 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 		return details(findByCode(code));
 	}
 
+	/** Transaccional: el aviso al dueño sale con la confirmación de la transacción. */
 	@Override
+	@Transactional
 	public ReservationDetails cancelByCode(String code) {
 		Reservation reservation = findByCode(code);
 		Restaurant restaurant = restaurantOf(reservation);
-		reservation.cancelByCustomer(clock.instant(), shiftStart(reservation, restaurant),
+		Shift shift = shifts.findById(restaurant.id(), reservation.shiftId()).orElseThrow(ShiftNotFoundException::new);
+		reservation.cancelByCustomer(clock.instant(), shift.startsAt(reservation.date(), restaurant.zone()),
 				restaurant.cancellationDeadlineHours());
-		return details(reservations.update(reservation));
+		Reservation cancelled = reservations.update(reservation);
+		events.cancelledByCustomer(restaurant, shift.name(), tableLabel(cancelled), cancelled);
+		return details(cancelled);
 	}
 
 	@Override
