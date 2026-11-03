@@ -38,6 +38,11 @@ class TablePersistenceAdapter implements TableRepositoryPort {
 	}
 
 	@Override
+	public List<DiningTable> findAllById(Collection<Long> ids) {
+		return tables.findAllById(ids).stream().map(DiningTableEntity::toDomain).toList();
+	}
+
+	@Override
 	public DiningTable save(DiningTable table) {
 		try {
 			return tables.save(DiningTableEntity.from(table)).toDomain();

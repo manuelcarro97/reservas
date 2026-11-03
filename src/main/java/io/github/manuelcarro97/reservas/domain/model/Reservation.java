@@ -6,6 +6,8 @@ import java.time.LocalDate;
 
 import io.github.manuelcarro97.reservas.domain.exception.CancellationDeadlinePassedException;
 import io.github.manuelcarro97.reservas.domain.exception.InvalidTransitionException;
+import io.github.manuelcarro97.reservas.domain.exception.TableRequiredToConfirmException;
+import io.github.manuelcarro97.reservas.domain.exception.TableTooSmallException;
 
 public class Reservation {
 
@@ -13,7 +15,7 @@ public class Reservation {
 	private final String code;
 	private final long restaurantId;
 	private final long shiftId;
-	private final Long tableId;
+	private Long tableId;
 	private final LocalDate date;
 	private final int partySize;
 	private final String customerName;
@@ -51,10 +53,22 @@ public class Reservation {
 
 	public void confirm(Instant now, Instant shiftStart) {
 		requireStatus(ReservationStatus.PENDING);
+		if (tableId == null) {
+			throw new TableRequiredToConfirmException();
+		}
 		if (!now.isBefore(shiftStart)) {
 			throw new InvalidTransitionException(status, ReservationStatus.CONFIRMED);
 		}
 		status = ReservationStatus.CONFIRMED;
+	}
+
+	/** Asigna o cambia la mesa; el índice único de la base decide si está libre, aquí solo estado y plazas. */
+	public void assignTable(long newTableId, int tableSeats) {
+		requireStatus(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
+		if (tableSeats < partySize) {
+			throw new TableTooSmallException();
+		}
+		tableId = newTableId;
 	}
 
 	public void cancel() {

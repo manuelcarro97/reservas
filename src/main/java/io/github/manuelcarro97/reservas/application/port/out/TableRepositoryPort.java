@@ -16,6 +16,9 @@ public interface TableRepositoryPort {
 
 	Optional<DiningTable> findById(long id);
 
+	/** Mesas con esos ids, también las borradas: una reserva conserva la etiqueta de su mesa aunque se borre. */
+	List<DiningTable> findAllById(Collection<Long> ids);
+
 	DiningTable save(DiningTable table);
 
 	/**

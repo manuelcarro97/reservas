@@ -9,15 +9,19 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Valid;
 
 import io.github.manuelcarro97.reservas.application.port.in.AdminReservation;
 import io.github.manuelcarro97.reservas.application.port.in.ManageReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ReservationDetails;
+import io.github.manuelcarro97.reservas.application.port.in.TableSuggestion;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -30,10 +34,27 @@ class AdminReservationController {
 		this.manageReservation = manageReservation;
 	}
 
-	@GetMapping("/restaurants/{slug}/reservations")
+	// Dos filtros excluyentes; cualquier otra combinación (ninguno, o un estado distinto de PENDING) da 400.
+	@GetMapping(path = "/restaurants/{slug}/reservations", params = { "date", "!status" })
 	List<AdminReservation> list(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug,
 			@RequestParam @SupportedDate @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-		return manageReservation.listByDate(jwt.getSubject(), slug, date);
+		return manageReservation.list(jwt.getSubject(), slug, date);
+	}
+
+	@GetMapping(path = "/restaurants/{slug}/reservations", params = { "status=PENDING", "!date" })
+	List<AdminReservation> pending(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug) {
+		return manageReservation.pending(jwt.getSubject(), slug);
+	}
+
+	@PutMapping("/reservations/{id}/table")
+	ReservationDetails assignTable(@AuthenticationPrincipal Jwt jwt, @PathVariable long id,
+			@Valid @RequestBody AssignTableRequest request) {
+		return manageReservation.assignTable(jwt.getSubject(), id, request.tableId());
+	}
+
+	@GetMapping("/reservations/{id}/suggestions")
+	List<TableSuggestion> suggestions(@AuthenticationPrincipal Jwt jwt, @PathVariable long id) {
+		return manageReservation.suggestions(jwt.getSubject(), id);
 	}
 
 	@PostMapping("/reservations/{id}/confirm")

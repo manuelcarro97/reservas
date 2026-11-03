@@ -10,12 +10,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 import io.github.manuelcarro97.reservas.application.port.out.ReservationRepositoryPort;
 import io.github.manuelcarro97.reservas.domain.exception.ConcurrentUpdateException;
+import io.github.manuelcarro97.reservas.domain.exception.TableTakenException;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.ReservationStatus;
 
@@ -84,11 +86,16 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 
 	@Override
 	public Reservation update(Reservation reservation) {
+		// saveAndFlush y no save: el UPDATE se ejecuta aquí, y con él saltan dentro del try la violación del índice
+		// único (mesa ya reservada) y el bloqueo optimista, aunque haya una transacción exterior.
 		try {
-			return reservations.save(ReservationEntity.from(reservation)).toDomain();
+			return reservations.saveAndFlush(ReservationEntity.from(reservation)).toDomain();
 		}
 		catch (OptimisticLockingFailureException staleVersion) {
 			throw new ConcurrentUpdateException();
+		}
+		catch (DataIntegrityViolationException slotTaken) {
+			throw new TableTakenException();
 		}
 	}
 

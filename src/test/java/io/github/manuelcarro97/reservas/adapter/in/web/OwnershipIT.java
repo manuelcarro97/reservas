@@ -17,6 +17,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -27,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import io.github.manuelcarro97.reservas.application.port.in.ManageReservationUseCase;
+import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
@@ -115,6 +117,15 @@ class OwnershipIT extends PostgresIT {
 				new Route("GET reservations",
 						it -> get("/api/v1/admin/restaurants/plano-a/reservations").param("date", DATE.toString()),
 						RESTAURANT_NOT_FOUND),
+				new Route("GET pending reservations",
+						it -> get("/api/v1/admin/restaurants/plano-a/reservations").param("status", "PENDING"),
+						RESTAURANT_NOT_FOUND),
+				new Route("PUT reservation table", it -> put(it.reservationPath("table"))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{"tableId":%d}
+							""".formatted(it.spare.id())), RESERVATION_NOT_FOUND),
+				new Route("GET suggestions", it -> get(it.reservationPath("suggestions")), RESERVATION_NOT_FOUND),
 				new Route("POST confirm", it -> post(it.reservationPath("confirm")), RESERVATION_NOT_FOUND),
 				new Route("POST cancel", it -> post(it.reservationPath("cancel")), RESERVATION_NOT_FOUND),
 				new Route("POST no-show", it -> post(it.reservationPath("no-show")), RESERVATION_NOT_FOUND,
@@ -137,12 +148,14 @@ class OwnershipIT extends PostgresIT {
 	private Restaurant restaurant;
 	private Shift shift;
 	private Reservation reservation;
+	private DiningTable spare;
 
 	@BeforeEach
 	void seed() {
 		restaurant = givenRestaurant("plano-a", "owner-a");
 		shift = givenDinnerShift(restaurant);
 		reservation = givenReservation(restaurant, shift, givenTable(restaurant, "M2", 2), DATE, 2);
+		spare = givenTable(restaurant, "M3", 4);
 	}
 
 	private String shiftPath() {
@@ -175,6 +188,22 @@ class OwnershipIT extends PostgresIT {
 		assertThat(fingerprint()).isEqualTo(before);
 	}
 
+	@Test
+	void ownerCannotAssignTableOfAnotherOwnersPlan() throws Exception {
+		Restaurant otherPlan = givenRestaurant("plano-b", "owner-b");
+		DiningTable foreign = givenTable(otherPlan, "B1", 4);
+		List<String> before = fingerprint();
+
+		mvc.perform(put(reservationPath("table")).contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"tableId":%d}
+					""".formatted(foreign.id())).with(AuthRequests.owner("owner-a")))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("TABLE_NOT_FOUND"));
+
+		assertThat(fingerprint()).isEqualTo(before);
+	}
+
 	/** Foto del estado que las rutas de administración pueden modificar. */
 	private List<String> fingerprint() {
 		List<String> state = new java.util.ArrayList<>();
@@ -188,7 +217,8 @@ class OwnershipIT extends PostgresIT {
 				+ "|| x || '/' || y || '/' || coalesce(deleted_at::text, '-') FROM dining_table ORDER BY id")
 			.query(String.class)
 			.list());
-		state.addAll(jdbc.sql("SELECT status || '/' || version FROM reservation ORDER BY id")
+		state.addAll(jdbc.sql("SELECT status || '/' || version || '/' || coalesce(table_id::text, '-') "
+				+ "FROM reservation ORDER BY id")
 			.query(String.class)
 			.list());
 		state.addAll(jdbc.sql("SELECT id || '/' || name || '/' || start_time || '/' || end_time || '/' "

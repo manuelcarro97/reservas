@@ -17,6 +17,10 @@ public interface ReservationRepositoryPort {
 
 	Optional<Reservation> findById(long id);
 
+	/**
+	 * Guarda la reserva con un UPDATE inmediato. Lanza ConcurrentUpdateException si otra transacción la cambió antes y
+	 * TableTakenException si la mesa ya tiene otra reserva activa en esa fecha y turno.
+	 */
 	Reservation update(Reservation reservation);
 
 	List<Reservation> findByDate(long restaurantId, LocalDate date);
