@@ -186,21 +186,50 @@ describe('EditorPage', () => {
     expect(slider('Pared derecha')).toBeTruthy();
   });
 
-  it('las flechas mueven el tirador de 20 en 20 sin llamar a la API', async () => {
+  it('las flechas mueven la pared hacia donde apuntan, de 20 en 20, sin llamar a la API', async () => {
     await open();
     await press('Pared derecha', 'ArrowRight');
     expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1220');
-    await press('Pared derecha', 'ArrowUp');
+    await press('Pared derecha', 'ArrowRight');
     expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1240');
     await press('Pared derecha', 'ArrowLeft');
-    await press('Pared derecha', 'ArrowDown');
-    await press('Pared derecha', 'ArrowDown');
+    await press('Pared derecha', 'ArrowLeft');
+    await press('Pared derecha', 'ArrowLeft');
     expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1180');
-    await press('Pared inferior', 'ArrowRight');
+    await press('Pared inferior', 'ArrowDown');
     expect(slider('Pared inferior').getAttribute('aria-valuenow')).toBe('580');
-    // Otras teclas no hacen nada.
+    // Una flecha perpendicular a la pared y otras teclas no hacen nada.
+    await press('Pared inferior', 'ArrowRight');
+    await press('Pared derecha', 'ArrowUp');
     await press('Pared inferior', 'a');
     expect(slider('Pared inferior').getAttribute('aria-valuenow')).toBe('580');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1180');
+  });
+
+  it('la flecha hacia fuera agranda también en la pared izquierda y en la de arriba', async () => {
+    await open();
+    await press('Pared izquierda', 'ArrowLeft');
+    expect(slider('Pared izquierda').getAttribute('aria-valuenow')).toBe('1220');
+    await press('Pared izquierda', 'ArrowRight');
+    await press('Pared izquierda', 'ArrowRight');
+    expect(slider('Pared izquierda').getAttribute('aria-valuenow')).toBe('1180');
+    await press('Pared superior', 'ArrowUp');
+    expect(slider('Pared superior').getAttribute('aria-valuenow')).toBe('580');
+    await press('Pared superior', 'ArrowDown');
+    await press('Pared superior', 'ArrowDown');
+    expect(slider('Pared superior').getAttribute('aria-valuenow')).toBe('540');
+  });
+
+  it('con el entrante centrado la flecha mueve la pared 20 y la medida 40', async () => {
+    await open();
+    await click('En U');
+    // Pared interior derecha: la flecha derecha la aleja del centro.
+    await press('Pared interior derecha del entrante', 'ArrowRight');
+    expect(slider('Pared interior derecha del entrante').getAttribute('aria-valuenow')).toBe('460');
+    await press('Pared interior izquierda del entrante', 'ArrowRight');
+    expect(slider('Pared interior izquierda del entrante').getAttribute('aria-valuenow')).toBe(
+      '420',
+    );
   });
 
   it('las flechas respetan el límite del rango', async () => {
@@ -307,6 +336,81 @@ describe('EditorPage', () => {
     pointer('pointerup', width, 300, 120);
   });
 
+  /** `viewBox` del plano y de la capa de tiradores: tienen que ser siempre el mismo. */
+  function viewBox(): string | null | undefined {
+    const plano = page.querySelector('app-plano svg')?.getAttribute('viewBox');
+    expect(page.querySelector('svg.handles')?.getAttribute('viewBox')).toBe(plano);
+    return plano;
+  }
+
+  it('durante el arrastre de la pared izquierda el encuadre solo se traslada en x lo que se desplazan las mesas', async () => {
+    await open();
+    stubScreenMatrix();
+    expect(viewBox()).toBe('-40 -40 1280 640');
+    const left = slider('Pared izquierda');
+    pointer('pointerdown', left, 0, 280);
+    pointer('pointermove', left, -40, 280);
+    await settle();
+    // El local crece 40 por la izquierda y las mesas se desplazan 40: el encuadre las sigue, mismo tamaño.
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1240');
+    expect(viewBox()).toBe('0 -40 1280 640');
+    pointer('pointermove', left, -80, 280);
+    await settle();
+    expect(viewBox()).toBe('40 -40 1280 640');
+    // Soltar reencuadra al nuevo tamaño.
+    pointer('pointerup', left, -80, 280);
+    await settle();
+    expect(viewBox()).toBe('-40 -40 1360 640');
+  });
+
+  it('con el local girado 90 la pared de arriba traslada el encuadre solo en y', async () => {
+    await open();
+    await click('Girar 90°');
+    stubScreenMatrix();
+    expect(viewBox()).toBe('-40 -40 640 1280');
+    const top = slider('Pared superior');
+    pointer('pointerdown', top, 280, 0);
+    pointer('pointermove', top, 280, -40);
+    await settle();
+    expect(viewBox()).toBe('-40 0 640 1280');
+    pointer('pointerup', top, 280, -40);
+    await settle();
+    expect(viewBox()).toBe('-40 -40 640 1320');
+  });
+
+  it('las paredes de la derecha y de abajo no mueven el encuadre; al soltar se reencuadra', async () => {
+    await open();
+    stubScreenMatrix();
+    const right = slider('Pared derecha');
+    pointer('pointerdown', right, 1200, 280);
+    pointer('pointermove', right, 1280, 280);
+    await settle();
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1280');
+    expect(viewBox()).toBe('-40 -40 1280 640');
+    pointer('pointercancel', right, 1280, 280);
+    await settle();
+    expect(viewBox()).toBe('-40 -40 1360 640');
+  });
+
+  it('perder la captura del puntero reencuadra', async () => {
+    await open();
+    stubScreenMatrix();
+    const bottom = slider('Pared inferior');
+    pointer('pointerdown', bottom, 600, 560);
+    pointer('pointermove', bottom, 600, 620);
+    await settle();
+    expect(viewBox()).toBe('-40 -40 1280 640');
+    pointer('lostpointercapture', bottom, 600, 620);
+    await settle();
+    expect(viewBox()).toBe('-40 -40 1280 700');
+  });
+
+  it('con el teclado no hay encuadre congelado: se reencuadra en cada paso', async () => {
+    await open();
+    await press('Pared derecha', 'ArrowRight');
+    expect(viewBox()).toBe('-40 -40 1300 640');
+  });
+
   it('perder la captura del puntero termina el arrastre', async () => {
     await open();
     stubScreenMatrix();
@@ -378,7 +482,7 @@ describe('EditorPage', () => {
   it('las flechas en la pared de arriba mueven las mesas con el origen', async () => {
     await open();
     const plano = harness.fixture.debugElement.query((el) => el.name === 'app-plano');
-    await press('Pared superior', 'ArrowRight');
+    await press('Pared superior', 'ArrowUp');
     expect(slider('Pared superior').getAttribute('aria-valuenow')).toBe('580');
     expect(plano.componentInstance.tables()[0]).toMatchObject({ x: 200, y: 470 });
   });

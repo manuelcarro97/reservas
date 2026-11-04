@@ -33,21 +33,14 @@
       moverlos de 20 en 20.
     </p>
 
-    @if (store.published() && store.roomChanged()) {
-      <p class="notice" role="status">
-        Este plano está publicado. Si tiene reservas activas a partir de hoy, no podrás guardar un
-        cambio de forma del local hasta cancelarlas.
-      </p>
-    }
-    @if (misplacedTables().length > 0) {
-      <p class="notice" role="status">
-        Con esta forma, estas mesas quedan fuera del local o demasiado cerca de la pared:
-        {{ misplacedTables().join(', ') }}. Muévelas antes de guardar.
-      </p>
-    }
-
     <div class="stage">
-      <app-plano [room]="store.room()" [tables]="store.tables()" [theme]="store.theme()" />
+      <app-plano
+        class="editing"
+        [room]="store.room()"
+        [tables]="store.tables()"
+        [theme]="store.theme()"
+        [viewBox]="viewBox()"
+      />
       <svg
         #overlay
         class="handles"
@@ -80,5 +73,19 @@
         }
       </svg>
     </div>
+
+    <!-- Debajo del plano: si salen en mitad de un arrastre no empujan el plano. -->
+    @if (store.published() && store.roomChanged()) {
+      <p class="notice" role="status">
+        Este plano está publicado. Si tiene reservas activas a partir de hoy, no podrás guardar un
+        cambio de forma del local hasta cancelarlas.
+      </p>
+    }
+    @if (misplacedTables().length > 0) {
+      <p class="notice" role="status">
+        Con esta forma, estas mesas quedan fuera del local o demasiado cerca de la pared:
+        {{ misplacedTables().join(', ') }}. Muévelas antes de guardar.
+      </p>
+    }
   }
 }

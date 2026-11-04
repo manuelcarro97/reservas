@@ -47,16 +47,37 @@ interface DrawnTable {
 const PAD = 40;
 const BADGE_HEIGHT = 40;
 
-/** `viewBox` del plano: el contorno del local con un margen de PAD. Lo usan también las capas que se dibujan encima. */
-export function planoViewBox(room: Room): string {
+/** Encuadre del plano: esquina superior izquierda y tamaño, en unidades de plano. */
+export interface PlanoFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Encuadre del plano: el contorno del local con un margen de PAD. */
+export function planoFrame(room: Room): PlanoFrame {
   const polygon = roomPolygon(room);
   const xs = polygon.map((point) => point.x);
   const ys = polygon.map((point) => point.y);
   const minX = Math.min(...xs);
   const minY = Math.min(...ys);
-  const width = Math.max(...xs) - minX;
-  const height = Math.max(...ys) - minY;
-  return `${minX - PAD} ${minY - PAD} ${width + PAD * 2} ${height + PAD * 2}`;
+  return {
+    x: minX - PAD,
+    y: minY - PAD,
+    width: Math.max(...xs) - minX + PAD * 2,
+    height: Math.max(...ys) - minY + PAD * 2,
+  };
+}
+
+/** Atributo `viewBox` de un encuadre. */
+export function frameViewBox({ x, y, width, height }: PlanoFrame): string {
+  return `${x} ${y} ${width} ${height}`;
+}
+
+/** `viewBox` del plano: el contorno del local con un margen de PAD. Lo usan también las capas que se dibujan encima. */
+export function planoViewBox(room: Room): string {
+  return frameViewBox(planoFrame(room));
 }
 
 const STATE_TEXT: Record<TableState, string> = {
@@ -103,6 +124,11 @@ export class PlanoComponent {
   readonly states = input<Record<number, TableState>>({});
   /** Con `true` las mesas se pueden enfocar y activar con clic, Enter o Espacio. */
   readonly interactive = input(false);
+  /**
+   * `viewBox` fijo. Sin él el plano se encuadra al local (`planoViewBox`). El editor lo usa mientras se arrastra una
+   * pared para que el plano no se reencuadre bajo el puntero.
+   */
+  readonly viewBox = input<string | null>(null);
 
   /** Id de la mesa activada. Se emite en todos los estados salvo `blocked` (la mesa que el cliente no puede elegir). */
   readonly tableSelected = output<number>();
@@ -155,7 +181,7 @@ export class PlanoComponent {
       .join(' '),
   );
 
-  protected readonly viewBox = computed(() => planoViewBox(this.room()));
+  protected readonly shownViewBox = computed(() => this.viewBox() ?? planoViewBox(this.room()));
 
   protected readonly drawnTables = computed<DrawnTable[]>(() =>
     this.tables()

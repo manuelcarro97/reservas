@@ -108,3 +108,8 @@
   stroke: #fff;
   stroke-width: 8;
 }
+
+/* En el editor, la pared que se arrastra puede salir del encuadre congelado: se sigue viendo. */
+:host(.editing) .plano {
+  overflow: visible;
+}

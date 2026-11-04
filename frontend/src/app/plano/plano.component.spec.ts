@@ -241,6 +241,15 @@ describe('PlanoComponent', () => {
     expect(root(fixture).querySelector('svg')?.getAttribute('viewBox')).toBe('-40 -40 880 1280');
   });
 
+  it('viewBoxInputOverridesTheFittedOne', () => {
+    const fixture = render({ viewBox: '0 -40 1280 880' });
+
+    expect(root(fixture).querySelector('svg')?.getAttribute('viewBox')).toBe('0 -40 1280 880');
+    fixture.componentRef.setInput('viewBox', null);
+    fixture.detectChanges();
+    expect(root(fixture).querySelector('svg')?.getAttribute('viewBox')).toBe('-40 -40 1280 880');
+  });
+
   // Con <base href="/"> y rutas sin hash, `url(#id)` se resuelve contra la base en Safari y Firefox antiguos
   // (otro documento) y se pierden suelo, banda, cojines, tablero y madera. Las referencias llevan la URL actual.
   describe('references against the current URL', () => {

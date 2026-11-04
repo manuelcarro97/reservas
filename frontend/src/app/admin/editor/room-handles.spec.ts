@@ -291,28 +291,63 @@ describe('room handles', () => {
     }
   });
 
+  /**
+   * Líneas del contorno que cambian (respecto a las de antes desplazadas como las mesas) al mover una pared. Salvo
+   * las excepciones inevitables es solo la de la pared movida:
+   * - el cuadrado mueve también la contigua, porque ancho y alto crecen juntos;
+   * - en la U y la T el entrante está centrado: mover una pared exterior izquierda o derecha lo recentra (se mueven
+   *   las dos paredes interiores) y mover una interior mueve su simétrica;
+   * - las dos patas de la U (y el pie de la T) comparten alto: es una sola línea.
+   */
+  function changedLines(base: Room, candidate: Handle): { changed: string[]; moved: string } {
+    const out = 40 / candidate.gain;
+    const move = moveHandleBy(
+      base,
+      candidate,
+      candidate.direction.x * out,
+      candidate.direction.y * out,
+    );
+    const before = lines(base, move.shift);
+    const changed = [...lines(move.room)].filter((line) => !before.has(line));
+    const moved =
+      candidate.direction.x !== 0
+        ? `v:${candidate.x + move.shift.x + out * candidate.direction.x}`
+        : `h:${candidate.y + move.shift.y + out * candidate.direction.y}`;
+    return { changed, moved };
+  }
+
   it('mover una pared solo mueve esa línea del contorno; las demás se quedan quietas respecto a las mesas', () => {
     for (const base of [RECTANGLE, L]) {
       for (const rotation of ROTATIONS) {
         const turned = { ...base, rotation };
         for (const candidate of handlesFor(turned)) {
-          const move = moveHandleBy(
-            turned,
-            candidate,
-            candidate.direction.x * 40,
-            candidate.direction.y * 40,
-          );
-          // Las líneas de antes, desplazadas lo que se desplazan las mesas, menos la pared movida.
-          const before = lines(turned, move.shift);
-          const after = lines(move.room);
-          const changed = [...after].filter((line) => !before.has(line));
+          const { changed, moved } = changedLines(turned, candidate);
           const label = `${base.shape} ${rotation} ${candidate.wall}`;
-          expect(changed.length, label).toBe(1);
-          const moved =
-            candidate.direction.x !== 0
-              ? `v:${candidate.x + move.shift.x + 40 * candidate.direction.x}`
-              : `h:${candidate.y + move.shift.y + 40 * candidate.direction.y}`;
-          expect(changed[0], label).toBe(moved);
+          expect(changed, label).toEqual([moved]);
+        }
+      }
+    }
+  });
+
+  it('en el cuadrado, la U y la T mover una pared mueve además lo que el modelo obliga a mover', () => {
+    const outerSides = ['left', 'right'];
+    const centred = ['innerLeft', 'innerRight', 'stemLeft', 'stemRight'];
+    for (const base of [SQUARE, U, T]) {
+      for (const rotation of ROTATIONS) {
+        const turned = { ...base, rotation };
+        for (const candidate of handlesFor(turned)) {
+          const { changed, moved } = changedLines(turned, candidate);
+          const label = `${base.shape} ${rotation} ${candidate.wall}`;
+          expect(changed, label).toContain(moved);
+          let expected = 1;
+          if (base === SQUARE) {
+            expected = 2;
+          } else if (outerSides.includes(candidate.wall)) {
+            expected = 3;
+          } else if (centred.includes(candidate.wall)) {
+            expected = 2;
+          }
+          expect(changed.length, label).toBe(expected);
         }
       }
     }

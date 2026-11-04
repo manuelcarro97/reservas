@@ -43,7 +43,7 @@ button[aria-pressed='true'] {
 }
 
 .notice {
-  margin: 0 0 0.75rem;
+  margin: 0.75rem 0 0;
   padding: 0.6rem 0.8rem;
   border: 1px solid #e3c88b;
   border-radius: 6px;

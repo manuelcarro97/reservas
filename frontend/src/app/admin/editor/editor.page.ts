@@ -13,7 +13,13 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { EMPTY, Subject, catchError, map, merge, switchMap, tap } from 'rxjs';
 import { AdminPlanControllerService } from '../../core/api/services/admin-plan-controller.service';
 import { Point, RoomShape, STEP } from '../../plano/geometry';
-import { PlanoComponent, planoViewBox } from '../../plano/plano.component';
+import {
+  PlanoComponent,
+  PlanoFrame,
+  frameViewBox,
+  planoFrame,
+  planoViewBox,
+} from '../../plano/plano.component';
 import { EditorStore } from './editor.store';
 import { Handle, handlesFor } from './room-handles';
 
@@ -74,8 +80,24 @@ export class EditorPage {
   private readonly overlay = viewChild<ElementRef<SVGSVGElement>>('overlay');
   private drag: Drag | null = null;
 
-  /** Mismo `viewBox` que `<app-plano>`: la capa de tiradores y el plano comparten coordenadas. */
-  protected readonly viewBox = computed(() => planoViewBox(this.store.room()));
+  /** Encuadre al empezar el arrastre en curso; null fuera de un arrastre. */
+  private readonly frozenFrame = signal<PlanoFrame | null>(null);
+
+  /**
+   * `viewBox` del plano y de la capa de tiradores (comparten coordenadas). Fuera de un arrastre se ajusta al local.
+   * Durante uno queda congelado en el del principio, trasladado lo que se desplazan las mesas cuando la pared
+   * arrastrada es la de la izquierda o la de arriba: así lo que no se mueve no se mueve en pantalla y solo la pared
+   * arrastrada sigue al puntero (el encuadre se reajusta de golpe al soltar). Si la pared sale del encuadre se sigue
+   * viendo porque el plano del editor tiene `overflow: visible`.
+   */
+  protected readonly viewBox = computed(() => {
+    const frozen = this.frozenFrame();
+    if (!frozen) {
+      return planoViewBox(this.store.room());
+    }
+    const shift = this.store.dragShift();
+    return frameViewBox({ ...frozen, x: frozen.x + shift.x, y: frozen.y + shift.y });
+  });
   protected readonly handles = computed(() => handlesFor(this.store.room()));
 
   /** Mesas que se salen del local o quedan pegadas a la pared con la forma actual. */
@@ -148,6 +170,7 @@ export class EditorPage {
       scale,
     };
     this.dragging.set(handle.wall);
+    this.frozenFrame.set(planoFrame(this.store.room()));
     this.store.beginDrag();
   }
 
@@ -171,34 +194,41 @@ export class EditorPage {
     (event.currentTarget as Element).releasePointerCapture?.(event.pointerId);
     this.drag = null;
     this.dragging.set(null);
+    this.frozenFrame.set(null);
     this.store.endDrag();
   }
 
-  /** Flechas: derecha y arriba agrandan, izquierda y abajo achican, de STEP en STEP. */
+  /**
+   * Flechas: mueven la pared hacia donde apunta la flecha, de STEP en STEP en pantalla (en la U y la T, donde el
+   * entrante está centrado, la medida cambia el doble). Una flecha perpendicular a la pared no hace nada.
+   */
   protected onKeydown(event: KeyboardEvent, handle: Handle): void {
     // Alt+flecha, Ctrl+flecha y Meta+flecha son atajos del navegador (atrás, adelante…): no se tocan.
     if (event.altKey || event.ctrlKey || event.metaKey) {
       return;
     }
-    const sign = this.keySign(event.key);
+    const arrow = this.arrowVector(event.key);
+    const sign = arrow ? arrow.x * handle.direction.x + arrow.y * handle.direction.y : 0;
     if (sign === 0) {
       return;
     }
     // Sin esto las flechas desplazan la página.
     event.preventDefault();
-    this.store.setHandleValue(handle, this.store.room()[handle.kind] + sign * STEP);
+    this.store.setHandleValue(handle, this.store.room()[handle.kind] + sign * STEP * handle.gain);
   }
 
-  private keySign(key: string): number {
+  private arrowVector(key: string): Point | null {
     switch (key) {
       case 'ArrowRight':
-      case 'ArrowUp':
-        return 1;
+        return { x: 1, y: 0 };
       case 'ArrowLeft':
+        return { x: -1, y: 0 };
+      case 'ArrowUp':
+        return { x: 0, y: -1 };
       case 'ArrowDown':
-        return -1;
+        return { x: 0, y: 1 };
       default:
-        return 0;
+        return null;
     }
   }
 

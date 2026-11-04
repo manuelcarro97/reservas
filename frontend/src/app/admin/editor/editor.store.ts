@@ -1,7 +1,14 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { LayoutRequest } from '../../core/api/models/layout-request';
 import { PlanResponse } from '../../core/api/models/plan-response';
-import { Room, RoomShape, roomRects, rotatePoint, validateLayout } from '../../plano/geometry';
+import {
+  Point,
+  Room,
+  RoomShape,
+  roomRects,
+  rotatePoint,
+  validateLayout,
+} from '../../plano/geometry';
 import { PlanoTable } from '../../plano/plano.component';
 import { ThemeKey } from '../../plano/themes';
 import { Handle, WallMove, moveHandleBy, moveHandleTo } from './room-handles';
@@ -36,6 +43,12 @@ export class EditorStore {
   private readonly saved = signal({ room: JSON.stringify(EMPTY_ROOM), all: '' });
   /** Local y mesas al empezar el arrastre en curso, para calcular desde ahí el desplazamiento total. */
   private dragStart: { room: Room; tables: EditorTable[] } | null = null;
+  private readonly dragShiftState = signal<Point>({ x: 0, y: 0 });
+  /**
+   * Cuánto se han desplazado las mesas (y el origen del local) desde que empezó el arrastre en curso; (0, 0) fuera de
+   * un arrastre. El editor traslada con esto su encuadre congelado para que lo que no se mueve no se mueva en pantalla.
+   */
+  readonly dragShift = this.dragShiftState.asReadonly();
   /** Los ids temporales solo bajan: nunca se repite uno mientras la página siga abierta. */
   private lastTemporaryId = 0;
 
@@ -66,6 +79,7 @@ export class EditorStore {
       rotation: plan.room?.rotation ?? 0,
     };
     this.dragStart = null;
+    this.dragShiftState.set({ x: 0, y: 0 });
     this.roomState.set(room);
     this.tablesState.set(
       (plan.tables ?? []).map((table) => ({
@@ -115,10 +129,12 @@ export class EditorStore {
   /** Empieza un arrastre: `dragHandle` calcula desde el local y las mesas de ahora hasta `endDrag`. */
   beginDrag(): void {
     this.dragStart = { room: this.room(), tables: this.tables() };
+    this.dragShiftState.set({ x: 0, y: 0 });
   }
 
   endDrag(): void {
     this.dragStart = null;
+    this.dragShiftState.set({ x: 0, y: 0 });
   }
 
   /**
@@ -128,7 +144,11 @@ export class EditorStore {
    */
   dragHandle(handle: Handle, dx: number, dy: number): void {
     const base = this.dragStart ?? { room: this.room(), tables: this.tables() };
-    this.apply(base, moveHandleBy(base.room, handle, dx, dy));
+    const move = moveHandleBy(base.room, handle, dx, dy);
+    this.apply(base, move);
+    if (this.dragStart) {
+      this.dragShiftState.set(move.shift);
+    }
   }
 
   /** Fija la medida principal del tirador (teclado). */
