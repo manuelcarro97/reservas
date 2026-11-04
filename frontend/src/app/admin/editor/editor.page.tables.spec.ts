@@ -510,7 +510,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
   });
 
   describe('tema', () => {
-    it('themeChangeIsSavedWithPatch: elegir tema lo aplica al plano y se guarda con PUT y PATCH', async () => {
+    it('themeChangeIsSavedWithPatch: elegir tema lo aplica al plano y se guarda solo con PATCH', async () => {
       await open();
       expect(button('Azul').getAttribute('aria-pressed')).toBe('true');
       await click('Noche');
@@ -520,8 +520,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
       expect(plano.theme()).toBe('NOCHE');
       button('Guardar').click();
       await settle();
-      expectPut().flush(PLAN);
-      await tick();
+      http.expectNone((request) => request.method === 'PUT');
       const patch = http.expectOne(
         (request) => request.method === 'PATCH' && request.url.endsWith('/restaurants/kafe'),
       );
@@ -567,6 +566,18 @@ describe('EditorPage: mesas, tema y guardado', () => {
       expect(embed.value).toContain(`${link.value}?embed=1`);
       expect(embed.value).toContain('<iframe');
       expect(embed.value).not.toContain('Kafé');
+    });
+
+    it('el enlace público y el iframe codifican el slug', async () => {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/plano');
+      expectPlan('kafe').flush({ ...PLAN, slug: 'ka fe/"x', status: 'PUBLISHED' });
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+      const link = page.querySelector('.published input') as HTMLInputElement;
+      expect(link.value.endsWith('/r/ka%20fe%2F%22x')).toBe(true);
+      const embed = page.querySelector('.published textarea') as HTMLTextAreaElement;
+      expect(embed.value).toContain(`src="${link.value}?embed=1"`);
     });
 
     it('un plano publicado enseña su enlace y no ofrece publicar otra vez', async () => {
@@ -643,6 +654,27 @@ describe('EditorPage: mesas, tema y guardado', () => {
       expect(page.querySelector('h1')?.textContent).toContain('Otro');
       expect(dialog()).toBeNull();
       expect(button('Guardar').disabled).toBe(true);
+    });
+
+    it('mientras se guarda no se sale: la respuesta de un plano no se carga bajo la URL de otro', async () => {
+      await open();
+      await key(tableGroup(5), 'ArrowRight');
+      button('Guardar').click();
+      await settle();
+      const router = TestBed.inject(Router);
+
+      expect(await router.navigateByUrl('/panel/otro/plano')).toBe(false);
+      await settle();
+      expect(router.url).toBe('/panel/kafe/plano');
+      expect(dialog()).toBeNull();
+      expect(page.querySelector('.info')?.textContent).toContain('Espera');
+      http.expectNone((request) => request.method === 'GET');
+
+      // Al terminar de guardar ya se puede salir.
+      expectPut().flush({ ...PLAN, tables: [{ ...PLAN.tables![0], x: 210 }, PLAN.tables![1]] });
+      await settle();
+      expect(await router.navigateByUrl('/panel/otro/plano')).toBe(true);
+      expectPlan('otro').flush(OTHER);
     });
 
     it('beforeunload avisa solo mientras haya cambios', async () => {

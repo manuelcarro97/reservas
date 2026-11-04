@@ -102,6 +102,8 @@ export class EditorStore {
     tables: [],
     theme: 'AZUL',
   });
+  /** Última respuesta del servidor cargada: de ella salen los ajustes que repite el `PATCH` si no hubo `PUT`. */
+  private loadedPlan: PlanResponse | null = null;
   /** Local y mesas al empezar el arrastre en curso, para calcular desde ahí el desplazamiento total. */
   private dragStart: { room: Room; tables: EditorTable[] } | null = null;
   private readonly dragShiftState = signal<Point>({ x: 0, y: 0 });
@@ -222,6 +224,7 @@ export class EditorStore {
     this.publishedState.set(plan.status === 'PUBLISHED');
     this.slugState.set(plan.slug ?? this.slug());
     this.savedState.set({ room, tables, theme });
+    this.loadedPlan = plan;
     this.clearFeedback();
   }
 
@@ -426,9 +429,10 @@ export class EditorStore {
   }
 
   /**
-   * Guarda el plano: `PUT layout` y, si el tema elegido no es el que devuelve el servidor, `PATCH` con el tema (el
-   * layout no lo lleva). El `PATCH` repite el resto de ajustes tal como los devolvió el `PUT`: no es parcial. Las
-   * respuestas llevan el plano completo con los ids reales, así que se carga la última sin pedirlo otra vez.
+   * Guarda el plano: `PUT layout` si la sala o las mesas cambiaron y `PATCH` con el tema si el elegido no es el que se
+   * cargó (el layout no lo lleva). Un cambio solo de tema no hace `PUT`. El `PATCH` repite el resto de ajustes tal
+   * como los devolvió el `PUT` (sin `PUT`, los del plano cargado): no es parcial. Las respuestas llevan el plano
+   * completo con los ids reales, así que se carga la última sin pedirlo otra vez.
    * Devuelve si se guardó todo; los motivos de un fallo quedan en `saveError`, `blockingCodes` y `serverProblems`.
    */
   async save(): Promise<boolean> {
@@ -439,21 +443,29 @@ export class EditorStore {
     this.clearFeedback();
     const slug = this.slug();
     const chosenTheme = this.theme();
+    const saved = this.savedState();
+    // Se compara con lo cargado, no con la respuesta del PUT: si otra pestaña cambió el tema, guardar solo una mesa
+    // no debe devolverlo al que se cargó aquí.
+    const layoutChanged =
+      !sameRoom(this.room(), saved.room) || !sameTables(this.tables(), saved.tables);
+    const themeChanged = chosenTheme !== saved.theme;
     let layoutSaved: PlanResponse | null = null;
     try {
-      layoutSaved = await firstValueFrom(
-        this.api.saveLayout({ slug, body: this.toLayoutRequest() }),
-      );
-      const plan =
-        layoutSaved.theme === chosenTheme
-          ? layoutSaved
-          : await firstValueFrom(
-              this.api.updateSettings({
-                slug,
-                body: settingsWithTheme(layoutSaved, slug, chosenTheme),
-              }),
-            );
-      this.load(plan);
+      let plan = this.loadedPlan;
+      if (layoutChanged) {
+        layoutSaved = await firstValueFrom(
+          this.api.saveLayout({ slug, body: this.toLayoutRequest() }),
+        );
+        plan = layoutSaved;
+      }
+      if (themeChanged) {
+        plan = await firstValueFrom(
+          this.api.updateSettings({ slug, body: settingsWithTheme(plan, slug, chosenTheme) }),
+        );
+      }
+      if (plan) {
+        this.load(plan);
+      }
       return true;
     } catch (error) {
       if (layoutSaved) {
@@ -525,7 +537,12 @@ export class EditorStore {
 }
 
 /** Cuerpo del `PATCH` con el tema nuevo y el resto de ajustes del plano sin tocar. */
-function settingsWithTheme(plan: PlanResponse, slug: string, theme: ThemeKey): PlanSettingsRequest {
+function settingsWithTheme(
+  plan: PlanResponse | null,
+  slug: string,
+  theme: ThemeKey,
+): PlanSettingsRequest {
+  plan ??= {};
   return {
     name: plan.name ?? slug,
     theme,

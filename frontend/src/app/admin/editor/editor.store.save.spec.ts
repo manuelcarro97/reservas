@@ -194,13 +194,12 @@ describe('EditorStore: guardar y publicar', () => {
     expect(store.publishError()).toContain('12 segundos');
   });
 
-  it('themeChangeIsSavedWithPatch', async () => {
+  it('themeChangeIsSavedWithPatch: solo el tema no hace PUT, solo PATCH', async () => {
     store.setTheme('NOCHE');
     expect(store.canSave()).toBe(true);
     const done = store.save();
-    expectPut().flush(PLAN);
-    await settle();
-    // El PATCH no es parcial: lleva el resto de ajustes tal como los devolvió el servidor.
+    http.expectNone((request) => request.method === 'PUT');
+    // El PATCH no es parcial: lleva el resto de ajustes tal como los cargó el servidor.
     const patch = expectPatch();
     expect(patch.request.body).toEqual({
       name: 'Kafé del Puerto',
@@ -214,12 +213,51 @@ describe('EditorStore: guardar y publicar', () => {
     expect(store.dirty()).toBe(false);
   });
 
-  it('sin cambio de tema no hay PATCH', async () => {
+  it('themeChangeIsSavedWithPatch: mesas y tema hacen PUT y luego PATCH con los ajustes del PUT', async () => {
+    store.moveTable(0, 210, 200);
+    store.setTheme('NOCHE');
+    const done = store.save();
+    expectPut().flush({
+      ...PLAN,
+      cancellationDeadlineHours: 6,
+      tables: [{ ...PLAN.tables![0], x: 210 }, PLAN.tables![1]],
+    });
+    await settle();
+    const patch = expectPatch();
+    expect(patch.request.body).toEqual({
+      name: 'Kafé del Puerto',
+      theme: 'NOCHE',
+      bookingMode: 'ASSIGNED',
+      cancellationDeadlineHours: 6,
+    });
+    patch.flush({ ...PLAN, theme: 'NOCHE', tables: store.tables().map((table) => ({ ...table })) });
+    expect(await done).toBe(true);
+    expect(store.dirty()).toBe(false);
+  });
+
+  it('sin cambio de tema no hay PATCH, aunque el servidor devuelva otro tema', async () => {
     store.moveTable(0, 210, 200);
     const done = store.save();
-    expectPut().flush({ ...PLAN, tables: [{ ...PLAN.tables![0], x: 210 }, PLAN.tables![1]] });
-    await done;
+    // Otra pestaña cambió el tema: guardar una mesa no lo revierte, y el editor adopta el del servidor.
+    expectPut().flush({
+      ...PLAN,
+      theme: 'TERRACOTA',
+      tables: [{ ...PLAN.tables![0], x: 210 }, PLAN.tables![1]],
+    });
+    expect(await done).toBe(true);
     http.expectNone(PLAN_URL);
+    expect(store.theme()).toBe('TERRACOTA');
+    expect(store.dirty()).toBe(false);
+  });
+
+  it('si solo falla el PATCH del tema no se pierde el tema elegido', async () => {
+    store.setTheme('NOCHE');
+    const done = store.save();
+    error(expectPatch(), 500, null);
+    expect(await done).toBe(false);
+    expect(store.theme()).toBe('NOCHE');
+    expect(store.dirty()).toBe(true);
+    expect(store.saveError()).toContain('No se pudo guardar');
   });
 
   it('si el PUT falla no se hace el PATCH', async () => {

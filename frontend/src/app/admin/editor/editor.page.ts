@@ -222,7 +222,7 @@ export class EditorPage implements ConfirmsLeaving {
   });
 
   protected readonly publicLink = computed(
-    () => `${this.document.location.origin}/r/${this.store.slug()}`,
+    () => `${this.document.location.origin}/r/${encodeURIComponent(this.store.slug())}`,
   );
   protected readonly embedCode = computed(
     () =>
@@ -521,6 +521,11 @@ export class EditorPage implements ConfirmsLeaving {
 
   /** Para `leaveEditorGuard`: sin cambios se sale; con ellos, pregunta en la página y espera la respuesta. */
   confirmLeave(): boolean | Promise<boolean> {
+    // Con una petición en curso no se sale: la respuesta de este plano no debe cargarse bajo la URL de otro.
+    if (this.store.saving() || this.store.publishing()) {
+      this.say('Espera a que termine de guardar antes de salir.');
+      return false;
+    }
     if (!this.store.dirty()) {
       return true;
     }
