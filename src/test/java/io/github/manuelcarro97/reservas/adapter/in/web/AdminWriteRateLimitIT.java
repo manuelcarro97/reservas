@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Duration;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -22,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import io.github.manuelcarro97.reservas.application.service.DemoAccount;
 import io.github.manuelcarro97.reservas.support.AuthRequests;
 import io.github.manuelcarro97.reservas.support.MutableClock;
 import io.github.manuelcarro97.reservas.support.PostgresIT;
@@ -37,6 +39,15 @@ class AdminWriteRateLimitIT extends PostgresIT {
 
 	@Autowired
 	private MockMvc mvc;
+
+	@Autowired
+	private DemoAccount demoAccount;
+
+	/** El contexto se comparte entre clases de test: la cuenta demo no debe quedar marcada para las demás. */
+	@AfterEach
+	void forgetDemoAccount() {
+		demoAccount.setUid(null);
+	}
 
 	private ResultActions deleteAs(String uid) throws Exception {
 		return mvc.perform(delete(WRITE).with(AuthRequests.owner(uid)));
@@ -105,6 +116,56 @@ class AdminWriteRateLimitIT extends PostgresIT {
 		}
 
 		deleteAs("owner-a").andExpect(status().isNotFound());
+	}
+
+	@Test
+	void aFakeBearerTokenDoesNotUseAnyonesQuota() throws Exception {
+		for (int i = 0; i < 100; i++) {
+			mvc.perform(delete(WRITE).header("Authorization", "Bearer not-a-jwt")).andExpect(status().isUnauthorized());
+		}
+
+		writeSixtyTimes("owner-a");
+	}
+
+	// --- la cuenta demo: todos los visitantes comparten el mismo sub ---
+
+	private ResultActions deleteFrom(String uid, String address) throws Exception {
+		return mvc.perform(delete(WRITE).with(AuthRequests.owner(uid)).with(request -> {
+			request.setRemoteAddr(address);
+			return request;
+		}));
+	}
+
+	private void writeSixtyTimesFrom(String uid, String address) throws Exception {
+		for (int i = 0; i < 60; i++) {
+			deleteFrom(uid, address).andExpect(status().isNotFound());
+		}
+	}
+
+	@Test
+	void demoAccountQuotaIsPerVisitorIpNotSharedByEveryone() throws Exception {
+		demoAccount.setUid("demo-owner");
+		writeSixtyTimesFrom("demo-owner", "203.0.113.1");
+		deleteFrom("demo-owner", "203.0.113.1").andExpect(status().isTooManyRequests());
+
+		deleteFrom("demo-owner", "203.0.113.2").andExpect(status().isNotFound());
+	}
+
+	@Test
+	void demoAccountQuotaGroupsIpv6By64() throws Exception {
+		demoAccount.setUid("demo-owner");
+		writeSixtyTimesFrom("demo-owner", "2001:db8:1234:5678::1");
+
+		deleteFrom("demo-owner", "2001:db8:1234:5678:ffff::2").andExpect(status().isTooManyRequests());
+		deleteFrom("demo-owner", "2001:db8:1234:5679::1").andExpect(status().isNotFound());
+	}
+
+	@Test
+	void anOrdinaryOwnerSharesOneQuotaAcrossIps() throws Exception {
+		demoAccount.setUid("demo-owner");
+		writeSixtyTimesFrom("owner-a", "203.0.113.1");
+
+		deleteFrom("owner-a", "203.0.113.2").andExpect(status().isTooManyRequests());
 	}
 
 	@Test

@@ -29,6 +29,13 @@ app:
 spring:
   application:
     name: reservas-api
+  mvc:
+    formcontent:
+      filter:
+        # La API es solo JSON. Este filtro de Spring Boot lee entero en memoria el cuerpo de un PUT, PATCH o DELETE con
+        # Content-Type application/x-www-form-urlencoded, y corre antes de la cadena de seguridad: se saltaría el tope de
+        # 64 KB de RequestSizeLimitFilter. No hay ningún endpoint que reciba formularios.
+        enabled: false
   flyway:
     # Una base que cargó el antiguo seed repetible de la demo (R__demo_restaurant, ya sustituido por el seeder en Java)
     # debe seguir arrancando aunque esa migración ya no exista.

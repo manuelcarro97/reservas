@@ -12,8 +12,11 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.ApplicationContext;
+import org.springframework.web.filter.FormContentFilter;
 
 import io.github.manuelcarro97.reservas.support.PostgresIT;
 
@@ -30,6 +33,9 @@ class RequestSizeLimitStreamIT extends PostgresIT {
 	@LocalServerPort
 	private int port;
 
+	@Autowired
+	private ApplicationContext context;
+
 	private HttpResponse<String> postChunked(int bytes) throws Exception {
 		String prefix = "{\"customerName\":\"";
 		String suffix = "\"}";
@@ -42,6 +48,57 @@ class RequestSizeLimitStreamIT extends PostgresIT {
 			.POST(BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(body)))
 			.build();
 		return HttpClient.newHttpClient().send(request, BodyHandlers.ofString());
+	}
+
+	private HttpResponse<String> sendForm(String method, String path, int bytes, boolean chunked) throws Exception {
+		byte[] body = ("a=" + "A".repeat(bytes - 2)).getBytes(StandardCharsets.UTF_8);
+		HttpRequest.BodyPublisher publisher = chunked ? BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(body))
+				: BodyPublishers.ofByteArray(body);
+		HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+			.header("Content-Type", "application/x-www-form-urlencoded")
+			.method(method, publisher)
+			.build();
+		return HttpClient.newHttpClient().send(request, BodyHandlers.ofString());
+	}
+
+	/**
+	 * Spring Boot registra un filtro que lee entero el cuerpo de un PUT, PATCH o DELETE con formulario antes de la
+	 * cadena de seguridad, y se saltaría el tope. La API es solo JSON: ese filtro no debe existir.
+	 */
+	@Test
+	void formContentFilterIsNotRegistered() {
+		assertThat(context.getBeanNamesForType(FormContentFilter.class)).isEmpty();
+	}
+
+	@Test
+	void formBodyLargerThanTheLimitOnDeleteReturns413() throws Exception {
+		HttpResponse<String> response = sendForm("DELETE", "/api/v1/reservations/XXXX", LIMIT * 4, false);
+
+		assertThat(response.statusCode()).isEqualTo(413);
+		assertThat(response.body()).contains("\"code\":\"PAYLOAD_TOO_LARGE\"");
+	}
+
+	@Test
+	void formBodyLargerThanTheLimitOnAdminPutReturns413() throws Exception {
+		HttpResponse<String> response = sendForm("PUT", "/api/v1/admin/restaurants/x/layout", LIMIT * 4, false);
+
+		assertThat(response.statusCode()).isEqualTo(413);
+		assertThat(response.body()).contains("\"code\":\"PAYLOAD_TOO_LARGE\"");
+	}
+
+	/** Por trozos y sin nadie que lo lea (la API no usa formularios): la petición llega al enrutado (405: ese DELETE no existe) sin tocar el cuerpo. */
+	@Test
+	void chunkedFormBodyOnDeleteIsNeverReadIntoMemory() throws Exception {
+		HttpResponse<String> response = sendForm("DELETE", "/api/v1/reservations/XXXX", LIMIT * 4, true);
+
+		assertThat(response.statusCode()).isEqualTo(405);
+	}
+
+	@Test
+	void smallFormBodyDoesNotBreakTheEndpoint() throws Exception {
+		HttpResponse<String> response = sendForm("DELETE", "/api/v1/reservations/XXXX", 10, false);
+
+		assertThat(response.statusCode()).isEqualTo(405);
 	}
 
 	@Test

@@ -19,6 +19,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import io.github.manuelcarro97.reservas.application.service.DemoAccount;
+
 /**
  * Límite de escrituras del panel ({@code POST}, {@code PUT}, {@code PATCH} y {@code DELETE} bajo
  * {@code /api/v1/admin/**}): {@value #WRITES_PER_MINUTE} por minuto y por usuario. Sin él, un único token válido (la
@@ -28,7 +30,8 @@ import jakarta.servlet.http.HttpServletResponse;
  * La clave es el {@code sub} del token ya verificado, que sale del contexto de seguridad: por eso este filtro va
  * <em>después</em> de la autenticación Bearer (ver {@code SecurityConfig}) y no lee la cabecera {@code Authorization}
  * a mano, que permitiría rotar un {@code sub} sin firmar para evadir el límite. Una petición sin token válido no llega
- * aquí con identidad: no cuenta para nadie y la rechaza la autorización con 401. Responde igual que el filtro público
+ * aquí con identidad: no cuenta para nadie y la rechaza la autorización con 401. En la cuenta demo, que usan todos los
+ * visitantes con el mismo sub, el cupo es por sub e IP. Responde igual que el filtro público
  * (ver {@link RateLimitedResponse}).
  */
 @Component
@@ -41,8 +44,11 @@ public class AdminWriteRateLimitFilter extends OncePerRequestFilter {
 
 	private final FixedWindowRateLimiter writes;
 
-	public AdminWriteRateLimitFilter(Clock clock) {
+	private final DemoAccount demoAccount;
+
+	public AdminWriteRateLimitFilter(Clock clock, DemoAccount demoAccount) {
 		this.writes = new FixedWindowRateLimiter(clock, WRITES_PER_MINUTE, WINDOW);
+		this.demoAccount = demoAccount;
 	}
 
 	/** Olvida todos los contadores. Para tests: el reloj fijo de la suite nunca rota la ventana. */
@@ -54,8 +60,12 @@ public class AdminWriteRateLimitFilter extends OncePerRequestFilter {
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws ServletException, IOException {
 		String subject = limitedSubject(request);
-		if (subject != null && !writes.tryAcquire(subject)) {
-			RateLimitedResponse.write(response, writes.retryAfterSeconds(subject));
+		// La cuenta demo es de todos los visitantes y comparten sub: un solo cupo lo agotaría uno para los demás. Su
+		// clave añade la IP del visitante (la misma agrupación que el límite público); la de un dueño real es solo su sub.
+		String key = subject == null || !demoAccount.isDemo(subject) ? subject
+				: subject + "|" + ClientIpKey.of(request.getRemoteAddr());
+		if (key != null && !writes.tryAcquire(key)) {
+			RateLimitedResponse.write(response, writes.retryAfterSeconds(key));
 			return;
 		}
 		chain.doFilter(request, response);

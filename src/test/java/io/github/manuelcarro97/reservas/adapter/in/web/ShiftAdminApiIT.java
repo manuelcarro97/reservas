@@ -348,6 +348,15 @@ class ShiftAdminApiIT extends PostgresIT {
 	}
 
 	@Test
+	void aPastClosureCanStillBeRemovedThroughTheApi() throws Exception {
+		restaurants.addClosure(plan.id(), LocalDate.of(2026, 11, 20), "Pasado");
+
+		send(delete(CLOSURES + "/2026-11-20")).andExpect(status().isNoContent());
+
+		assertThat(restaurants.isClosed(plan.id(), LocalDate.of(2026, 11, 20))).isFalse();
+	}
+
+	@Test
 	void removingAClosureThatDoesNotExistIsNoOp() throws Exception {
 		send(delete(CLOSURES + "/2026-12-24")).andExpect(status().isNoContent());
 	}
