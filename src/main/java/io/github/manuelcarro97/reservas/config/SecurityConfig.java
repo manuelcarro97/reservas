@@ -22,8 +22,10 @@ import io.github.manuelcarro97.reservas.adapter.in.web.RateLimitFilter;
 class SecurityConfig {
 
 	/**
-	 * El filtro de límite por IP va solo en la cadena de seguridad: como bean de tipo {@code Filter} Spring Boot lo
-	 * registraría también como filtro de servlet y contaría cada petición dos veces.
+	 * El filtro de límite por IP vive solo en la cadena de seguridad, después de CORS: así el 429 lleva las cabeceras
+	 * CORS y el navegador puede leerlo. Como bean de tipo {@code Filter} Spring Boot lo registraría además como filtro
+	 * de servlet; se desactiva ese registro para tener un único sitio (no contaría doble: es un
+	 * {@code OncePerRequestFilter}).
 	 */
 	@Bean
 	FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter rateLimitFilter) {

@@ -120,8 +120,9 @@ class AnonymizationIT extends PostgresIT {
 	}
 
 	@Test
-	void todayIsCountedInTheRestaurantZoneNotInUtc() {
-		// 23:30 UTC del 31 de diciembre ya es 1 de enero en Madrid: el límite es 2 de diciembre, no 1.
+	void todayIsCountedInMadridNotInUtc() {
+		// La zona es Europe/Madrid fija, no la del plano (que aquí también es Madrid). 23:30 UTC del 31 de diciembre
+		// ya es 1 de enero en Madrid: el límite es 2 de diciembre, no 1.
 		clock.set(ZonedDateTime.of(2026, 12, 31, 23, 30, 0, 0, ZoneId.of("UTC")).toInstant());
 		Reservation onTheEdge = reservationOn(LocalDate.of(2026, 12, 1));
 		Reservation older = reservationOn(LocalDate.of(2026, 11, 30));

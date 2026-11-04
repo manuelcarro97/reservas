@@ -85,6 +85,17 @@ class RateLimitIT extends PostgresIT {
 	}
 
 	@Test
+	void rateLimitedResponseCarriesCorsHeadersSoTheBrowserCanReadIt() throws Exception {
+		bookTenTimes();
+
+		mvc.perform(post(BOOKINGS).contentType(MediaType.APPLICATION_JSON)
+			.content("{}")
+			.header("Origin", "http://localhost:4200"))
+			.andExpect(status().isTooManyRequests())
+			.andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:4200"));
+	}
+
+	@Test
 	void retryAfterShrinksAsTheWindowAdvancesAndTheWindowRotates() throws Exception {
 		bookTenTimes();
 
