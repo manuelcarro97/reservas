@@ -80,6 +80,17 @@ describe('EditorStore', () => {
     expect(SHAPE_DEFAULTS.T).toEqual({ width: 1100, height: 900, cutWidth: 340, cutDepth: 520 });
   });
 
+  it('elegir la forma que ya está activa no hace nada', () => {
+    const depth = handlesFor(store.room()).find((handle) => handle.kind === 'cutDepth') as Handle;
+    store.setHandleValue(depth, 520);
+    const adjusted = store.room();
+    store.setShape('L');
+    expect(store.room()).toBe(adjusted);
+    store.load(PLAN);
+    store.setShape('L');
+    expect(store.dirty()).toBe(false);
+  });
+
   it('cada forma por defecto es un local válido', () => {
     for (const shape of ['SQUARE', 'RECTANGLE', 'L', 'U', 'T'] as const) {
       store.setShape(shape);
@@ -98,6 +109,9 @@ describe('EditorStore', () => {
   });
 
   it('rotateRoomRotatesTables', () => {
+    // Una mesa en el hueco de la L: la paridad de problemas no puede ser `[]` contra `[]`.
+    store.addTable({ label: '9', shape: 'SQUARE', seats: 4, rotation: 0, x: 800, y: 700 });
+    expect(store.problems().map((problem) => problem.code)).toContain('OUT_OF_ROOM');
     for (let step = 0; step < 4; step++) {
       const before = store.room();
       const tablesBefore = store.tables();
@@ -125,9 +139,9 @@ describe('EditorStore', () => {
         expect(table.id).toBe(old.id);
       });
       // Las mesas siguen donde estaban respecto a las paredes.
-      expect(validateLayout(store.room(), store.tables())).toEqual(
-        validateLayout(before, tablesBefore),
-      );
+      const problemsBefore = validateLayout(before, tablesBefore);
+      expect(problemsBefore.length).toBeGreaterThan(0);
+      expect(validateLayout(store.room(), store.tables())).toEqual(problemsBefore);
     }
   });
 

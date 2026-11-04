@@ -85,6 +85,10 @@ export class EditorStore {
 
   /** Cambia la forma con las medidas de referencia de esa forma; mantiene el giro y deja las mesas donde están. */
   setShape(shape: RoomShape): void {
+    // Elegir la forma que ya está activa no restablece las medidas que el dueño ha ajustado.
+    if (shape === this.room().shape) {
+      return;
+    }
     this.roomState.update((room) => ({ shape, ...SHAPE_DEFAULTS[shape], rotation: room.rotation }));
   }
 

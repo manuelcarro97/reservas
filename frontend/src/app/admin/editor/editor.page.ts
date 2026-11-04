@@ -28,11 +28,24 @@ const SHAPES: readonly { shape: RoomShape; name: string }[] = [
   { shape: 'T', name: 'En T' },
 ];
 
-/** Arrastre en curso: el tirador agarrado y dónde estaba el puntero (en unidades de plano) al empezar. */
+/** Parte lineal de la matriz inversa pantalla -> plano (sin traslación: solo se convierten desplazamientos). */
+interface ScreenToPlan {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+}
+
+/**
+ * Arrastre en curso: el tirador agarrado, dónde estaba el puntero en pantalla al empezar y la conversión a unidades
+ * de plano de ese instante. La conversión queda fija: el viewBox depende del tamaño del local que se está arrastrando,
+ * así que la escala cambia con cada movimiento y releerla realimentaría el arrastre.
+ */
 interface Drag {
   handle: Handle;
   pointerId: number;
-  origin: Point;
+  start: Point;
+  scale: ScreenToPlan;
 }
 
 /**
@@ -112,18 +125,28 @@ export class EditorPage {
     return this.store.room().shape === shape;
   }
 
+  /** Sentido en pantalla en el que se mueve el tirador. */
+  protected orientation(handle: Handle): 'horizontal' | 'vertical' {
+    return handle.direction.x !== 0 ? 'horizontal' : 'vertical';
+  }
+
   protected onPointerDown(event: PointerEvent, handle: Handle): void {
     if (event.button !== 0) {
       return;
     }
-    const origin = this.toPlan(event);
-    if (!origin) {
+    const scale = this.screenToPlan();
+    if (!scale) {
       return;
     }
     event.preventDefault();
     // La captura hace que el arrastre siga llegando al tirador aunque el puntero salga de él.
     (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
-    this.drag = { handle, pointerId: event.pointerId, origin };
+    this.drag = {
+      handle,
+      pointerId: event.pointerId,
+      start: { x: event.clientX, y: event.clientY },
+      scale,
+    };
     this.dragging.set(handle.kind);
     this.store.beginDrag();
   }
@@ -133,13 +156,14 @@ export class EditorPage {
     if (!drag || event.pointerId !== drag.pointerId) {
       return;
     }
-    const point = this.toPlan(event);
-    if (point) {
-      // Desplazamiento total desde que se agarró: redondear cada movimiento suelto dejaría el tirador quieto.
-      this.store.dragHandle(drag.handle, point.x - drag.origin.x, point.y - drag.origin.y);
-    }
+    // Desplazamiento total desde que se agarró: redondear cada movimiento suelto dejaría el tirador quieto.
+    const screenX = event.clientX - drag.start.x;
+    const screenY = event.clientY - drag.start.y;
+    const { a, b, c, d } = drag.scale;
+    this.store.dragHandle(drag.handle, a * screenX + c * screenY, b * screenX + d * screenY);
   }
 
+  /** Fin del arrastre: soltar, cancelar o perder la captura (`lostpointercapture`). */
   protected onPointerEnd(event: PointerEvent): void {
     if (!this.drag || event.pointerId !== this.drag.pointerId) {
       return;
@@ -152,6 +176,10 @@ export class EditorPage {
 
   /** Flechas: derecha y arriba agrandan, izquierda y abajo achican, de STEP en STEP. */
   protected onKeydown(event: KeyboardEvent, handle: Handle): void {
+    // Alt+flecha, Ctrl+flecha y Meta+flecha son atajos del navegador (atrás, adelante…): no se tocan.
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
     const sign = this.keySign(event.key);
     if (sign === 0) {
       return;
@@ -174,16 +202,13 @@ export class EditorPage {
     }
   }
 
-  /** Pantalla a plano con la inversa de la matriz del SVG; null si el navegador no la da. */
-  private toPlan(event: PointerEvent): Point | null {
+  /** Pantalla a plano con la inversa de la matriz actual del SVG; null si el navegador no la da. */
+  private screenToPlan(): ScreenToPlan | null {
     const matrix = this.overlay()?.nativeElement.getScreenCTM?.();
     if (!matrix) {
       return null;
     }
-    const inverse = matrix.inverse();
-    return {
-      x: inverse.a * event.clientX + inverse.c * event.clientY + inverse.e,
-      y: inverse.b * event.clientX + inverse.d * event.clientY + inverse.f,
-    };
+    const { a, b, c, d } = matrix.inverse();
+    return { a, b, c, d };
   }
 }

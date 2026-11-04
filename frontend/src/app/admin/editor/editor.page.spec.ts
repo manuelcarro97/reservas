@@ -107,11 +107,34 @@ describe('EditorPage', () => {
     target.dispatchEvent(event);
   }
 
-  /** Matriz identidad: un píxel de pantalla es una unidad de plano. */
-  function stubScreenMatrix(): void {
+  /**
+   * `getScreenCTM` del SVG de tiradores: `zoom` píxeles por unidad de plano (1 = un píxel es una unidad) y un
+   * desplazamiento fijo. Devuelve la función que cambia el zoom, como hace el navegador al cambiar el viewBox.
+   */
+  function stubScreenMatrix(zoom = 1): (next: number) => void {
     const overlay = page.querySelector('svg.handles') as SVGSVGElement;
-    const identity = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => identity };
-    Object.assign(overlay, { getScreenCTM: () => identity });
+    let current = zoom;
+    Object.assign(overlay, {
+      getScreenCTM: () => ({
+        a: current,
+        b: 0,
+        c: 0,
+        d: current,
+        e: 70,
+        f: 30,
+        inverse: () => ({
+          a: 1 / current,
+          b: 0,
+          c: 0,
+          d: 1 / current,
+          e: -70 / current,
+          f: -30 / current,
+        }),
+      }),
+    });
+    return (next) => {
+      current = next;
+    };
   }
 
   it('muestra el plano y sus tiradores de ancho y alto', async () => {
@@ -228,6 +251,94 @@ describe('EditorPage', () => {
     pointer('pointermove', width, 1500, 290);
     await settle();
     expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1240');
+  });
+
+  it('la escala del arrastre se fija al empezar aunque la matriz cambie durante él', async () => {
+    await open();
+    // 0,5 píxeles por unidad: 10 px = 20 unidades.
+    const setZoom = stubScreenMatrix(0.5);
+    const width = slider('Ancho del local');
+    pointer('pointerdown', width, 300, 100);
+    pointer('pointermove', width, 310, 100);
+    await settle();
+    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1220');
+    // El viewBox crece con el ancho y el navegador cambia la escala: no debe notarse.
+    setZoom(0.05);
+    pointer('pointermove', width, 320, 100);
+    await settle();
+    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1240');
+    setZoom(4);
+    pointer('pointermove', width, 330, 100);
+    await settle();
+    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1260');
+    pointer('pointermove', width, 304, 100);
+    await settle();
+    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1200');
+  });
+
+  it('con el local girado 90 o 270 el arrastre horizontal mueve el alto y el vertical el ancho', async () => {
+    await open();
+    await click('Girar 90°');
+    const setZoom = stubScreenMatrix(0.5);
+    const height = slider('Alto del local');
+    pointer('pointerdown', height, 300, 100);
+    pointer('pointermove', height, 310, 100);
+    setZoom(0.1);
+    pointer('pointermove', height, 320, 100);
+    await settle();
+    expect(slider('Alto del local').getAttribute('aria-valuenow')).toBe('600');
+    pointer('pointerup', height, 320, 100);
+
+    await click('Girar 90°');
+    await click('Girar 90°');
+    expect(page.querySelector('svg.handles')).not.toBeNull();
+    const setZoom270 = stubScreenMatrix(0.5);
+    const width = slider('Ancho del local');
+    pointer('pointerdown', width, 300, 100);
+    pointer('pointermove', width, 300, 110);
+    setZoom270(0.1);
+    pointer('pointermove', width, 300, 120);
+    await settle();
+    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1240');
+    pointer('pointerup', width, 300, 120);
+  });
+
+  it('perder la captura del puntero termina el arrastre', async () => {
+    await open();
+    stubScreenMatrix();
+    const width = slider('Ancho del local');
+    pointer('pointerdown', width, 1200, 280);
+    pointer('pointermove', width, 1220, 280);
+    pointer('lostpointercapture', width, 1220, 280);
+    pointer('pointermove', width, 1300, 280);
+    await settle();
+    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1220');
+  });
+
+  it('las flechas con Alt, Ctrl o Meta no mueven el tirador', async () => {
+    await open();
+    for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
+      slider('Ancho del local').dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          bubbles: true,
+          cancelable: true,
+          [modifier]: true,
+        }),
+      );
+    }
+    await settle();
+    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1200');
+  });
+
+  it('los tiradores dicen su orientación y su valor con unidades', async () => {
+    await open();
+    expect(slider('Ancho del local').getAttribute('aria-orientation')).toBe('horizontal');
+    expect(slider('Alto del local').getAttribute('aria-orientation')).toBe('vertical');
+    expect(slider('Ancho del local').getAttribute('aria-valuetext')).toBe('1200 unidades');
+    await click('Girar 90°');
+    // Girado, el ancho del local se mueve en vertical.
+    expect(slider('Ancho del local').getAttribute('aria-orientation')).toBe('vertical');
   });
 
   it('con el plano publicado, cambiar la forma avisa de las reservas activas', async () => {
