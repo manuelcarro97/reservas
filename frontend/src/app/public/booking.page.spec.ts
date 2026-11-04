@@ -178,6 +178,16 @@ describe('BookingPage', () => {
     expect(shiftButtons().map((button) => button.disabled)).toEqual([false, true]);
   });
 
+  it('unknownThemeFallsBackToAzul', async () => {
+    await open('/r/kafe', { ...PLAN, theme: 'NEON' as PublicPlanResponse['theme'] });
+    await flushShifts();
+    await chooseShift('Comida');
+
+    const host = page.querySelector<HTMLElement>('app-booking-page')!;
+    expect(host.style.getPropertyValue('--page')).toBe(THEMES.AZUL.page);
+    expect(page.querySelectorAll('g.t').length).toBe(3);
+  });
+
   it('unknownOrDraftPlanShowsNoDisponible', async () => {
     harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/r/nada');

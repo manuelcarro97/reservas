@@ -13,7 +13,7 @@ import { Subscription, catchError, map, of, switchMap } from 'rxjs';
 import { EmbedMode } from '../core/embed-mode';
 import { ReservationDetails } from '../core/api/models/reservation-details';
 import { PublicReservationControllerService } from '../core/api/services/public-reservation-controller.service';
-import { THEMES } from '../plano/themes';
+import { THEMES, knownTheme } from '../plano/themes';
 import { errorCode, rateLimitedMessage } from './api-errors';
 import { PoweredByComponent } from './powered-by.component';
 
@@ -68,7 +68,7 @@ export class ReservationPage {
   protected readonly deadlinePassed = signal(false);
 
   /** Tema del plano de la reserva; mientras no hay reserva (cargando, no encontrada), el de un plano nuevo. */
-  protected readonly colors = computed(() => THEMES[this.reservation()?.theme ?? 'AZUL']);
+  protected readonly colors = computed(() => THEMES[knownTheme(this.reservation()?.theme)]);
 
   /** `Cena · 20:00–22:00`; las horas llegan como `HH:mm:ss` o `HH:mm`. */
   protected readonly shiftLabel = computed(() => {
@@ -168,10 +168,20 @@ export class ReservationPage {
       this.deadlinePassed.set(true);
       this.cancelError.set(DEADLINE_PASSED_MESSAGE);
     } else if (code === 'INVALID_TRANSITION') {
+      // La reserva ya no está activa (p. ej. la canceló el local): se muestra su estado real, sin botón.
       this.cancelError.set(NOT_CANCELLABLE_MESSAGE);
+      this.refresh();
     } else {
       this.cancelError.set(GENERIC_CANCEL_ERROR);
     }
+  }
+
+  /** Vuelve a pedir la reserva; si falla se deja lo que había (el mensaje de error ya explica el motivo). */
+  private refresh(): void {
+    this.cancelRequest = this.api.byCode({ code: this.code }).subscribe({
+      next: (reservation) => this.reservation.set(reservation),
+      error: () => undefined,
+    });
   }
 
   /** Código nuevo en la ruta: se descarta todo lo de la reserva anterior. */

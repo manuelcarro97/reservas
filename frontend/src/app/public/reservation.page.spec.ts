@@ -116,6 +116,36 @@ describe('ReservationPage', () => {
     expect(host.style.getPropertyValue('--accent')).toBe(THEMES.NOCHE.cushA);
   });
 
+  it('unknownThemeFallsBackToAzul', async () => {
+    await open(`/reserva/${CODE}`, {
+      ...RESERVATION,
+      theme: 'NEON' as ReservationDetails['theme'],
+    });
+
+    const host = page.querySelector<HTMLElement>('app-reservation-page')!;
+    expect(host.style.getPropertyValue('--page')).toBe(THEMES.AZUL.page);
+    expect(page.textContent).toContain(CODE);
+  });
+
+  it('rejectedCancelRefreshesTheReservation', async () => {
+    await open();
+
+    await click('Cancelar reserva');
+    await click('Sí, cancelar');
+    expectApi(`${CODE}/cancel`, 'POST').flush(
+      { code: 'INVALID_TRANSITION' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    await settle();
+    // El local la había cancelado mientras tanto: se vuelve a pedir y se muestra el estado real.
+    expectApi(CODE, 'GET').flush({ ...RESERVATION, status: 'CANCELLED' });
+    await settle();
+
+    expect(page.querySelector('[role=alert]')?.textContent).toContain('ya no se puede cancelar');
+    expect(page.textContent).toContain('Cancelada');
+    expect(button('Cancelar reserva')).toBeUndefined();
+  });
+
   it('linksToBookAgainAtTheSamePlan', async () => {
     await open();
 

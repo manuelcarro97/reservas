@@ -10,7 +10,7 @@ import { TableDto } from '../core/api/models/table-dto';
 import { PublicReservationControllerService } from '../core/api/services/public-reservation-controller.service';
 import { Room } from '../plano/geometry';
 import { PlanoTable, TableState } from '../plano/plano.component';
-import { ThemeKey } from '../plano/themes';
+import { ThemeKey, knownTheme } from '../plano/themes';
 import { errorCode, rateLimitedMessage } from './api-errors';
 
 /** Días de antelación máximos, inclusive (`BookingPolicy.BOOKING_WINDOW_DAYS` del backend). */
@@ -136,7 +136,7 @@ export class BookingStore {
   readonly error = signal<string | null>(null);
   readonly reservation = signal<ReservationDetails | null>(null);
 
-  readonly theme = computed<ThemeKey>(() => this.plan()?.theme ?? 'AZUL');
+  readonly theme = computed<ThemeKey>(() => knownTheme(this.plan()?.theme));
   readonly room = computed(() => toRoom(this.plan()?.room));
   readonly tables = computed(() => (this.plan()?.tables ?? []).map(toTable));
   readonly freeChoice = computed(() => this.plan()?.bookingMode === 'FREE_CHOICE');

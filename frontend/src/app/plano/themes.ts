@@ -118,5 +118,10 @@ export const THEMES: Record<ThemeKey, ThemeColors> = {
   },
 };
 
+/** El tema del plano si el cliente lo conoce; uno nuevo del backend (cliente desfasado) no debe romper la página. */
+export function knownTheme(theme: string | undefined): ThemeKey {
+  return theme !== undefined && Object.hasOwn(THEMES, theme) ? (theme as ThemeKey) : 'AZUL';
+}
+
 /** Colores de estado, comunes a todos los temas. La mesa libre es blanca (`topA`/`topB` del tema). */
 export const STATE_COLORS = { sel: '#2f9e68', pending: '#8b98a8', taken: '#d2453b' } as const;
