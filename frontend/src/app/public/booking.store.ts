@@ -11,6 +11,7 @@ import { PublicReservationControllerService } from '../core/api/services/public-
 import { Room } from '../plano/geometry';
 import { PlanoTable, TableState } from '../plano/plano.component';
 import { ThemeKey } from '../plano/themes';
+import { errorCode, rateLimitedMessage } from './api-errors';
 
 /** Días de antelación máximos, inclusive (`BookingPolicy.BOOKING_WINDOW_DAYS` del backend). */
 export const BOOKING_WINDOW_DAYS = 90;
@@ -93,18 +94,6 @@ function toTable(dto: TableDto): PlanoTable {
     x: dto.x ?? 0,
     y: dto.y ?? 0,
   };
-}
-
-function errorCode(error: HttpErrorResponse): string | undefined {
-  return (error.error as { code?: string } | null)?.code;
-}
-
-function rateLimitedMessage(error: HttpErrorResponse): string {
-  const seconds = Number.parseInt(error.headers?.get('Retry-After') ?? '', 10);
-  if (!(seconds > 0)) {
-    return 'Demasiados intentos. Espera un momento y vuelve a probar.';
-  }
-  return `Demasiados intentos. Vuelve a probar en ${seconds} ${seconds === 1 ? 'segundo' : 'segundos'}.`;
 }
 
 /**
