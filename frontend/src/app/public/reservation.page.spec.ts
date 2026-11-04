@@ -9,6 +9,7 @@ import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ApiConfiguration } from '../core/api/api-configuration';
 import { ReservationDetails } from '../core/api/models/reservation-details';
+import { THEMES } from '../plano/themes';
 import { ShellComponent } from '../shell/shell.component';
 import { ReservationPage } from './reservation.page';
 
@@ -21,6 +22,12 @@ const RESERVATION: ReservationDetails = {
   shiftId: 10,
   status: 'CONFIRMED',
   tableLabel: 'Terraza 3',
+  restaurantName: 'Kafé',
+  slug: 'kafe',
+  theme: 'NOCHE',
+  shiftName: 'Cena',
+  shiftStart: '20:00:00',
+  shiftEnd: '23:30:00',
 };
 
 describe('ReservationPage', () => {
@@ -96,7 +103,31 @@ describe('ReservationPage', () => {
     expect(text).toContain('4 personas');
     expect(text).toContain('Terraza 3');
     expect(text).toContain('Confirmada');
+    expect(text).toContain('Kafé');
+    expect(text).toContain('Cena · 20:00–23:30');
     expect(button('Cancelar reserva')).toBeDefined();
+  });
+
+  it('appliesThePlanTheme', async () => {
+    await open();
+
+    const host = page.querySelector<HTMLElement>('app-reservation-page')!;
+    expect(host.style.getPropertyValue('--page')).toBe(THEMES.NOCHE.page);
+    expect(host.style.getPropertyValue('--accent')).toBe(THEMES.NOCHE.cushA);
+  });
+
+  it('linksToBookAgainAtTheSamePlan', async () => {
+    await open();
+
+    const link = page.querySelector<HTMLAnchorElement>('a[href="/r/kafe"]');
+    expect(link?.textContent).toContain('Hacer otra reserva');
+  });
+
+  it('bookAgainLinkKeepsEmbedMode', async () => {
+    await open(`/reserva/${CODE}?embed=1`);
+
+    const link = page.querySelector<HTMLAnchorElement>('a[href="/r/kafe?embed=1"]');
+    expect(link?.textContent).toContain('Hacer otra reserva');
   });
 
   it('cancelAsksConfirmationThenCancels', async () => {

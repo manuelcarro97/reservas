@@ -19,10 +19,14 @@
       <section class="sheet" aria-live="polite">
         <p class="code">{{ reservation.code }}</p>
         <dl>
+          <dt>Local</dt>
+          <dd>{{ reservation.restaurantName }}</dd>
           <dt>Estado</dt>
           <dd>{{ statusLabel() }}</dd>
           <dt>Fecha</dt>
           <dd>{{ dateLabel() }}</dd>
+          <dt>Turno</dt>
+          <dd>{{ shiftLabel() }}</dd>
           <dt>Personas</dt>
           <dd>
             {{ reservation.partySize }} {{ reservation.partySize === 1 ? 'persona' : 'personas' }}
@@ -63,6 +67,12 @@
           <button type="button" class="button danger" (click)="askConfirmation()">
             Cancelar reserva
           </button>
+        }
+
+        @if (reservation.slug) {
+          <a class="link" [routerLink]="['/r', reservation.slug]" [queryParams]="embedQuery">
+            Hacer otra reserva
+          </a>
         }
       </section>
     }

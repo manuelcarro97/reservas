@@ -8,8 +8,9 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription, catchError, map, of, switchMap } from 'rxjs';
+import { EmbedMode } from '../core/embed-mode';
 import { ReservationDetails } from '../core/api/models/reservation-details';
 import { PublicReservationControllerService } from '../core/api/services/public-reservation-controller.service';
 import { THEMES } from '../plano/themes';
@@ -36,18 +37,17 @@ const GENERIC_CANCEL_ERROR = 'No se pudo cancelar la reserva. Inténtalo de nuev
 /** Página pública `/reserva/:code`: el cliente consulta su reserva con el código y puede cancelarla. */
 @Component({
   selector: 'app-reservation-page',
-  imports: [PoweredByComponent],
+  imports: [PoweredByComponent, RouterLink],
   templateUrl: './reservation.page.html',
   styleUrl: './reservation.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    // La reserva no trae el plano, así que no se conoce su tema: se usa el de un plano nuevo.
-    '[style.--page]': 'colors.page',
-    '[style.--sheet]': 'colors.sheet',
-    '[style.--ink]': 'colors.ink',
-    '[style.--muted]': 'colors.muted',
-    '[style.--line-ui]': 'colors.lineUi',
-    '[style.--accent]': 'colors.cushA',
+    '[style.--page]': 'colors().page',
+    '[style.--sheet]': 'colors().sheet',
+    '[style.--ink]': 'colors().ink',
+    '[style.--muted]': 'colors().muted',
+    '[style.--line-ui]': 'colors().lineUi',
+    '[style.--accent]': 'colors().cushA',
   },
 })
 export class ReservationPage {
@@ -55,7 +55,8 @@ export class ReservationPage {
   private cancelRequest: Subscription | undefined;
   private code = '';
 
-  protected readonly colors = THEMES.AZUL;
+  /** Con `?embed=1` el enlace "Hacer otra reserva" conserva el modo incrustado. */
+  protected readonly embedQuery = inject(EmbedMode).embedded ? { embed: 1 } : null;
 
   protected readonly status = signal<LookupStatus>('loading');
   protected readonly reservation = signal<ReservationDetails | null>(null);
@@ -65,6 +66,19 @@ export class ReservationPage {
   protected readonly cancelError = signal<string | null>(null);
   /** El backend ya dijo que pasó el plazo: el botón no se ofrece más. */
   protected readonly deadlinePassed = signal(false);
+
+  /** Tema del plano de la reserva; mientras no hay reserva (cargando, no encontrada), el de un plano nuevo. */
+  protected readonly colors = computed(() => THEMES[this.reservation()?.theme ?? 'AZUL']);
+
+  /** `Cena · 20:00–22:00`; las horas llegan como `HH:mm:ss` o `HH:mm`. */
+  protected readonly shiftLabel = computed(() => {
+    const reservation = this.reservation();
+    const start = reservation?.shiftStart?.slice(0, 5);
+    const end = reservation?.shiftEnd?.slice(0, 5);
+    return [reservation?.shiftName, start && end ? `${start}–${end}` : start]
+      .filter(Boolean)
+      .join(' · ');
+  });
 
   protected readonly statusLabel = computed(() => {
     const status = this.reservation()?.status;

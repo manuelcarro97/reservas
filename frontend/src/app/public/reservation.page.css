@@ -100,3 +100,9 @@ dd {
   background: #fde8e6;
   color: #8e1d14;
 }
+
+.link {
+  justify-self: start;
+  color: var(--accent);
+  font-weight: 600;
+}
