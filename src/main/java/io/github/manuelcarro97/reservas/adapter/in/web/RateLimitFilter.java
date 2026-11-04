@@ -24,7 +24,8 @@ import jakarta.servlet.http.HttpServletResponse;
  * límite responde 429 con la misma forma de error que el resto de la API y la cabecera {@code Retry-After}.
  * <p>
  * La IP es {@code getRemoteAddr()} y nunca se lee {@code X-Forwarded-For} a mano: detrás de un proxy el contenedor la
- * resuelve según {@code server.forward-headers-strategy}. Es un filtro de la cadena de seguridad (se registra en
+ * resuelve según {@code server.forward-headers-strategy}. La clave es la IPv4 entera o el /64 de una IPv6 (ver
+ * {@link ClientIpKey}). Es un filtro de la cadena de seguridad (se registra en
  * {@code SecurityConfig}), no un filtro de servlet suelto: por eso su respuesta no pasa por
  * {@link ApiExceptionHandler}: lo construye {@link RateLimitedResponse} con el mismo helper de errores.
  */
@@ -60,7 +61,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 			throws ServletException, IOException {
 		FixedWindowRateLimiter limiter = limiterFor(request);
 		if (limiter != null) {
-			String ip = request.getRemoteAddr();
+			String ip = ClientIpKey.of(request.getRemoteAddr());
 			if (!limiter.tryAcquire(ip)) {
 				RateLimitedResponse.write(response, limiter.retryAfterSeconds(ip));
 				return;

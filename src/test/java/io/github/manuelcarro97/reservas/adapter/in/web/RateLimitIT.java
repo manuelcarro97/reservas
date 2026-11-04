@@ -127,6 +127,25 @@ class RateLimitIT extends PostgresIT {
 	}
 
 	@Test
+	void ipv6AddressesOfTheSame64ShareTheBookingQuota() throws Exception {
+		for (int i = 0; i < 10; i++) {
+			booking(fromIp("2001:db8:1234:5678::" + Integer.toHexString(i + 1))).andExpect(status().isBadRequest());
+		}
+
+		booking(fromIp("2001:db8:1234:5678:aaaa:bbbb:cccc:dddd")).andExpect(status().isTooManyRequests());
+	}
+
+	@Test
+	void ipv6AddressOfAnother64HasItsOwnQuota() throws Exception {
+		for (int i = 0; i < 10; i++) {
+			booking(fromIp("2001:db8:1234:5678::1")).andExpect(status().isBadRequest());
+		}
+		booking(fromIp("2001:db8:1234:5678::1")).andExpect(status().isTooManyRequests());
+
+		booking(fromIp("2001:db8:1234:5679::1")).andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void forwardedForHeaderDoesNotChangeTheKey() throws Exception {
 		// Sin forward-headers-strategy (por defecto none) la IP es la del socket: variar X-Forwarded-For no da cupo nuevo.
 		for (int i = 0; i < 10; i++) {

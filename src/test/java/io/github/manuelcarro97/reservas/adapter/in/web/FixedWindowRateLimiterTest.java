@@ -131,6 +131,57 @@ class FixedWindowRateLimiterTest {
 		assertThat(limiter.trackedKeys()).isEqualTo(1);
 	}
 
+	// --- tope duro de claves ---
+
+	@Test
+	void aNewKeyIsRejectedWhileEveryTrackedKeyIsStillLive() {
+		FixedWindowRateLimiter limiter = new FixedWindowRateLimiter(clock, 2, WINDOW, 3);
+		limiter.tryAcquire("a");
+		limiter.tryAcquire("b");
+		limiter.tryAcquire("c");
+
+		assertThat(limiter.tryAcquire("d")).isFalse();
+		assertThat(limiter.trackedKeys()).isEqualTo(3);
+	}
+
+	@Test
+	void keysAlreadyTrackedKeepWorkingWhenTheCapIsReached() {
+		FixedWindowRateLimiter limiter = new FixedWindowRateLimiter(clock, 2, WINDOW, 3);
+		limiter.tryAcquire("a");
+		limiter.tryAcquire("b");
+		limiter.tryAcquire("c");
+
+		assertThat(limiter.tryAcquire("a")).isTrue();
+		assertThat(limiter.tryAcquire("a")).isFalse();
+	}
+
+	@Test
+	void whenFullTheExpiredKeysArePurgedAtOnceAndTheNewKeyFits() {
+		FixedWindowRateLimiter limiter = new FixedWindowRateLimiter(clock, 2, WINDOW, 3);
+		limiter.tryAcquire("a");
+		limiter.tryAcquire("b");
+		limiter.tryAcquire("c");
+
+		clock.set(MutableClock.START.plus(WINDOW));
+
+		assertThat(limiter.tryAcquire("d")).isTrue();
+		assertThat(limiter.trackedKeys()).isEqualTo(1);
+	}
+
+	@Test
+	void aKeyRejectedByTheCapIsToldToWaitAWholeWindow() {
+		FixedWindowRateLimiter limiter = new FixedWindowRateLimiter(clock, 2, WINDOW, 1);
+		limiter.tryAcquire("a");
+
+		assertThat(limiter.tryAcquire("b")).isFalse();
+		assertThat(limiter.retryAfterSeconds("b")).isEqualTo(60);
+	}
+
+	@Test
+	void defaultCapIsFiftyThousandKeys() {
+		assertThat(FixedWindowRateLimiter.MAX_KEYS).isEqualTo(50_000);
+	}
+
 	@Test
 	void purgeRunningAlongsideCallersNeverLetsMoreThanTheLimitThrough() throws Exception {
 		int limit = 5;
