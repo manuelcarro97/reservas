@@ -53,6 +53,10 @@ class PublicApiIT extends PostgresIT {
 		return mvc.perform(post(RESERVATIONS).contentType(MediaType.APPLICATION_JSON).content(json));
 	}
 
+	private ResultActions postReservation(String json, MediaType accept) throws Exception {
+		return mvc.perform(post(RESERVATIONS).contentType(MediaType.APPLICATION_JSON).accept(accept).content(json));
+	}
+
 	private String createReservation() throws Exception {
 		String response = postReservation(body(2)).andReturn().getResponse().getContentAsString();
 		return JsonPath.read(response, "$.code");
@@ -202,6 +206,26 @@ class PublicApiIT extends PostgresIT {
 				{"date":"%s","shiftId":%d,"partySize":2,"customerName":"Ana","customerPhone":"600000000"}
 				""".formatted(DATE, shift.id()))
 			.andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.code").value("TABLE_REQUIRED"));
+	}
+
+	/** El cliente Angular pide `Accept: application/json`: los errores de dominio deben seguir llegando con su `code`. */
+	@Test
+	void takenTableAcceptingJsonReturns409WithCode() throws Exception {
+		createReservation();
+
+		postReservation(body(2), MediaType.APPLICATION_JSON).andExpect(status().isConflict())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.code").value("TABLE_TAKEN"));
+	}
+
+	@Test
+	void missingTableAcceptingJsonReturns422WithCode() throws Exception {
+		postReservation("""
+				{"date":"%s","shiftId":%d,"partySize":2,"customerName":"Ana","customerPhone":"600000000"}
+				""".formatted(DATE, shift.id()), MediaType.APPLICATION_JSON)
+			.andExpect(status().isUnprocessableContent())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.code").value("TABLE_REQUIRED"));
 	}
 
