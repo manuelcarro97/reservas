@@ -2,6 +2,8 @@ package io.github.manuelcarro97.reservas.adapter.in.scheduling;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +16,10 @@ import io.github.manuelcarro97.reservas.application.port.in.AnonymizeReservation
  * Solo registra cuántas filas cambió, nunca nombres ni teléfonos. Un fallo no sale del método: se registra un solo
  * WARN con la clase de la excepción, su primer frame y las clases de sus causas, nunca un mensaje (el de una librería
  * puede traer valores de la consulta), y el siguiente intento es el de la noche siguiente.
+ * <p>
+ * Corre también al arrancar la aplicación: en un hosting gratuito que duerme el proceso, las 3:30 pueden pasar sin que
+ * esté despierto y los datos personales se conservarían más de 30 días. Es idempotente: una fila ya anonimizada no
+ * vuelve a cambiar, así que ejecutarlo dos veces o desde dos instancias no hace daño.
  */
 @Component
 class AnonymizationJob {
@@ -26,6 +32,12 @@ class AnonymizationJob {
 
 	AnonymizationJob(AnonymizeReservationsUseCase anonymize) {
 		this.anonymize = anonymize;
+	}
+
+	/** Cuando la aplicación ya atiende peticiones: un fallo aquí tampoco debe impedir que arranque. */
+	@EventListener(ApplicationReadyEvent.class)
+	void anonymizeOnStartup() {
+		anonymizeOldReservations();
 	}
 
 	@Scheduled(cron = "0 30 3 * * *", zone = "Europe/Madrid")

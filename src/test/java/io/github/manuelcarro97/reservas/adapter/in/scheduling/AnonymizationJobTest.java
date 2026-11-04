@@ -7,6 +7,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import ch.qos.logback.classic.Level;
@@ -46,6 +48,40 @@ class AnonymizationJobTest {
 
 		assertThat(scheduled.cron()).isEqualTo("0 30 3 * * *");
 		assertThat(scheduled.zone()).isEqualTo("Europe/Madrid");
+	}
+
+	@Test
+	void alsoRunsWhenTheApplicationIsReady() throws Exception {
+		EventListener listener = AnonymizationJob.class.getDeclaredMethod("anonymizeOnStartup")
+			.getAnnotation(EventListener.class);
+
+		assertThat(listener).isNotNull();
+		assertThat(listener.value()).containsExactly(ApplicationReadyEvent.class);
+	}
+
+	@Test
+	void startupRunAnonymizesOnceAndLogsOnlyTheNumberOfRows() {
+		int[] calls = { 0 };
+		AnonymizationJob job = new AnonymizationJob(() -> ++calls[0] + 4);
+
+		job.anonymizeOnStartup();
+
+		assertThat(calls[0]).isEqualTo(1);
+		assertThat(messages(Level.INFO)).contains("5");
+		assertThat(messages(Level.WARN)).isEmpty();
+	}
+
+	@Test
+	void startupFailureWarnsWithoutMessageAndDoesNotStopTheApplication() {
+		AnonymizationJob job = new AnonymizationJob(() -> {
+			throw new IllegalStateException(SECRET, new IllegalArgumentException(SECRET));
+		});
+
+		assertThatCode(job::anonymizeOnStartup).doesNotThrowAnyException();
+
+		assertThat(messages(Level.WARN)).contains(IllegalStateException.class.getName())
+			.contains("caused by " + IllegalArgumentException.class.getName())
+			.doesNotContain(SECRET);
 	}
 
 	@Test

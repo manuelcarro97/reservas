@@ -2,6 +2,7 @@ package io.github.manuelcarro97.reservas.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -10,6 +11,9 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ConfigurableApplicationContext;
 
 import io.github.manuelcarro97.reservas.application.port.in.AnonymizeReservationsUseCase;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
@@ -25,6 +29,9 @@ class AnonymizationIT extends PostgresIT {
 
 	@Autowired
 	private AnonymizeReservationsUseCase anonymize;
+
+	@Autowired
+	private ConfigurableApplicationContext context;
 
 	private Restaurant restaurant;
 	private Shift shift;
@@ -70,6 +77,18 @@ class AnonymizationIT extends PostgresIT {
 
 		assertThat(changed).isEqualTo(1);
 		assertAnonymized(old);
+	}
+
+	/** Un arranque tras días dormido (hosting gratuito) anonimiza lo que el cron de las 3:30 no pudo. */
+	@Test
+	void applicationReadyEventAnonymizesOldReservations() {
+		Reservation old = reservationOn(TODAY.minusDays(31));
+		Reservation recent = reservationOn(TODAY.minusDays(5));
+
+		context.publishEvent(new ApplicationReadyEvent(new SpringApplication(), new String[0], context, Duration.ZERO));
+
+		assertAnonymized(old);
+		assertUntouched(recent);
 	}
 
 	@Test

@@ -10,8 +10,10 @@ import io.github.manuelcarro97.reservas.config.TelegramDisabled;
 import io.github.manuelcarro97.reservas.config.TelegramEnabled;
 
 /**
- * Aviso por log, el canal cuando no hay token de bot de Telegram (ver {@link TelegramEnabled}). El texto lleva el
- * nombre del cliente pero nunca su teléfono ni su email, y no se escribe el uid del dueño.
+ * Aviso por log, el canal cuando no hay token de bot de Telegram (ver {@link TelegramEnabled}). Solo deja constancia de
+ * que hubo un aviso y de su tamaño: el texto lleva el nombre del cliente y los logs del hosting no son un sitio para
+ * datos personales (se conservan y los ve quien tenga acceso al panel). No se escribe tampoco el uid del dueño. El
+ * puerto solo recibe el texto ya redactado, así que no hay tipo ni plano que registrar sin cambiar su contrato.
  */
 @Component
 @Conditional(TelegramDisabled.class)
@@ -21,8 +23,7 @@ class LoggingNotificationAdapter implements NotificationPort {
 
 	@Override
 	public void notifyOwner(String ownerUid, String text) {
-		// El nombre lo escribe el cliente: sin saltos de línea ni otros controles, no puede falsear líneas del log.
-		log.info("Owner notification: {}", text.replaceAll("\\p{Cntrl}", " "));
+		log.info("Owner notification raised ({} characters, no channel configured)", text.length());
 	}
 
 }
