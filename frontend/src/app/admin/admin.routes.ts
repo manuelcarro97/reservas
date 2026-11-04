@@ -17,9 +17,12 @@ export const adminRoutes: Routes = [
     children: [
       { path: '', loadComponent: () => import('./plans.page').then((m) => m.PlansPage) },
       { path: 'cuenta', loadComponent: () => import('./account.page').then((m) => m.AccountPage) },
-      // Provisionales: cada tarea (F7 Plano, F8 Turnos y Ajustes, F9 Reservas) sustituye la suya.
+      // Provisionales: cada tarea (F8 Turnos y Ajustes, F9 Reservas) sustituye la suya.
       { path: ':slug', loadComponent: placeholder },
-      { path: ':slug/plano', loadComponent: placeholder },
+      {
+        path: ':slug/plano',
+        loadComponent: () => import('./editor/editor.page').then((m) => m.EditorPage),
+      },
       { path: ':slug/turnos', loadComponent: placeholder },
       { path: ':slug/ajustes', loadComponent: placeholder },
     ],

@@ -1,0 +1,81 @@
+@switch (status()) {
+  @case ('loading') {
+    <p class="state">Cargando el plano…</p>
+  }
+  @case ('notFound') {
+    <p class="state" role="alert">Este plano no existe.</p>
+    <p><a routerLink="/panel">Volver a tus planos</a></p>
+  }
+  @case ('error') {
+    <p class="state" role="alert">No se pudo cargar el plano.</p>
+    <button type="button" (click)="retry()">Reintentar</button>
+  }
+  @case ('ready') {
+    <h1>Forma del local · {{ planName() }}</h1>
+
+    <div class="toolbar">
+      <div class="shapes" role="group" aria-label="Forma del local">
+        @for (option of shapes; track option.shape) {
+          <button
+            type="button"
+            [attr.aria-pressed]="isShape(option.shape)"
+            (click)="store.setShape(option.shape)"
+          >
+            {{ option.name }}
+          </button>
+        }
+      </div>
+      <button type="button" (click)="store.rotateRoom()">Girar 90°</button>
+    </div>
+
+    <p class="help">
+      Arrastra los puntos del contorno para cambiar las medidas, o enfócalos y usa las flechas para
+      moverlos de 20 en 20.
+    </p>
+
+    @if (store.published() && store.roomChanged()) {
+      <p class="notice" role="status">
+        Este plano está publicado. Si tiene reservas activas a partir de hoy, no podrás guardar un
+        cambio de forma del local hasta cancelarlas.
+      </p>
+    }
+    @if (misplacedTables().length > 0) {
+      <p class="notice" role="status">
+        Con esta forma, estas mesas quedan fuera del local o demasiado cerca de la pared:
+        {{ misplacedTables().join(', ') }}. Muévelas antes de guardar.
+      </p>
+    }
+
+    <div class="stage">
+      <app-plano [room]="store.room()" [tables]="store.tables()" [theme]="store.theme()" />
+      <svg
+        #overlay
+        class="handles"
+        [attr.viewBox]="viewBox()"
+        role="group"
+        aria-label="Tiradores del contorno del local"
+      >
+        @for (handle of handles(); track handle.kind) {
+          <g
+            class="handle"
+            role="slider"
+            tabindex="0"
+            [class.active]="dragging() === handle.kind"
+            [attr.aria-label]="handle.label"
+            [attr.aria-valuemin]="handle.min"
+            [attr.aria-valuemax]="handle.max"
+            [attr.aria-valuenow]="handle.value"
+            (pointerdown)="onPointerDown($event, handle)"
+            (pointermove)="onPointerMove($event)"
+            (pointerup)="onPointerEnd($event)"
+            (pointercancel)="onPointerEnd($event)"
+            (keydown)="onKeydown($event, handle)"
+          >
+            <circle class="hit" [attr.cx]="handle.x" [attr.cy]="handle.y" r="28" />
+            <circle class="knob" [attr.cx]="handle.x" [attr.cy]="handle.y" r="14" />
+          </g>
+        }
+      </svg>
+    </div>
+  }
+}

@@ -106,7 +106,18 @@ describe('routes', () => {
       harness.detectChanges();
 
       expect(TestBed.inject(Router).url).toBe(href);
-      expect(host.textContent).toContain('Esta sección llega pronto');
+      if (href === '/panel/kafe/plano') {
+        // El editor ya existe: pide el plano al abrirse (el interceptor espera al token, de ahí el await).
+        await flushPromises();
+        backend
+          .expectOne((request) => request.url.endsWith('/api/v1/admin/restaurants/kafe'))
+          .flush({ slug: 'kafe', name: 'Kafé', status: 'DRAFT', tables: [] });
+        await harness.fixture.whenStable();
+        harness.detectChanges();
+        expect(host.textContent).toContain('Forma del local');
+      } else {
+        expect(host.textContent).toContain('Esta sección llega pronto');
+      }
     }
   });
 

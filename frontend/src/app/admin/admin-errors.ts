@@ -7,6 +7,8 @@ const MESSAGES: Record<string, string> = {
   PLAN_CREATION_LIMIT:
     'Has creado demasiados planos en las últimas 24 horas. Inténtalo de nuevo más tarde.',
   DEMO_READ_ONLY: 'La cuenta de demostración es de solo lectura.',
+  ROOM_LOCKED:
+    'No se puede cambiar la forma del local mientras haya reservas activas. Cancela estas reservas antes:',
   RESTAURANT_NOT_FOUND: 'Ese plano ya no existe.',
   SLUG_RESERVED: 'Ese enlace está reservado. Elige otro.',
   ALREADY_EXISTS: 'Ese enlace ya está en uso. Elige otro.',
@@ -26,13 +28,17 @@ export function adminErrorMessage(error: HttpErrorResponse, fallback: string): s
   return (code && MESSAGES[code]) || fallback;
 }
 
-/** Códigos de las reservas que impiden un borrado (409 `PLAN_HAS_RESERVATIONS`, propiedad `reservations`). */
+/**
+ * Códigos de las reservas que impiden un borrado (409 `PLAN_HAS_RESERVATIONS`) o un cambio de la forma del local
+ * (409 `ROOM_LOCKED`), en la propiedad `reservations`.
+ */
 export function blockingReservations(error: HttpErrorResponse): string[] {
-  if (errorCode(error) !== 'PLAN_HAS_RESERVATIONS') {
+  const code = errorCode(error);
+  if (code !== 'PLAN_HAS_RESERVATIONS' && code !== 'ROOM_LOCKED') {
     return [];
   }
   const codes = problemBody(error)['reservations'];
   return Array.isArray(codes)
-    ? codes.filter((code): code is string => typeof code === 'string')
+    ? codes.filter((item): item is string => typeof item === 'string')
     : [];
 }

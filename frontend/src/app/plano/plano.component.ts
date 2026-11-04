@@ -47,6 +47,18 @@ interface DrawnTable {
 const PAD = 40;
 const BADGE_HEIGHT = 40;
 
+/** `viewBox` del plano: el contorno del local con un margen de PAD. Lo usan también las capas que se dibujan encima. */
+export function planoViewBox(room: Room): string {
+  const polygon = roomPolygon(room);
+  const xs = polygon.map((point) => point.x);
+  const ys = polygon.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const width = Math.max(...xs) - minX;
+  const height = Math.max(...ys) - minY;
+  return `${minX - PAD} ${minY - PAD} ${width + PAD * 2} ${height + PAD * 2}`;
+}
+
 const STATE_TEXT: Record<TableState, string> = {
   free: 'libre',
   selected: 'seleccionada',
@@ -143,15 +155,7 @@ export class PlanoComponent {
       .join(' '),
   );
 
-  protected readonly viewBox = computed(() => {
-    const xs = this.polygon().map((point) => point.x);
-    const ys = this.polygon().map((point) => point.y);
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    const width = Math.max(...xs) - minX;
-    const height = Math.max(...ys) - minY;
-    return `${minX - PAD} ${minY - PAD} ${width + PAD * 2} ${height + PAD * 2}`;
-  });
+  protected readonly viewBox = computed(() => planoViewBox(this.room()));
 
   protected readonly drawnTables = computed<DrawnTable[]>(() =>
     this.tables()

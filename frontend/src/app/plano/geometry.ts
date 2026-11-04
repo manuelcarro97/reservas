@@ -52,10 +52,11 @@ export const WALL_INSET = 16;
 
 export const MAX_TABLES = 60;
 
-const STEP = 20;
-const MIN_SIDE = 400;
-const MAX_SIDE = 2000;
-const MIN_CUT = 200;
+/** Medidas del local (RoomLayout del backend): múltiplos de STEP, lados entre MIN_SIDE y MAX_SIDE, hueco de MIN_CUT como mínimo. */
+export const STEP = 20;
+export const MIN_SIDE = 400;
+export const MAX_SIDE = 2000;
+export const MIN_CUT = 200;
 const CHAIR_DEPTH = 34;
 const RESERVED_LABEL_PREFIX = '~';
 
@@ -208,7 +209,7 @@ function unrotatedPolygon({ shape, width, height, cutWidth, cutDepth }: Room): P
 }
 
 /** Giro horario en pasos de 90 grados (coordenadas SVG, con y hacia abajo), como `RoomLayout.rotate`. */
-function rotatePoint({ rotation, width, height }: Room, { x, y }: Point): Point {
+export function rotatePoint({ rotation, width, height }: Room, { x, y }: Point): Point {
   switch (rotation) {
     case 90:
       return { x: height - y, y: x };
