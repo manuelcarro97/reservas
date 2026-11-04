@@ -95,6 +95,16 @@
   user-select: none;
 }
 
-[data-interactive] .t {
+[data-interactive] .t:not(.blocked) {
   cursor: pointer;
+}
+
+/* Foco de teclado propio: contorno claro sobre el tablero (el del navegador sobre un <g> dibuja su caja). */
+.t:focus-visible {
+  outline: none;
+}
+
+.t:focus-visible .top {
+  stroke: #fff;
+  stroke-width: 8;
 }

@@ -1,4 +1,7 @@
+import { BrowserPlatformLocation, PlatformLocation } from '@angular/common';
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { Room } from './geometry';
 import { PlanoComponent, PlanoTable } from './plano.component';
 import { THEMES } from './themes';
@@ -36,6 +39,20 @@ describe('PlanoComponent', () => {
 
   function tableGroups(fixture: ComponentFixture<PlanoComponent>): SVGGElement[] {
     return Array.from(root(fixture).querySelectorAll<SVGGElement>('g.t'));
+  }
+
+  /** Valores `url(...)` de los atributos que referencian `<defs>`. */
+  function references(fixture: ComponentFixture<PlanoComponent>): string[] {
+    const refs: string[] = [];
+    for (const element of Array.from(root(fixture).querySelectorAll('*'))) {
+      for (const name of ['fill', 'filter', 'clip-path']) {
+        const value = element.getAttribute(name);
+        if (value?.startsWith('url(')) {
+          refs.push(value);
+        }
+      }
+    }
+    return refs;
   }
 
   function keydown(target: Element, key: string): void {
@@ -182,9 +199,9 @@ describe('PlanoComponent', () => {
       [first, firstIds],
       [second, secondIds],
     ] as const) {
-      const html = root(fixture).innerHTML;
+      const refs = references(fixture);
       for (const id of ids) {
-        expect(html).toContain(`url(#${id})`);
+        expect(refs.some((ref) => ref.endsWith(`#${id}")`))).toBe(true);
       }
     }
   });
@@ -222,5 +239,58 @@ describe('PlanoComponent', () => {
     const fixture = render({ room: { ...ROOM, rotation: 90 } });
 
     expect(root(fixture).querySelector('svg')?.getAttribute('viewBox')).toBe('-40 -40 880 1280');
+  });
+
+  // Con <base href="/"> y rutas sin hash, `url(#id)` se resuelve contra la base en Safari y Firefox antiguos
+  // (otro documento) y se pierden suelo, banda, cojines, tablero y madera. Las referencias llevan la URL actual.
+  describe('references against the current URL', () => {
+    let base: HTMLBaseElement;
+
+    beforeEach(() => {
+      base = document.createElement('base');
+      base.href = '/';
+      document.head.appendChild(base);
+      history.replaceState({}, '', '/r/demo?fecha=1');
+    });
+
+    afterEach(() => {
+      base.remove();
+      history.replaceState({}, '', '/');
+    });
+
+    it('prefixesEveryReferenceWithThePathAndQuery', () => {
+      const fixture = render();
+      const refs = references(fixture);
+
+      // floor, clip de la banda, y por mesa: cojín, tablero y madera.
+      expect(refs.length).toBeGreaterThanOrEqual(2 + 3 * TABLES.length);
+      for (const ref of refs) {
+        expect(ref).toMatch(/^url\("\/r\/demo\?fecha=1#plano-\d+-[a-z]+"\)$/);
+      }
+    });
+
+    it('updatesTheReferencesWhenTheRouterNavigatesToAnotherQuery', async () => {
+      @Component({ template: '' })
+      class Blank {}
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([{ path: '**', component: Blank }]),
+          // TestBed monta una PlatformLocation falsa que no toca la URL del documento; aquí se quiere la real.
+          { provide: PlatformLocation, useClass: BrowserPlatformLocation },
+        ],
+      });
+      const fixture = render();
+      const router = TestBed.inject(Router);
+
+      await router.navigateByUrl('/r/demo?fecha=2');
+      fixture.detectChanges();
+
+      const refs = references(fixture);
+      expect(refs.length).toBeGreaterThan(0);
+      for (const ref of refs) {
+        expect(ref).toMatch(/^url\("\/r\/demo\?fecha=2#/);
+      }
+      expect(root(fixture).querySelector('svg')?.getAttribute('viewBox')).not.toBeNull();
+    });
   });
 });

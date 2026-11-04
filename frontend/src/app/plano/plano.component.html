@@ -65,12 +65,8 @@
   </defs>
 
   <polygon class="wall-stone" [attr.points]="polygonPoints()" />
-  <polygon [attr.fill]="'url(#' + ids.floor + ')'" [attr.points]="polygonPoints()" />
-  <polygon
-    class="wall-band"
-    [attr.clip-path]="'url(#' + ids.room + ')'"
-    [attr.points]="polygonPoints()"
-  />
+  <polygon [attr.fill]="ref(ids.floor)" [attr.points]="polygonPoints()" />
+  <polygon class="wall-band" [attr.clip-path]="ref(ids.room)" [attr.points]="polygonPoints()" />
   <polygon class="wall-line" [attr.points]="polygonPoints()" />
 
   @for (drawn of drawnTables(); track drawn.table.id) {
@@ -98,7 +94,7 @@
               width="34"
               height="33"
               rx="10"
-              [attr.fill]="'url(#' + ids.cushion + ')'"
+              [attr.fill]="ref(ids.cushion)"
             />
             <path class="seat-back" d="M-18 15 Q0 27 18 15" />
           </g>
@@ -107,8 +103,8 @@
           <circle
             class="top"
             [attr.r]="drawn.radius"
-            [attr.fill]="'url(#' + ids.tabletop + ')'"
-            [attr.filter]="'url(#' + ids.wood + ')'"
+            [attr.fill]="ref(ids.tabletop)"
+            [attr.filter]="ref(ids.wood)"
           />
         } @else if (drawn.rect) {
           <rect
@@ -118,8 +114,8 @@
             [attr.y]="drawn.rect.y"
             [attr.width]="drawn.rect.width"
             [attr.height]="drawn.rect.height"
-            [attr.fill]="'url(#' + ids.tabletop + ')'"
-            [attr.filter]="'url(#' + ids.wood + ')'"
+            [attr.fill]="ref(ids.tabletop)"
+            [attr.filter]="ref(ids.wood)"
           />
         }
       </g>

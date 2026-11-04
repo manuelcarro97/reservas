@@ -1,4 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs';
 import { Point, Room, TableLike, isSupportedSeats, roomPolygon } from './geometry';
 import { Chair, ROUND_R, chairPositions, rectSize } from './table-drawing';
 import { STATE_COLORS, THEMES, ThemeKey } from './themes';
@@ -96,6 +108,25 @@ export class PlanoComponent {
     wood: `${this.prefix}-wood`,
   };
 
+  private readonly document = inject(DOCUMENT);
+
+  /**
+   * Ruta y query del documento, sin hash. Con `<base href>` y rutas sin hash, un `url(#id)` se resuelve contra la
+   * base (otro documento) en Safari y Firefox antiguos; con la URL actual por delante apunta siempre a esta página.
+   * Se actualiza en cada navegación: si quedase vieja, la referencia apuntaría a otro documento igual.
+   */
+  private readonly documentUrl = signal(this.currentDocumentUrl());
+
+  constructor() {
+    // Sin Router (tests de componente sueltos) se queda con la URL inicial.
+    inject(Router, { optional: true })
+      ?.events.pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => this.documentUrl.set(this.currentDocumentUrl()));
+  }
+
   protected readonly colors = computed(() => THEMES[this.theme()]);
 
   /** Matriz del filtro de veta: pinta el color de la madera donde el ruido es opaco. */
@@ -145,6 +176,17 @@ export class PlanoComponent {
         };
       }),
   );
+
+  /** `url("<ruta>?<query>#id")` para `fill`, `filter` y `clip-path`. */
+  protected ref(id: string): string {
+    const url = this.documentUrl().replace(/["\\]/g, '\\$&');
+    return `url("${url}#${id}")`;
+  }
+
+  private currentDocumentUrl(): string {
+    const { pathname, search } = this.document.location;
+    return pathname + search;
+  }
 
   protected stateOf(id: number): TableState {
     return this.states()[id] ?? 'free';
