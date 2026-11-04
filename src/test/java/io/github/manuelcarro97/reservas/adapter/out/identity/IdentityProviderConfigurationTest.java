@@ -16,6 +16,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseOptions;
+
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderPort;
 
 /**
@@ -97,6 +100,11 @@ class IdentityProviderConfigurationTest {
 		try {
 			assertThat(provider).isInstanceOf(FirebaseIdentityProvider.class);
 			assertThat(warnings()).isEmpty();
+			// Sin tiempo máximo una llamada colgada retendría la conexión de la base de datos (deleteUser va tras el commit).
+			FirebaseOptions options = FirebaseApp.getInstance(IdentityProviderConfiguration.FIREBASE_APP_NAME)
+				.getOptions();
+			assertThat(options.getConnectTimeout()).isEqualTo(10_000);
+			assertThat(options.getReadTimeout()).isEqualTo(10_000);
 		}
 		finally {
 			((AutoCloseable) provider).close();

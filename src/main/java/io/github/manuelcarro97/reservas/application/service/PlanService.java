@@ -30,6 +30,7 @@ import io.github.manuelcarro97.reservas.application.port.out.ReservationReposito
 import io.github.manuelcarro97.reservas.application.port.out.RestaurantRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.ShiftRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.TableRepositoryPort;
+import io.github.manuelcarro97.reservas.domain.exception.DemoReadOnlyException;
 import io.github.manuelcarro97.reservas.domain.exception.LayoutInvalidException;
 import io.github.manuelcarro97.reservas.domain.exception.PlanLimitReachedException;
 import io.github.manuelcarro97.reservas.domain.exception.PlanNotPublishableException;
@@ -62,20 +63,26 @@ class PlanService implements ManagePlanUseCase {
 	private final ShiftRepositoryPort shifts;
 	private final ReservationRepositoryPort reservations;
 	private final Clock clock;
+	private final DemoAccount demoAccount;
 	private final LayoutValidator layoutValidator = new LayoutValidator();
 	private final SeatingCapacity seatingCapacity = new SeatingCapacity();
 
 	PlanService(RestaurantRepositoryPort restaurants, TableRepositoryPort tables, ShiftRepositoryPort shifts,
-			ReservationRepositoryPort reservations, Clock clock) {
+			ReservationRepositoryPort reservations, Clock clock, DemoAccount demoAccount) {
 		this.restaurants = restaurants;
 		this.tables = tables;
 		this.shifts = shifts;
 		this.reservations = reservations;
 		this.clock = clock;
+		this.demoAccount = demoAccount;
 	}
 
 	@Override
 	public Restaurant create(String ownerUid, String slug, String name) {
+		// La demo solo tiene su plano (lo siembra el seeder): crear más lo dejaría sin sitio y sin limpiar.
+		if (demoAccount.isDemo(ownerUid)) {
+			throw new DemoReadOnlyException();
+		}
 		// El recuento de planos y el alta van bajo el bloqueo del dueño: sin él, dos altas a la vez pasarían el límite.
 		restaurants.lockOwner(ownerUid);
 		if (restaurants.findByOwner(ownerUid).size() >= MAX_PLANS_PER_OWNER) {
@@ -115,6 +122,10 @@ class PlanService implements ManagePlanUseCase {
 	@Override
 	public Restaurant publish(String ownerUid, String slug) {
 		Restaurant locked = lockOwned(ownerUid, slug);
+		// Un plano ajeno ya dio 404 arriba; la demo solo publica el suyo.
+		if (demoAccount.isDemo(ownerUid) && !DemoAccount.PLAN_SLUG.equals(locked.slug())) {
+			throw new DemoReadOnlyException();
+		}
 		List<DiningTable> current = tables.findAll(locked.id());
 		if (current.isEmpty()) {
 			throw new PlanNotPublishableException("The plan needs at least one table");

@@ -17,6 +17,7 @@ import io.github.manuelcarro97.reservas.application.port.in.AccountUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ManagePlanUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.TelegramLinkUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.TelegramStatus;
+import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderException;
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderPort;
 import io.github.manuelcarro97.reservas.application.port.out.OwnerAccountRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.ReservationRepositoryPort;
@@ -69,6 +70,10 @@ class AccountService implements AccountUseCase {
 
 	@Override
 	public void deletePlan(String ownerUid, String slug) {
+		// El slug de un plano borrado no se reutiliza: si la demo borrara el suyo, el seeder no podría recrearlo.
+		if (demoAccount.isDemo(ownerUid)) {
+			throw new DemoReadOnlyException();
+		}
 		restaurants.lockOwner(ownerUid);
 		Restaurant found = RestaurantAccess.owned(restaurants, slug, ownerUid);
 		// Se revalida con la fila bloqueada: entre la lectura y el bloqueo el plano pudo cambiar.
@@ -120,7 +125,9 @@ class AccountService implements AccountUseCase {
 	/**
 	 * La cuenta del proveedor se borra cuando el borrado de la base de datos ya está confirmado: si se borrara antes y la
 	 * transacción fallara, el dueño perdería el acceso con sus planos aún vivos. Si el proveedor falla no se deshace
-	 * nada (ya está confirmado) y la respuesta sigue siendo un éxito; se registra para limpiarlo a mano.
+	 * nada (ya está confirmado) y la respuesta sigue siendo un éxito; se registra, con el uid (seudónimo, no secreto), para
+	 * limpiarlo a mano. De una {@link IdentityProviderException} se escribe su mensaje (operación y códigos enumerados);
+	 * de cualquier otra excepción solo la clase y el primer frame, nunca su mensaje.
 	 */
 	private void deleteIdentityUserAfterCommit(String ownerUid) {
 		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -129,12 +136,16 @@ class AccountService implements AccountUseCase {
 				try {
 					identityProvider.deleteUser(ownerUid);
 				}
+				catch (IdentityProviderException failure) {
+					// Su mensaje es seguro por contrato: operación y códigos enumerados.
+					log.warn("Identity provider user deletion failed for uid {}: {}", ownerUid, failure.getMessage());
+				}
 				catch (RuntimeException failure) {
 					// Nunca el mensaje ni la traza completa: el de una librería externa puede traer datos de la cuenta de
-					// servicio. Clase y primer frame bastan para saber dónde falló. Ni el uid.
+					// servicio. Clase y primer frame bastan para saber dónde falló.
 					StackTraceElement[] frames = failure.getStackTrace();
-					log.warn("Identity provider user deletion failed: {} at {}", failure.getClass().getName(),
-							frames.length > 0 ? frames[0] : "unknown");
+					log.warn("Identity provider user deletion failed for uid {}: {} at {}", ownerUid,
+							failure.getClass().getName(), frames.length > 0 ? frames[0] : "unknown");
 				}
 			}
 		});

@@ -163,7 +163,11 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 
 	@Override
 	public ReservationDetails byCode(String code) {
-		return details(findByCode(code));
+		Reservation reservation = findByCode(code);
+		// Las reservas de un plano borrado se anonimizaron y ya no se consultan: igual que una que no existe. Un plano en
+		// borrador sí sigue visible.
+		restaurants.findById(reservation.restaurantId()).orElseThrow(ReservationNotFoundException::new);
+		return details(reservation);
 	}
 
 	/** Transaccional: el aviso al dueño sale con la confirmación de la transacción. */

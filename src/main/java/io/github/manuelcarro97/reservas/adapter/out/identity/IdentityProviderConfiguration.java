@@ -29,6 +29,7 @@ class IdentityProviderConfiguration {
 	private static final Logger log = LoggerFactory.getLogger(IdentityProviderConfiguration.class);
 
 	static final String FIREBASE_APP_NAME = "reservas-identity";
+	static final int CALL_TIMEOUT_MILLIS = 10_000;
 
 	@Bean
 	IdentityProviderPort identityProvider(@Value("${app.firebase.service-account-json:}") String serviceAccountJson) {
@@ -38,8 +39,13 @@ class IdentityProviderConfiguration {
 		try {
 			GoogleCredentials credentials = GoogleCredentials
 				.fromStream(new ByteArrayInputStream(serviceAccountJson.getBytes(StandardCharsets.UTF_8)));
-			FirebaseApp app = FirebaseApp.initializeApp(FirebaseOptions.builder().setCredentials(credentials).build(),
-					FIREBASE_APP_NAME);
+			// Sin tiempos máximos una llamada colgada sería infinita, y deleteUser corre tras el commit con la conexión de
+			// la base de datos aún tomada.
+			FirebaseApp app = FirebaseApp.initializeApp(FirebaseOptions.builder()
+				.setCredentials(credentials)
+				.setConnectTimeout(CALL_TIMEOUT_MILLIS)
+				.setReadTimeout(CALL_TIMEOUT_MILLIS)
+				.build(), FIREBASE_APP_NAME);
 			return new FirebaseIdentityProvider(app);
 		}
 		catch (IOException | RuntimeException failure) {

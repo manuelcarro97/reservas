@@ -6,6 +6,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
 
+import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderException;
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderPort;
 
 /**
@@ -31,7 +32,7 @@ class FirebaseIdentityProvider implements IdentityProviderPort, AutoCloseable {
 		catch (FirebaseAuthException failure) {
 			// Que ya no exista es el resultado que se buscaba.
 			if (failure.getAuthErrorCode() != AuthErrorCode.USER_NOT_FOUND) {
-				throw new IdentityProviderException("deleteUser", failure);
+				throw new IdentityProviderException("deleteUser", codesOf(failure));
 			}
 		}
 	}
@@ -51,8 +52,13 @@ class FirebaseIdentityProvider implements IdentityProviderPort, AutoCloseable {
 			return uid;
 		}
 		catch (FirebaseAuthException failure) {
-			throw new IdentityProviderException("ensureUser", failure);
+			throw new IdentityProviderException("ensureUser", codesOf(failure));
 		}
+	}
+
+	/** Solo los códigos enumerados: el mensaje de la librería no se copia. */
+	private static String codesOf(FirebaseAuthException failure) {
+		return failure.getErrorCode() + ", " + failure.getAuthErrorCode();
 	}
 
 	private boolean exists(String uid) throws FirebaseAuthException {

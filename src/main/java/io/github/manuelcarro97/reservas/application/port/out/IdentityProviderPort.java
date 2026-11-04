@@ -4,8 +4,9 @@ package io.github.manuelcarro97.reservas.application.port.out;
 public interface IdentityProviderPort {
 
 	/**
-	 * Borra la cuenta del proveedor. Que ya no exista no es un error. Si el proveedor falla lanza una excepción sin
-	 * datos de la cuenta ni del proveedor en el mensaje: quien llama la registra tal cual.
+	 * Borra la cuenta del proveedor. Que ya no exista no es un error. Si el proveedor falla lanza
+	 * {@link IdentityProviderException}, cuyo mensaje solo lleva la operación y códigos enumerados: quien llama puede
+	 * registrarlo tal cual.
 	 */
 	void deleteUser(String uid);
 

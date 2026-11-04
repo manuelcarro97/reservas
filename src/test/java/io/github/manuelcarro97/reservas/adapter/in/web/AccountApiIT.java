@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderException;
 import io.github.manuelcarro97.reservas.application.service.DemoAccount;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
@@ -357,8 +359,88 @@ class AccountApiIT extends PostgresIT {
 		assertThat(identity.deleted()).containsExactly("owner-a");
 		assertThat(isDeleted("plano-a")).isTrue();
 		assertThat(accountRows("owner-a")).isZero();
-		// El fallo se registra, sin el mensaje de la excepción ni la traza completa.
-		assertThat(output.getAll()).contains("IllegalStateException").doesNotContain("MARCA-SECRETA");
+		// El fallo se registra con el uid (para limpiarlo a mano), sin el mensaje de la excepción ni la traza completa.
+		assertThat(output.getAll()).contains("IllegalStateException", "owner-a").doesNotContain("MARCA-SECRETA");
+	}
+
+	@Test
+	void identityProviderFailureLogsUidAndEnumeratedCodes(CapturedOutput output) throws Exception {
+		givenRestaurant("plano-a", "owner-a");
+		identity.failWith(new IdentityProviderException("deleteUser", "UNAVAILABLE, UNKNOWN"));
+
+		as("owner-a", delete(ACCOUNT)).andExpect(status().isNoContent());
+
+		// La excepción del puerto solo lleva operación y códigos enumerados: su mensaje sí se registra.
+		assertThat(output.getAll()).contains("owner-a", "deleteUser", "UNAVAILABLE, UNKNOWN");
+	}
+
+	@Test
+	void demoCannotDeletePlan() throws Exception {
+		demoAccount.setUid("owner-demo");
+		givenRestaurant("demo", "owner-demo");
+
+		// El slug de un plano borrado no se reutiliza: si la demo borrara el suyo, el seeder no podría recrearlo.
+		as("owner-demo", delete(PLANS + "/demo")).andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("DEMO_READ_ONLY"));
+
+		assertThat(isDeleted("demo")).isFalse();
+	}
+
+	@Test
+	void demoCannotCreatePlan() throws Exception {
+		demoAccount.setUid("owner-demo");
+
+		createPlan("owner-demo", "otro").andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("DEMO_READ_ONLY"));
+
+		assertThat(restaurants.findBySlug("otro")).isEmpty();
+	}
+
+	@Test
+	void demoCannotPublishAPlanOtherThanDemo() throws Exception {
+		demoAccount.setUid("owner-demo");
+		givenRestaurant("otro", "owner-demo");
+
+		as("owner-demo", post(PLANS + "/otro/publish")).andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("DEMO_READ_ONLY"));
+		// Un plano ajeno sigue dando 404 y no revela nada.
+		givenRestaurant("de-otro", "owner-b");
+		as("owner-demo", post(PLANS + "/de-otro/publish")).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void demoCanStillEditAndPublishItsOwnPlan() throws Exception {
+		demoAccount.setUid("owner-demo");
+		givenRestaurant("demo", "owner-demo");
+		String layout = """
+				{"room":{"shape":"RECTANGLE","width":1200,"height":800,"cutWidth":0,"cutDepth":0,"rotation":0},
+				 "tables":[{"label":"M1","shape":"SQUARE","seats":2,"rotation":0,"x":200,"y":200}]}
+				""";
+
+		as("owner-demo", put(PLANS + "/demo/layout").contentType(MediaType.APPLICATION_JSON).content(layout))
+			.andExpect(status().isOk());
+		as("owner-demo", post(PLANS + "/demo/publish")).andExpect(status().isOk());
+	}
+
+	@Test
+	void byCodeOfDeletedPlanReturns404() throws Exception {
+		Restaurant plan = givenRestaurant("plano-a", "owner-a");
+		Reservation past = reserve(plan, givenDinnerShift(plan), "M1", PAST);
+		mvc.perform(get("/api/v1/reservations/" + past.code())).andExpect(status().isOk());
+
+		as("owner-a", delete(PLANS + "/plano-a")).andExpect(status().isNoContent());
+
+		mvc.perform(get("/api/v1/reservations/" + past.code())).andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("RESERVATION_NOT_FOUND"));
+	}
+
+	@Test
+	void byCodeOfDraftPlanStillWorks() throws Exception {
+		Restaurant plan = givenRestaurant("plano-a", "owner-a");
+		Reservation reservation = reserve(plan, givenDinnerShift(plan), "M1", FUTURE);
+		restaurants.save(restaurants.findBySlug("plano-a").orElseThrow().withRoomAsDraft(plan.room()));
+
+		mvc.perform(get("/api/v1/reservations/" + reservation.code())).andExpect(status().isOk());
 	}
 
 	@Test

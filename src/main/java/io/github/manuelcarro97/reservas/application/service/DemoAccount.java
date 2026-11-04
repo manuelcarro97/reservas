@@ -9,6 +9,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class DemoAccount {
 
+	/** Slug del único plano que la cuenta demo puede publicar; el seeder lo recrea cada noche. */
+	public static final String PLAN_SLUG = "demo";
+
 	private volatile String uid;
 
 	public boolean isDemo(String ownerUid) {
