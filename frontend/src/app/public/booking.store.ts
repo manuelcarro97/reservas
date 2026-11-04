@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, catchError, map, of, switchMap } from 'rxjs';
 import { PublicPlanResponse } from '../core/api/models/public-plan-response';
@@ -34,11 +34,36 @@ const GENERIC_ERROR = 'No se pudo completar la reserva. Inténtalo de nuevo.';
 const TABLE_TAKEN_MESSAGE = 'Esa mesa se acaba de reservar, elige otra';
 const UNAVAILABLE_PLAN_MESSAGE = 'Este plano no está disponible';
 
-/** Fecha local como `YYYY-MM-DD`. Sin `toISOString()`: es UTC y de madrugada daría el día anterior. */
+/** Fecha de calendario de un `Date` creado con componentes locales, como `YYYY-MM-DD`. Solo para sumar días. */
 export function localIsoDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** Reloj de la página; los tests lo sustituyen por uno fijo. */
+export const NOW = new InjectionToken<() => Date>('NOW', {
+  providedIn: 'root',
+  factory: () => () => new Date(),
+});
+
+/**
+ * Día de calendario (`YYYY-MM-DD`) que es ahora en `timeZone` (id IANA del local). Sin zona, o si el navegador no la
+ * conoce, usa la del navegador. Sin `toISOString()`: es UTC y daría otro día cerca de medianoche.
+ */
+export function todayIn(timeZone: string | undefined, now: Date): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const part = (type: string) => parts.find((candidate) => candidate.type === type)?.value ?? '';
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  } catch {
+    return localIsoDate(now);
+  }
 }
 
 export function addDays(isoDate: string, days: number): string {
@@ -88,6 +113,7 @@ function rateLimitedMessage(error: HttpErrorResponse): string {
 @Injectable()
 export class BookingStore {
   private readonly api = inject(PublicReservationControllerService);
+  private readonly now = inject(NOW);
 
   private slug = '';
   private planRequest: Subscription | undefined;
@@ -95,14 +121,14 @@ export class BookingStore {
   private readonly availabilityRequests = new Subject<{ date: string; partySize: number }>();
   private readonly occupancyRequests = new Subject<{ date: string; shiftId: number }>();
 
-  /** "Hoy" es la fecha local del navegador: el plan público no expone la zona del restaurante. */
-  readonly today = localIsoDate(new Date());
-  readonly maxDate = addDays(this.today, BOOKING_WINDOW_DAYS);
+  /** "Hoy" en la zona del local; hasta tener el plan, el del navegador. */
+  readonly today = signal(todayIn(undefined, this.now()));
+  readonly maxDate = computed(() => addDays(this.today(), BOOKING_WINDOW_DAYS));
 
   readonly status = signal<PlanStatus>('loading');
   readonly plan = signal<PublicPlanResponse | null>(null);
 
-  readonly date = signal(this.today);
+  readonly date = signal(this.today());
   readonly partySize = signal(DEFAULT_PARTY_SIZE);
   /** `null` mientras se piden los turnos. */
   readonly shifts = signal<ShiftAvailability[] | null>(null);
@@ -208,7 +234,7 @@ export class BookingStore {
     this.submitRequest?.unsubscribe();
     this.status.set('loading');
     this.plan.set(null);
-    this.date.set(this.today);
+    this.date.set(this.today());
     this.partySize.set(DEFAULT_PARTY_SIZE);
     this.customerName.set('');
     this.customerPhone.set('');
@@ -220,6 +246,8 @@ export class BookingStore {
     this.planRequest = this.api.plan({ slug }).subscribe({
       next: (plan) => {
         this.plan.set(plan);
+        this.today.set(todayIn(plan.timeZone, this.now()));
+        this.date.set(this.today());
         this.partySize.set(Math.min(DEFAULT_PARTY_SIZE, this.maxPartySize()));
         this.status.set('ready');
         this.requestShifts();
@@ -231,7 +259,7 @@ export class BookingStore {
 
   setDate(date: string): void {
     // Un valor vacío o fuera de la ventana (campo a medio escribir) no pide nada.
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < this.today || date > this.maxDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < this.today() || date > this.maxDate()) {
       return;
     }
     this.date.set(date);

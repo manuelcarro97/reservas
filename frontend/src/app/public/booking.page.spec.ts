@@ -14,11 +14,12 @@ import { ShiftAvailability } from '../core/api/models/shift-availability';
 import { THEMES } from '../plano/themes';
 import { ShellComponent } from '../shell/shell.component';
 import { BookingPage } from './booking.page';
-import { addDays, localIsoDate } from './booking.store';
+import { NOW, addDays, todayIn } from './booking.store';
 
 const PLAN: PublicPlanResponse = {
   slug: 'kafe',
   name: 'Kafé',
+  timeZone: 'Europe/Madrid',
   theme: 'NOCHE',
   bookingMode: 'FREE_CHOICE',
   cancellationDeadlineHours: 2,
@@ -30,6 +31,10 @@ const PLAN: PublicPlanResponse = {
   ],
   shifts: [],
 };
+
+// 23:30 UTC del 5 de enero: en Madrid (UTC+1) ya es día 6; con la zona del navegador (UTC en CI) seguiría siendo 5.
+const CLOCK = new Date('2030-01-05T23:30:00Z');
+const TODAY = '2030-01-06';
 
 const SHIFTS: ShiftAvailability[] = [
   { shiftId: 10, name: 'Comida', start: '13:00', available: true },
@@ -60,6 +65,7 @@ describe('BookingPage', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: NOW, useValue: () => CLOCK },
         provideRouter([
           {
             path: '',
@@ -168,7 +174,7 @@ describe('BookingPage', () => {
     expect(page.querySelectorAll('g.t').length).toBe(0);
     const availability = await flushShifts();
     expect(availability.request.params.get('partySize')).toBe('2');
-    expect(availability.request.params.get('date')).toBe(localIsoDate(new Date()));
+    expect(availability.request.params.get('date')).toBe(TODAY);
     expect(shiftButtons().map((button) => button.disabled)).toEqual([false, true]);
   });
 
@@ -243,7 +249,7 @@ describe('BookingPage', () => {
 
     const request = await submit();
     expect(request.request.body).toEqual({
-      date: localIsoDate(new Date()),
+      date: TODAY,
       shiftId: 10,
       partySize: 2,
       customerName: 'Ana Pérez',
@@ -372,9 +378,17 @@ describe('BookingPage', () => {
     await flushShifts();
 
     const input = page.querySelector<HTMLInputElement>('input[type=date]')!;
-    const today = new Date();
-    expect(input.min).toBe(localIsoDate(today));
-    expect(input.max).toBe(addDays(localIsoDate(today), 90));
+    expect(input.min).toBe(TODAY);
+    expect(input.max).toBe(addDays(TODAY, 90));
+  });
+
+  it('todayUsesThePlanTimeZone', async () => {
+    await open('/r/kafe', { ...PLAN, timeZone: 'America/Los_Angeles' });
+
+    const request = await flushShifts();
+
+    expect(request.request.params.get('date')).toBe('2030-01-05');
+    expect(page.querySelector<HTMLInputElement>('input[type=date]')!.min).toBe('2030-01-05');
   });
 
   it('changingDateReloadsShiftsAndClearsSelection', async () => {
@@ -384,7 +398,7 @@ describe('BookingPage', () => {
     table('2').dispatchEvent(new Event('click'));
     await settle();
 
-    const tomorrow = addDays(localIsoDate(new Date()), 1);
+    const tomorrow = addDays(TODAY, 1);
     type('input[type=date]', tomorrow);
     page.querySelector('input[type=date]')!.dispatchEvent(new Event('change', { bubbles: true }));
     await settle();
@@ -397,9 +411,19 @@ describe('BookingPage', () => {
 });
 
 describe('booking dates', () => {
-  it('formatsLocalDateWithoutUtcShift', () => {
-    // 00:30 locales: toISOString() daría el día anterior en zonas con offset positivo.
-    expect(localIsoDate(new Date(2030, 0, 5, 0, 30))).toBe('2030-01-05');
+  it('todayFollowsTheRestaurantZoneNotTheBrowser', () => {
+    const instant = new Date('2030-01-05T23:30:00Z');
+
+    expect(todayIn('Europe/Madrid', instant)).toBe('2030-01-06');
+    expect(todayIn('America/Los_Angeles', instant)).toBe('2030-01-05');
+    expect(todayIn('Asia/Tokyo', new Date('2030-01-05T15:30:00Z'))).toBe('2030-01-06');
+  });
+
+  it('unknownZoneFallsBackToBrowserDate', () => {
+    const instant = new Date(2030, 0, 5, 12, 0);
+
+    expect(todayIn('No/Existe', instant)).toBe('2030-01-05');
+    expect(todayIn(undefined, instant)).toBe('2030-01-05');
   });
 
   it('addsDaysAcrossMonths', () => {
