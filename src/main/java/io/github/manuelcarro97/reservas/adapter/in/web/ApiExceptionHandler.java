@@ -56,6 +56,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 			case UNPROCESSABLE -> HttpStatus.UNPROCESSABLE_CONTENT;
 			case CONFLICT -> HttpStatus.CONFLICT;
 			case FORBIDDEN -> HttpStatus.FORBIDDEN;
+			case TOO_MANY_REQUESTS -> HttpStatus.TOO_MANY_REQUESTS;
 		};
 	}
 

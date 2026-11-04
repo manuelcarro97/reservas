@@ -33,6 +33,12 @@ public interface RestaurantRepositoryPort {
 
 	Restaurant save(Restaurant restaurant);
 
+	/** Guarda un plano nuevo anotando {@code createdAt} (el reloj de la aplicación) como su fecha de creación. */
+	Restaurant create(Restaurant restaurant, Instant createdAt);
+
+	/** Planos que el dueño creó después de {@code since}, también los borrados. */
+	int countCreatedAfter(String ownerUid, Instant since);
+
 	/**
 	 * Borrado lógico del plano con un UPDATE dirigido: desaparece de las consultas y su slug sigue ocupado para siempre.
 	 * Si ya estaba borrado no hace nada.

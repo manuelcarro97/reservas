@@ -16,6 +16,15 @@ interface RestaurantJpaRepository extends JpaRepository<RestaurantEntity, Long> 
 
 	List<RestaurantEntity> findByOwnerUidAndDeletedAtIsNullOrderById(String ownerUid);
 
+	// created_at no es un campo de la entidad: lo escriben y leen estas sentencias, así guardar la entidad no lo pisa.
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query(nativeQuery = true, value = "UPDATE restaurant SET created_at = :at WHERE id = :id")
+	int stampCreatedAt(long id, Instant at);
+
+	@Query(nativeQuery = true,
+			value = "SELECT count(*) FROM restaurant WHERE owner_uid = :ownerUid AND created_at > :since")
+	int countCreatedAfter(String ownerUid, Instant since);
+
 	// UPDATE dirigido a propósito: guardar la entidad pondría deleted_at a null y resucitaría el plano.
 	// flush antes y clear después: la sentencia se ejecuta ya y el contexto no conserva copias viejas de la fila.
 	@Modifying(flushAutomatically = true, clearAutomatically = true)

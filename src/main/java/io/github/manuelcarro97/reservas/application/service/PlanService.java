@@ -2,6 +2,7 @@ package io.github.manuelcarro97.reservas.application.service;
 
 import java.time.Clock;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -32,6 +33,7 @@ import io.github.manuelcarro97.reservas.application.port.out.ShiftRepositoryPort
 import io.github.manuelcarro97.reservas.application.port.out.TableRepositoryPort;
 import io.github.manuelcarro97.reservas.domain.exception.DemoReadOnlyException;
 import io.github.manuelcarro97.reservas.domain.exception.LayoutInvalidException;
+import io.github.manuelcarro97.reservas.domain.exception.PlanCreationLimitException;
 import io.github.manuelcarro97.reservas.domain.exception.PlanLimitReachedException;
 import io.github.manuelcarro97.reservas.domain.exception.PlanNotPublishableException;
 import io.github.manuelcarro97.reservas.domain.exception.RoomLockedException;
@@ -54,6 +56,9 @@ import io.github.manuelcarro97.reservas.domain.service.SeatingCapacity;
 class PlanService implements ManagePlanUseCase {
 
 	static final int MAX_PLANS_PER_OWNER = 3;
+	/** Planos que un dueño puede crear en 24 horas móviles, contando los que ya borró. */
+	static final int MAX_PLANS_CREATED_PER_WINDOW = 5;
+	static final Duration CREATION_WINDOW = Duration.ofHours(24);
 
 	private static final ZoneId DEFAULT_ZONE = ZoneId.of("Europe/Madrid");
 	private static final int DEFAULT_CANCELLATION_DEADLINE_HOURS = 2;
@@ -88,9 +93,14 @@ class PlanService implements ManagePlanUseCase {
 		if (restaurants.findByOwner(ownerUid).size() >= MAX_PLANS_PER_OWNER) {
 			throw new PlanLimitReachedException();
 		}
-		Restaurant plan = restaurants.save(new Restaurant(null, slug, name, DEFAULT_ZONE,
+		// Cuentan también los borrados: crear y borrar no es una vía para saltarse el tope.
+		Instant now = clock.instant();
+		if (restaurants.countCreatedAfter(ownerUid, now.minus(CREATION_WINDOW)) >= MAX_PLANS_CREATED_PER_WINDOW) {
+			throw new PlanCreationLimitException();
+		}
+		Restaurant plan = restaurants.create(new Restaurant(null, slug, name, DEFAULT_ZONE,
 				DEFAULT_CANCELLATION_DEADLINE_HOURS, ownerUid, PlanStatus.DRAFT, RoomLayout.defaultRoom(), Theme.AZUL,
-				BookingMode.FREE_CHOICE));
+				BookingMode.FREE_CHOICE), now);
 		saveDefaultShift(plan, "Comida", LocalTime.of(13, 0), LocalTime.of(16, 0));
 		saveDefaultShift(plan, "Cena", LocalTime.of(20, 0), LocalTime.of(23, 30));
 		return plan;

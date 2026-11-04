@@ -85,6 +85,18 @@ class RestaurantPersistenceAdapter implements RestaurantRepositoryPort {
 	}
 
 	@Override
+	public Restaurant create(Restaurant restaurant, Instant createdAt) {
+		Restaurant saved = save(restaurant);
+		restaurants.stampCreatedAt(saved.id(), createdAt);
+		return saved;
+	}
+
+	@Override
+	public int countCreatedAfter(String ownerUid, Instant since) {
+		return restaurants.countCreatedAfter(ownerUid, since);
+	}
+
+	@Override
 	public void softDelete(long id, Instant at) {
 		restaurants.softDelete(id, at);
 	}

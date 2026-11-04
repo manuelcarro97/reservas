@@ -166,7 +166,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 		Reservation reservation = findByCode(code);
 		// Las reservas de un plano borrado se anonimizaron y ya no se consultan: igual que una que no existe. Un plano en
 		// borrador sí sigue visible.
-		restaurants.findById(reservation.restaurantId()).orElseThrow(ReservationNotFoundException::new);
+		visiblePlanOf(reservation);
 		return details(reservation);
 	}
 
@@ -175,7 +175,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	@Transactional
 	public ReservationDetails cancelByCode(String code) {
 		Reservation reservation = findByCode(code);
-		Restaurant restaurant = restaurantOf(reservation);
+		Restaurant restaurant = visiblePlanOf(reservation);
 		Shift shift = shifts.findById(restaurant.id(), reservation.shiftId()).orElseThrow(ShiftNotFoundException::new);
 		reservation.cancelByCustomer(clock.instant(), shift.startsAt(reservation.date(), restaurant.zone()),
 				restaurant.cancellationDeadlineHours());
@@ -290,6 +290,11 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	@Override
 	public int expire() {
 		return reservations.cancelPendingStartedBefore(clock.instant());
+	}
+
+	/** El plano de una reserva consultada por su código; borrado, da el mismo error que un código que no existe. */
+	private Restaurant visiblePlanOf(Reservation reservation) {
+		return restaurants.findById(reservation.restaurantId()).orElseThrow(ReservationNotFoundException::new);
 	}
 
 	private Restaurant restaurantOf(Reservation reservation) {

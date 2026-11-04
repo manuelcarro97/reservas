@@ -435,6 +435,57 @@ class AccountApiIT extends PostgresIT {
 	}
 
 	@Test
+	void cancelByCodeOfDeletedPlanReturns404() throws Exception {
+		Restaurant plan = givenRestaurant("plano-a", "owner-a");
+		Reservation past = reserve(plan, givenDinnerShift(plan), "M1", PAST);
+		as("owner-a", delete(PLANS + "/plano-a")).andExpect(status().isNoContent());
+
+		mvc.perform(post("/api/v1/reservations/" + past.code() + "/cancel")).andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("RESERVATION_NOT_FOUND"));
+	}
+
+	/** Crea y borra un plano, cinco veces: no quedan planos vivos, pero los cinco cuentan para el tope diario. */
+	private void createAndDeleteFivePlans(String uid) throws Exception {
+		for (int i = 1; i <= 5; i++) {
+			createPlan(uid, "plano-" + i).andExpect(status().isCreated());
+			as(uid, delete(PLANS + "/plano-" + i)).andExpect(status().isNoContent());
+		}
+	}
+
+	@Test
+	void sixthPlanCreatedInADayIsRejectedEvenIfTheOthersAreDeleted() throws Exception {
+		createAndDeleteFivePlans("owner-a");
+
+		createPlan("owner-a", "plano-6").andExpect(status().isTooManyRequests())
+			.andExpect(jsonPath("$.code").value("PLAN_CREATION_LIMIT"));
+
+		assertThat(restaurants.findBySlug("plano-6")).isEmpty();
+		// El tope es por dueño.
+		createPlan("owner-b", "plano-b").andExpect(status().isCreated());
+	}
+
+	@Test
+	void planCreationCapIsRollingNotCalendar() throws Exception {
+		createAndDeleteFivePlans("owner-a");
+
+		// A las 23 h 59 min de los primeros todavía cuentan; pasadas 24 h ya no.
+		clock.set(clock.instant().plus(java.time.Duration.ofHours(23).plusMinutes(59)));
+		createPlan("owner-a", "plano-6").andExpect(status().isTooManyRequests());
+		clock.set(clock.instant().plus(java.time.Duration.ofMinutes(2)));
+		createPlan("owner-a", "plano-6").andExpect(status().isCreated());
+	}
+
+	@Test
+	void liveLimitOfThreeStillApplies() throws Exception {
+		createPlan("owner-a", "uno").andExpect(status().isCreated());
+		createPlan("owner-a", "dos").andExpect(status().isCreated());
+		createPlan("owner-a", "tres").andExpect(status().isCreated());
+
+		createPlan("owner-a", "cuatro").andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PLAN_LIMIT_REACHED"));
+	}
+
+	@Test
 	void byCodeOfDraftPlanStillWorks() throws Exception {
 		Restaurant plan = givenRestaurant("plano-a", "owner-a");
 		Reservation reservation = reserve(plan, givenDinnerShift(plan), "M1", FUTURE);
