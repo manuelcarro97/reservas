@@ -38,7 +38,10 @@ export class BookingPage {
   }
 
   protected onDateChange(event: Event): void {
-    this.store.setDate((event.target as HTMLInputElement).value);
+    const input = event.target as HTMLInputElement;
+    this.store.setDate(input.value);
+    // Si el valor no vale (campo vaciado o fuera de rango) el store lo ignora: el campo vuelve a la fecha que se reserva.
+    input.value = this.store.date();
   }
 
   protected onPartySizeChange(event: Event): void {

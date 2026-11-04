@@ -391,6 +391,87 @@ describe('BookingPage', () => {
     expect(page.querySelector<HTMLInputElement>('input[type=date]')!.min).toBe('2030-01-05');
   });
 
+  it('clearedDateIsRestoredAndFieldIsRequired', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+
+    const input = page.querySelector<HTMLInputElement>('input[type=date]')!;
+    expect(input.required).toBe(true);
+    input.value = '';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+
+    expect(input.value).toBe(TODAY);
+    expect(shiftButtons().length).toBe(2);
+  });
+
+  it('formIsLockedWhileSubmitting', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+    table('2').dispatchEvent(new Event('click'));
+    await fillCustomer();
+    const request = await submit();
+
+    expect(page.querySelector<HTMLFieldSetElement>('fieldset.body')!.disabled).toBe(true);
+    expect(shiftButtons().every((button) => button.matches(':disabled'))).toBe(true);
+    table('1').dispatchEvent(new Event('click'));
+    await settle();
+    expect(table('2').classList.contains('selected')).toBe(true);
+    expect(table('1').classList.contains('selected')).toBe(false);
+
+    request.flush(RESERVATION, { status: 201, statusText: 'Created' });
+    await settle();
+  });
+
+  it('missingShiftOnCreateReloadsShifts', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+    table('2').dispatchEvent(new Event('click'));
+    await fillCustomer();
+
+    const request = await submit();
+    request.flush({ code: 'SHIFT_NOT_FOUND' }, { status: 404, statusText: 'Not Found' });
+    await settle();
+
+    await flushShifts();
+    expect(page.textContent).toContain('Ese turno o mesa ya no está disponible, elige otro');
+    expect(page.textContent).not.toContain('Este plano no está disponible');
+    expect(page.querySelector('form')).not.toBeNull();
+  });
+
+  it('unknownRestaurantOnCreateShowsNoDisponible', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+    table('2').dispatchEvent(new Event('click'));
+    await fillCustomer();
+
+    const request = await submit();
+    request.flush({ code: 'RESTAURANT_NOT_FOUND' }, { status: 404, statusText: 'Not Found' });
+    await settle();
+
+    expect(page.querySelector('[role=alert]')?.textContent).toContain(
+      'Este plano no está disponible',
+    );
+  });
+
+  it('changingDateCancelsInFlightOccupancy', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    shiftButtons()[0].click();
+    await settle();
+    const occupancy = expectApi('kafe/occupancy');
+
+    type('input[type=date]', addDays(TODAY, 1));
+    page.querySelector('input[type=date]')!.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+
+    expect(occupancy.cancelled).toBe(true);
+    await flushShifts();
+  });
+
   it('changingDateReloadsShiftsAndClearsSelection', async () => {
     await open('/r/kafe');
     await flushShifts();

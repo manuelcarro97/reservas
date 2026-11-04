@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, Subscription, catchError, map, of, switchMap } from 'rxjs';
+import { EMPTY, Subject, Subscription, catchError, map, of, switchMap } from 'rxjs';
 import { PublicPlanResponse } from '../core/api/models/public-plan-response';
 import { ReservationDetails } from '../core/api/models/reservation-details';
 import { RoomDto } from '../core/api/models/room-dto';
@@ -33,6 +33,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 const GENERIC_ERROR = 'No se pudo completar la reserva. Inténtalo de nuevo.';
 const TABLE_TAKEN_MESSAGE = 'Esa mesa se acaba de reservar, elige otra';
 const UNAVAILABLE_PLAN_MESSAGE = 'Este plano no está disponible';
+const GONE_MESSAGE = 'Ese turno o mesa ya no está disponible, elige otro';
 
 /** Fecha de calendario de un `Date` creado con componentes locales, como `YYYY-MM-DD`. Solo para sumar días. */
 export function localIsoDate(date: Date): string {
@@ -119,7 +120,8 @@ export class BookingStore {
   private planRequest: Subscription | undefined;
   private submitRequest: Subscription | undefined;
   private readonly availabilityRequests = new Subject<{ date: string; partySize: number }>();
-  private readonly occupancyRequests = new Subject<{ date: string; shiftId: number }>();
+  /** `null` cancela la petición en vuelo sin pedir otra. */
+  private readonly occupancyRequests = new Subject<{ date: string; shiftId: number } | null>();
 
   /** "Hoy" en la zona del local; hasta tener el plan, el del navegador. */
   readonly today = signal(todayIn(undefined, this.now()));
@@ -205,15 +207,17 @@ export class BookingStore {
     this.occupancyRequests
       .pipe(
         switchMap((request) =>
-          this.api.occupancy({ slug: this.slug, ...request }).pipe(
-            map((tables) => ({
-              occupied: new Set(
-                tables.filter((table) => table.occupied).map((table) => table.tableId ?? 0),
+          request === null
+            ? EMPTY
+            : this.api.occupancy({ slug: this.slug, ...request }).pipe(
+                map((tables) => ({
+                  occupied: new Set(
+                    tables.filter((table) => table.occupied).map((table) => table.tableId ?? 0),
+                  ),
+                  failed: false,
+                })),
+                catchError(() => of({ occupied: null, failed: true })),
               ),
-              failed: false,
-            })),
-            catchError(() => of({ occupied: null, failed: true })),
-          ),
         ),
         takeUntilDestroyed(),
       )
@@ -259,7 +263,12 @@ export class BookingStore {
 
   setDate(date: string): void {
     // Un valor vacío o fuera de la ventana (campo a medio escribir) no pide nada.
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < this.today() || date > this.maxDate()) {
+    if (
+      this.submitting() ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      date < this.today() ||
+      date > this.maxDate()
+    ) {
       return;
     }
     this.date.set(date);
@@ -267,7 +276,12 @@ export class BookingStore {
   }
 
   setPartySize(partySize: number): void {
-    if (!Number.isInteger(partySize) || partySize < 1 || partySize > this.maxPartySize()) {
+    if (
+      this.submitting() ||
+      !Number.isInteger(partySize) ||
+      partySize < 1 ||
+      partySize > this.maxPartySize()
+    ) {
       return;
     }
     this.partySize.set(partySize);
@@ -277,7 +291,11 @@ export class BookingStore {
   selectShift(shiftId: number): void {
     const shift = this.shifts()?.find((candidate) => candidate.shiftId === shiftId);
     // Pulsar el turno ya elegido no repite nada, salvo que la ocupación haya fallado: así se puede reintentar.
-    if (!shift?.available || (this.shiftId() === shiftId && !this.occupancyFailed())) {
+    if (
+      this.submitting() ||
+      !shift?.available ||
+      (this.shiftId() === shiftId && !this.occupancyFailed())
+    ) {
       return;
     }
     this.shiftId.set(shiftId);
@@ -288,7 +306,12 @@ export class BookingStore {
 
   selectTable(tableId: number): void {
     const known = this.tables().some((table) => table.id === tableId);
-    if (!known || this.occupied() === null || this.tableStates()[tableId] === 'blocked') {
+    if (
+      this.submitting() ||
+      !known ||
+      this.occupied() === null ||
+      this.tableStates()[tableId] === 'blocked'
+    ) {
       return;
     }
     this.tableId.set(tableId);
@@ -329,8 +352,12 @@ export class BookingStore {
 
   private handleSubmitError(error: HttpErrorResponse): void {
     const code = errorCode(error);
-    if (error.status === 404) {
+    if (error.status === 404 && code === 'RESTAURANT_NOT_FOUND') {
       this.error.set(UNAVAILABLE_PLAN_MESSAGE);
+    } else if (error.status === 404) {
+      // Turno o mesa que ya no existen (SHIFT_NOT_FOUND, TABLE_NOT_FOUND): se recargan los turnos de la fecha.
+      this.requestShifts();
+      this.error.set(GONE_MESSAGE);
     } else if (error.status === 429) {
       this.error.set(rateLimitedMessage(error));
     } else if (code === 'TABLE_TAKEN') {
@@ -350,6 +377,7 @@ export class BookingStore {
     this.occupied.set(null);
     this.occupancyFailed.set(false);
     this.tableId.set(null);
+    this.occupancyRequests.next(null);
   }
 
   /** Fecha o personas cambiadas: los turnos, la ocupación y la mesa elegida ya no valen. */
