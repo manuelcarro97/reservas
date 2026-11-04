@@ -63,7 +63,9 @@
                 {{ shift.name }} · {{ shift.start?.slice(0, 5) }}
               </button>
             } @empty {
-              <p class="hint">Ese día no hay turnos.</p>
+              @if (!store.shiftsFailed()) {
+                <p class="hint">Ese día no hay turnos.</p>
+              }
             }
             @if (store.shiftsFailed()) {
               <p class="hint" role="alert">

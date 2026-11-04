@@ -248,7 +248,8 @@ export class BookingStore {
 
   selectShift(shiftId: number): void {
     const shift = this.shifts()?.find((candidate) => candidate.shiftId === shiftId);
-    if (!shift?.available || this.shiftId() === shiftId) {
+    // Pulsar el turno ya elegido no repite nada, salvo que la ocupación haya fallado: así se puede reintentar.
+    if (!shift?.available || (this.shiftId() === shiftId && !this.occupancyFailed())) {
       return;
     }
     this.shiftId.set(shiftId);

@@ -259,6 +259,32 @@ describe('BookingPage', () => {
     expect(page.querySelector('form')).toBeNull();
   });
 
+  it('failedOccupancyCanBeRetriedWithSameShift', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    shiftButtons()[0].click();
+    await settle();
+    expectApi('kafe/occupancy').flush(null, { status: 500, statusText: 'Server Error' });
+    await settle();
+    expect(page.textContent).toContain('No se pudo cargar el plano de mesas');
+
+    shiftButtons()[0].click();
+    await settle();
+    expectApi('kafe/occupancy').flush(FREE_OCCUPANCY);
+    await settle();
+
+    expect(page.querySelectorAll('g.t').length).toBe(3);
+  });
+
+  it('failedShiftsShowOnlyTheErrorMessage', async () => {
+    await open('/r/kafe');
+    expectApi('kafe/availability').flush(null, { status: 500, statusText: 'Server Error' });
+    await settle();
+
+    expect(page.textContent).toContain('No se pudieron cargar los turnos');
+    expect(page.textContent).not.toContain('Ese día no hay turnos');
+  });
+
   it('tableTakenReloadsOccupancyAndAsksAgain', async () => {
     await open('/r/kafe');
     await flushShifts();
