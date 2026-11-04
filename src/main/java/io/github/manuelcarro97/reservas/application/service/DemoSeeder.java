@@ -80,6 +80,15 @@ class DemoSeeder implements ResetDemoUseCase {
 			boolean confirmed) {
 	}
 
+	/**
+	 * Si el teléfono es uno de los ficticios de las reservas de ejemplo. Es lo que distingue, en el panel de la demo,
+	 * una reserva sembrada de la de un visitante: el seeder no guarda email, así que no hay otro dato que comparar, y
+	 * un visitante que copie uno de estos números solo ve un teléfono de mentira y público.
+	 */
+	static boolean isSamplePhone(String phone) {
+		return SAMPLES.stream().anyMatch(sample -> sample.phone().equals(phone));
+	}
+
 	private record Slot(LocalDate date, Shift shift) {
 	}
 

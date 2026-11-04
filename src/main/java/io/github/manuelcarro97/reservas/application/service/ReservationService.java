@@ -66,18 +66,21 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	private final ReservationRepositoryPort reservations;
 	private final Clock clock;
 	private final ReservationEvents events;
+	private final DemoAccount demoAccount;
 	private final BookingPolicy bookingPolicy = new BookingPolicy();
 	private final SeatingCapacity seatingCapacity = new SeatingCapacity();
 	private final TableAssigner tableAssigner = new TableAssigner();
 
 	ReservationService(RestaurantRepositoryPort restaurants, ShiftRepositoryPort shifts, TableRepositoryPort tables,
-			ReservationRepositoryPort reservations, Clock clock, ReservationEvents events) {
+			ReservationRepositoryPort reservations, Clock clock, ReservationEvents events,
+			DemoAccount demoAccount) {
 		this.restaurants = restaurants;
 		this.shifts = shifts;
 		this.tables = tables;
 		this.reservations = reservations;
 		this.clock = clock;
 		this.events = events;
+		this.demoAccount = demoAccount;
 	}
 
 	/**
@@ -192,7 +195,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	@Override
 	public List<AdminReservation> list(String ownerUid, String slug, LocalDate date) {
 		Restaurant restaurant = RestaurantAccess.owned(restaurants, slug, ownerUid);
-		return adminViews(reservations.findByDate(restaurant.id(), date));
+		return adminViews(reservations.findByDate(restaurant.id(), date), ownerUid);
 	}
 
 	@Override
@@ -211,7 +214,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 			.sorted(Comparator.comparing(Reservation::date)
 				.thenComparing(reservation -> shiftStarts.get(reservation.shiftId()))
 				.thenComparing(Reservation::id))
-			.toList());
+			.toList(), ownerUid);
 	}
 
 	@Override
@@ -318,8 +321,15 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 		return shift.startsAt(reservation.date(), restaurant.zone());
 	}
 
-	/** Las etiquetas salen también de mesas borradas: una reserva no pierde la suya porque se quite la mesa. */
-	private List<AdminReservation> adminViews(List<Reservation> found) {
+	/**
+	 * Las etiquetas salen también de mesas borradas: una reserva no pierde la suya porque se quite la mesa.
+	 * <p>
+	 * En el panel de la cuenta demo (público: sus credenciales están en el README) el teléfono y el email de quien
+	 * reservó en el plano público se enmascaran; solo se ven completas las reservas sembradas, con teléfonos ficticios
+	 * (ver {@link DemoSeeder#isSamplePhone}). El nombre se mantiene.
+	 */
+	private List<AdminReservation> adminViews(List<Reservation> found, String ownerUid) {
+		boolean demoPanel = demoAccount.isDemo(ownerUid);
 		Set<Long> tableIds = found.stream()
 			.map(Reservation::tableId)
 			.filter(Objects::nonNull)
@@ -328,11 +338,18 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 			.stream()
 			.collect(Collectors.toMap(DiningTable::id, DiningTable::label));
 		return found.stream()
-			.map(reservation -> new AdminReservation(reservation.id(), reservation.code(), reservation.status(),
-					reservation.date(), reservation.shiftId(), reservation.partySize(), reservation.tableId(),
-					labels.get(reservation.tableId()), reservation.customerName(), reservation.customerPhone(),
-					reservation.customerEmail(), reservation.createdAt()))
+			.map(reservation -> adminView(reservation, labels.get(reservation.tableId()), demoPanel))
 			.toList();
+	}
+
+	private static AdminReservation adminView(Reservation reservation, String tableLabel, boolean demoPanel) {
+		boolean masked = demoPanel && !DemoSeeder.isSamplePhone(reservation.customerPhone());
+		// El seeder no guarda email: en la demo ningún email legítimo hay que enseñar.
+		String phone = masked ? ContactMask.phone(reservation.customerPhone()) : reservation.customerPhone();
+		String email = demoPanel ? null : reservation.customerEmail();
+		return new AdminReservation(reservation.id(), reservation.code(), reservation.status(), reservation.date(),
+				reservation.shiftId(), reservation.partySize(), reservation.tableId(), tableLabel,
+				reservation.customerName(), phone, email, reservation.createdAt());
 	}
 
 	private String tableLabel(Reservation reservation) {
