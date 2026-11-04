@@ -6,6 +6,7 @@ import java.time.Duration;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
@@ -21,7 +22,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import io.github.manuelcarro97.reservas.domain.exception.RateLimitedException;
 
 /**
  * Límite por IP de los endpoints públicos que escriben o consultan por código: 10 altas de reserva por minuto y 30
@@ -32,7 +32,7 @@ import io.github.manuelcarro97.reservas.domain.exception.RateLimitedException;
  * La IP es {@code getRemoteAddr()} y nunca se lee {@code X-Forwarded-For} a mano: detrás de un proxy el contenedor la
  * resuelve según {@code server.forward-headers-strategy}. Es un filtro de la cadena de seguridad (se registra en
  * {@code SecurityConfig}), no un filtro de servlet suelto: por eso su respuesta no pasa por
- * {@link ApiExceptionHandler} y construye el error a mano con {@link ApiExceptionHandler#problemOf}.
+ * {@link ApiExceptionHandler} y construye el error con el mismo helper, {@link ApiExceptionHandler#problem}.
  */
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
@@ -46,8 +46,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	private static final PathPattern LOOKUPS_PATH = PathPatternParser.defaultInstance
 		.parse("/api/v1/reservations/**");
 
-	// Una sola instancia que nunca se lanza: su traza no cuesta nada por cada 429.
-	private static final RateLimitedException RATE_LIMITED = new RateLimitedException();
+	private static final String RATE_LIMITED_DETAIL = "Too many requests, try again later";
 
 	private final FixedWindowRateLimiter bookings;
 	private final FixedWindowRateLimiter lookups;
@@ -92,7 +91,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
 	private void reject(HttpServletRequest request, HttpServletResponse response, long retryAfterSeconds)
 			throws IOException {
-		ProblemDetail problem = ApiExceptionHandler.problemOf(RATE_LIMITED);
+		ProblemDetail problem = ApiExceptionHandler.problem(HttpStatus.TOO_MANY_REQUESTS, RATE_LIMITED_DETAIL,
+				"RATE_LIMITED");
 		response.setStatus(problem.getStatus());
 		response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
 		converter.write(problem, MediaType.APPLICATION_PROBLEM_JSON, new ServletServerHttpResponse(response));

@@ -52,11 +52,13 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 			WHERE restaurant_id = :restaurantId
 			""";
 
-	// Mismo version + 1 que arriba. El filtro por nombre deja fuera las ya anonimizadas: segunda pasada, cero filas.
+	// Mismo version + 1 que arriba. Deja fuera solo las filas ya anonimizadas del todo (nombre, teléfono y email): un
+	// cliente que se llame "Anonimizado" conserva su teléfono hasta que se anonimice. Segunda pasada, cero filas.
 	private static final String ANONYMIZE_BEFORE = """
 			UPDATE reservation
 			SET customer_name = 'Anonimizado', customer_phone = '-', customer_email = NULL, version = version + 1
-			WHERE reservation_date < :cutoff AND customer_name <> 'Anonimizado'
+			WHERE reservation_date < :cutoff
+			  AND NOT (customer_name = 'Anonimizado' AND customer_phone = '-' AND customer_email IS NULL)
 			""";
 
 	private final ReservationJpaRepository reservations;

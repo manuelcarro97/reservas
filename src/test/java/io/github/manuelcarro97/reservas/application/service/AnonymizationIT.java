@@ -100,6 +100,22 @@ class AnonymizationIT extends PostgresIT {
 	}
 
 	@Test
+	void anonymizesACustomerWhoIsCalledAnonimizadoAndSecondPassTouchesNothing() {
+		Reservation old = reservationOn(TODAY.minusDays(40));
+		jdbc.sql("""
+				UPDATE reservation SET customer_name = 'Anonimizado', customer_phone = '611222333',
+				                       customer_email = 'ana@example.com' WHERE id = ?
+				""").param(old.id()).update();
+
+		assertThat(anonymize.anonymizeOld()).isEqualTo(1);
+
+		assertAnonymized(old);
+		Object versionAfterFirstRun = row(old).get("version");
+		assertThat(anonymize.anonymizeOld()).isZero();
+		assertThat(row(old).get("version")).isEqualTo(versionAfterFirstRun);
+	}
+
+	@Test
 	void anonymizesOldPendingAndConfirmedWithoutChangingTheirStatusAndBumpsTheVersion() {
 		Reservation pending = reservationOn(TODAY.minusDays(45));
 		Reservation confirmed = reservationOn(TODAY.minusDays(45));

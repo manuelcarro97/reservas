@@ -60,6 +60,8 @@ class SecurityConfig {
 		configuration.setAllowedOrigins(allowedOrigins);
 		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+		// Retry-After no es una cabecera de respuesta legible entre orígenes sin esto; el 429 del límite por IP la usa.
+		configuration.setExposedHeaders(List.of("Retry-After"));
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
 		return source;

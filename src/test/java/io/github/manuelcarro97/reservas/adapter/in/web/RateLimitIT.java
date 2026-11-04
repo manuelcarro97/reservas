@@ -1,6 +1,7 @@
 package io.github.manuelcarro97.reservas.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -93,6 +94,17 @@ class RateLimitIT extends PostgresIT {
 			.header("Origin", "http://localhost:4200"))
 			.andExpect(status().isTooManyRequests())
 			.andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:4200"));
+	}
+
+	@Test
+	void rateLimitedResponseExposesRetryAfterToBrowsers() throws Exception {
+		bookTenTimes();
+
+		mvc.perform(post(BOOKINGS).contentType(MediaType.APPLICATION_JSON)
+			.content("{}")
+			.header("Origin", "http://localhost:4200"))
+			.andExpect(status().isTooManyRequests())
+			.andExpect(header().string("Access-Control-Expose-Headers", containsString("Retry-After")));
 	}
 
 	@Test
