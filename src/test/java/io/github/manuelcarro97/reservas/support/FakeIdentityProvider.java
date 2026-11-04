@@ -17,6 +17,7 @@ public class FakeIdentityProvider implements IdentityProviderPort {
 	private volatile Consumer<String> onDelete = uid -> {
 	};
 	private volatile RuntimeException failure;
+	private volatile RuntimeException ensureFailure;
 
 	public List<String> deleted() {
 		return deleted;
@@ -36,12 +37,18 @@ public class FakeIdentityProvider implements IdentityProviderPort {
 		failure = exception;
 	}
 
+	/** Hace que {@code ensureUser} lance esta excepción (sin registrar la llamada). */
+	public void failEnsureWith(RuntimeException exception) {
+		ensureFailure = exception;
+	}
+
 	public void reset() {
 		deleted.clear();
 		ensured.clear();
 		onDelete = uid -> {
 		};
 		failure = null;
+		ensureFailure = null;
 	}
 
 	@Override
@@ -55,6 +62,9 @@ public class FakeIdentityProvider implements IdentityProviderPort {
 
 	@Override
 	public String ensureUser(String uid, String email, String password) {
+		if (ensureFailure != null) {
+			throw ensureFailure;
+		}
 		ensured.add(new Ensured(uid, email));
 		return uid;
 	}

@@ -13,12 +13,21 @@ app:
     # Solo por variable de entorno, nunca en el repo. Sin token no hay Telegram: los avisos van al log.
     bot-token: ${TELEGRAM_BOT_TOKEN:}
     bot-username: ${TELEGRAM_BOT_USERNAME:}
+  demo:
+    # La cuenta demo y su plano, restaurados al arrancar y cada noche. Apagado salvo el perfil demo o DEMO_ENABLED=true.
+    # El email y la contraseña solo por variable de entorno, nunca en el repo; sin ellos el plano se siembra pero la
+    # cuenta del proveedor de identidad no se toca. El uid es fijo: no cambia aunque alguien borre la cuenta del proveedor.
+    enabled: ${DEMO_ENABLED:false}
+    uid: ${DEMO_UID:demo-owner}
+    email: ${DEMO_EMAIL:}
+    password: ${DEMO_PASSWORD:}
 
 spring:
   application:
     name: reservas-api
   flyway:
-    # Los datos de demo son opcionales: una base que los cargó debe arrancar también sin ese perfil.
+    # Una base que cargó el antiguo seed repetible de la demo (R__demo_restaurant, ya sustituido por el seeder en Java)
+    # debe seguir arrancando aunque esa migración ya no exista.
     ignore-migration-patterns: '*:future,repeatable:missing'
   jpa:
     open-in-view: false

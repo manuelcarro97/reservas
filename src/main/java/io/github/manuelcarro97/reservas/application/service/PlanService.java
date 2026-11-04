@@ -98,6 +98,19 @@ class PlanService implements ManagePlanUseCase {
 		if (restaurants.countCreatedAfter(ownerUid, now.minus(CREATION_WINDOW)) >= MAX_PLANS_CREATED_PER_WINDOW) {
 			throw new PlanCreationLimitException();
 		}
+		return newDraft(ownerUid, slug, name, now);
+	}
+
+	/**
+	 * Crea el borrador por defecto sin las restricciones de la demo ni los límites de planos: solo para el seeder de la
+	 * demo, que lo llama dentro de su transacción y tras borrar los planos de la cuenta. Está fuera de
+	 * {@link ManagePlanUseCase} y la clase no es visible fuera de este paquete: ningún controlador llega a él.
+	 */
+	public Restaurant createUnrestricted(String ownerUid, String slug, String name) {
+		return newDraft(ownerUid, slug, name, clock.instant());
+	}
+
+	private Restaurant newDraft(String ownerUid, String slug, String name, Instant now) {
 		Restaurant plan = restaurants.create(new Restaurant(null, slug, name, DEFAULT_ZONE,
 				DEFAULT_CANCELLATION_DEADLINE_HOURS, ownerUid, PlanStatus.DRAFT, RoomLayout.defaultRoom(), Theme.AZUL,
 				BookingMode.FREE_CHOICE), now);

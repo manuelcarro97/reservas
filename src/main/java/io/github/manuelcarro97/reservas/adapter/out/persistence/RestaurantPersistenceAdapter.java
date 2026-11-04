@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.LockModeType;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -59,7 +60,14 @@ class RestaurantPersistenceAdapter implements RestaurantRepositoryPort {
 			throw new RestaurantNotFoundException();
 		}
 		// refresh relee la fila bajo el bloqueo: si ya estaba cargada en esta transacción, find devolvería su estado viejo.
-		entityManager.refresh(entity, LockModeType.PESSIMISTIC_WRITE);
+		try {
+			entityManager.refresh(entity, LockModeType.PESSIMISTIC_WRITE);
+		}
+		catch (EntityNotFoundException removedWhileWaiting) {
+			// La fila existía al leerla y otra transacción la borró de verdad (la restauración de la demo) mientras
+			// esperaba el bloqueo: para quien llama el plano ya no existe.
+			throw new RestaurantNotFoundException();
+		}
 		if (entity.isDeleted()) {
 			throw new RestaurantNotFoundException();
 		}

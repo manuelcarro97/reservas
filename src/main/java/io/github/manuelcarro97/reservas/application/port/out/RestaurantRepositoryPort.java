@@ -20,7 +20,8 @@ public interface RestaurantRepositoryPort {
 
 	/**
 	 * Bloquea la fila del plano ({@code SELECT … FOR UPDATE}) y devuelve su estado actual, no el de una lectura
-	 * previa. Exige una transacción activa; lanza RestaurantNotFoundException si no existe o está borrado.
+	 * previa. Exige una transacción activa; lanza RestaurantNotFoundException si no existe, está borrado o se borró
+	 * físicamente mientras esperaba el bloqueo.
 	 */
 	Restaurant lock(long id);
 
