@@ -11,7 +11,7 @@ import { PublicReservationControllerService } from '../core/api/services/public-
 import { Room } from '../plano/geometry';
 import { PlanoTable, TableState } from '../plano/plano.component';
 import { ThemeKey, knownTheme } from '../plano/themes';
-import { errorCode, rateLimitedMessage } from './api-errors';
+import { errorCode, rateLimitedMessage } from '../core/api-errors';
 
 /** Días de antelación máximos, inclusive (`BookingPolicy.BOOKING_WINDOW_DAYS` del backend). */
 export const BOOKING_WINDOW_DAYS = 90;

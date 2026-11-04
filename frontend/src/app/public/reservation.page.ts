@@ -14,7 +14,7 @@ import { EmbedMode } from '../core/embed-mode';
 import { ReservationDetails } from '../core/api/models/reservation-details';
 import { PublicReservationControllerService } from '../core/api/services/public-reservation-controller.service';
 import { THEMES, knownTheme } from '../plano/themes';
-import { errorCode, rateLimitedMessage } from './api-errors';
+import { errorCode, rateLimitedMessage } from '../core/api-errors';
 import { PoweredByComponent } from './powered-by.component';
 
 type LookupStatus = 'loading' | 'ready' | 'not-found' | 'error';

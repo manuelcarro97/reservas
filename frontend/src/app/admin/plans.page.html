@@ -1,0 +1,130 @@
+<h1>Mis planos</h1>
+
+@switch (store.status()) {
+  @case ('loading') {
+    <p class="state" role="status">Cargando…</p>
+  }
+  @case ('error') {
+    <p class="state" role="alert">No se pudieron cargar tus planos. Inténtalo de nuevo.</p>
+    <button type="button" class="secondary" (click)="store.retry()">Reintentar</button>
+  }
+  @case ('ready') {
+    @if (deleteFailure(); as failure) {
+      <div class="error" role="alert">
+        <p>{{ failure.message }}</p>
+        @if (failure.reservations.length > 0) {
+          <ul>
+            @for (code of failure.reservations; track code) {
+              <li>{{ code }}</li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
+    @if (store.plans().length === 0) {
+      <p class="state">Todavía no tienes ningún plano.</p>
+    } @else {
+      <ul class="plans">
+        @for (plan of store.plans(); track plan.slug) {
+          <li class="plan">
+            <div class="plan-head">
+              <h2>{{ plan.name }}</h2>
+              <span class="status" [class.published]="plan.status === 'PUBLISHED'">{{
+                plan.status ? statusLabels[plan.status] : ''
+              }}</span>
+            </div>
+            <nav class="links" [attr.aria-label]="'Accesos de ' + plan.name">
+              <a [routerLink]="['/panel', plan.slug]">Reservas</a>
+              <a [routerLink]="['/panel', plan.slug, 'plano']">Plano</a>
+              <a [routerLink]="['/panel', plan.slug, 'turnos']">Turnos</a>
+              <a [routerLink]="['/panel', plan.slug, 'ajustes']">Ajustes</a>
+            </nav>
+
+            @if (!store.demo()) {
+              @if (confirmingDelete() === plan.slug) {
+                <div class="confirm">
+                  <p>
+                    ¿Borrar el plano «{{ plan.name }}»? Su enlace público dejará de funcionar y las
+                    reservas que tenga se anonimizarán. No se puede deshacer.
+                  </p>
+                  <div class="buttons">
+                    <button
+                      type="button"
+                      class="danger"
+                      [disabled]="deleting()"
+                      (click)="deletePlan(plan.slug ?? '')"
+                    >
+                      Sí, borrar el plano
+                    </button>
+                    <button
+                      type="button"
+                      class="secondary"
+                      [disabled]="deleting()"
+                      (click)="keepPlan()"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  class="link-danger"
+                  (click)="askDeleteConfirmation(plan.slug ?? '')"
+                >
+                  Borrar plano
+                </button>
+              }
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    @if (createError(); as message) {
+      <p class="error" role="alert">{{ message }}</p>
+    }
+
+    @if (store.demo()) {
+      <p class="state">
+        Esta es la cuenta de demostración: puedes mirar todo, pero es de solo lectura.
+      </p>
+    } @else if (store.canCreatePlan()) {
+      <form class="create-plan" novalidate (submit)="create($event)">
+        <h2>Crear un plano</h2>
+        <fieldset [disabled]="creating()">
+          <label>
+            Nombre del local
+            <input
+              type="text"
+              name="name"
+              maxlength="120"
+              autocomplete="off"
+              [value]="name()"
+              (input)="onName($event)"
+            />
+          </label>
+          <label>
+            Enlace
+            <input
+              type="text"
+              name="slug"
+              maxlength="80"
+              autocomplete="off"
+              spellcheck="false"
+              [value]="slug()"
+              (input)="onSlug($event)"
+            />
+            <span class="hint">Tus clientes reservarán en /r/{{ slug() || 'enlace' }}</span>
+          </label>
+          <button type="submit" class="primary">Crear plano</button>
+        </fieldset>
+      </form>
+    } @else {
+      <p class="state">
+        Has llegado al máximo de {{ store.maxPlans() }} planos. Borra uno si quieres crear otro.
+      </p>
+    }
+  }
+}

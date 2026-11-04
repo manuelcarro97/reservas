@@ -1,0 +1,168 @@
+h1 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.state {
+  color: #5b6877;
+}
+
+.plans {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.plan {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid #e3e7ec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.status {
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: #eef1f4;
+  color: #5b6877;
+  font-size: 0.85rem;
+}
+
+.status.published {
+  background: #e4f4ea;
+  color: #14532d;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.create-plan {
+  padding: 1rem;
+  border: 1px solid #e3e7ec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+fieldset {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+label {
+  display: grid;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+input {
+  padding: 0.5rem;
+  border: 1px solid #c4ccd6;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 400;
+}
+
+.hint {
+  color: #5b6877;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+button {
+  padding: 0.5rem 1.2rem;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  justify-self: start;
+  border: 0;
+  background: #2457a6;
+  color: #fff;
+}
+
+.secondary {
+  border: 1px solid #c4ccd6;
+  background: #fff;
+  color: inherit;
+}
+
+.danger {
+  border: 0;
+  background: #b3261e;
+  color: #fff;
+}
+
+.link-danger {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #b3261e;
+  font-weight: 400;
+  text-decoration: underline;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.confirm {
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: #fdf3f2;
+}
+
+.confirm p {
+  margin: 0 0 0.6rem;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.error {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  background: #fde8e6;
+  color: #8e1d14;
+}
+
+.error p {
+  margin: 0;
+}
+
+.error ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+  font-family: ui-monospace, monospace;
+}

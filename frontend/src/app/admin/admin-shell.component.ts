@@ -1,0 +1,40 @@
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { AuthService } from '../core/auth/auth.service';
+import { MeStore } from './me.store';
+import { PlanSwitcherComponent } from './plan-switcher.component';
+
+/**
+ * Marco del panel del dueño (`/panel/**`): cabecera con selector de plano, Cuenta y Salir. Es aparte del marco
+ * público (`ShellComponent`), que no puede inyectar `AuthService` para no descargar Firebase en las páginas públicas.
+ * Provee el `MeStore` que comparten la cabecera y las páginas del panel.
+ */
+@Component({
+  selector: 'app-admin-shell',
+  imports: [PlanSwitcherComponent, RouterLink, RouterOutlet],
+  providers: [MeStore],
+  templateUrl: './admin-shell.component.html',
+  styleUrl: './admin-shell.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class AdminShellComponent {
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
+  protected readonly signOutError = signal<string | null>(null);
+
+  constructor() {
+    inject(MeStore).refresh();
+  }
+
+  protected async signOut(): Promise<void> {
+    this.signOutError.set(null);
+    try {
+      await this.auth.signOut();
+    } catch {
+      this.signOutError.set('No se pudo salir. Inténtalo de nuevo.');
+      return;
+    }
+    await this.router.navigateByUrl('/entrar');
+  }
+}

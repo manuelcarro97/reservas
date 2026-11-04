@@ -4,10 +4,14 @@ import { ReservationPage } from './public/reservation.page';
 import { ShellComponent } from './shell/shell.component';
 
 export const routes: Routes = [
+  // Panel del dueño: marco propio (no el público, que no puede inyectar `AuthService`) y protegido con `authGuard`.
+  {
+    path: 'panel',
+    loadChildren: () => import('./admin/admin.routes').then((m) => m.adminRoutes),
+  },
   {
     path: '',
     component: ShellComponent,
-    // Las tareas siguientes añaden aquí las rutas del panel (protegidas con `authGuard`).
     children: [
       { path: 'r/:slug', component: BookingPage },
       { path: 'reserva/:code', component: ReservationPage },
