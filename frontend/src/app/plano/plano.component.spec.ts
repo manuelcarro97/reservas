@@ -182,6 +182,9 @@ describe('PlanoComponent', () => {
     const svg = root(fixture).querySelector('svg') as SVGSVGElement;
 
     expect(svg.style.getPropertyValue('--stone')).toBe(THEMES.BOSQUE.stone);
+    // Los nombres en camelCase deben llegar tal cual: el CSS los usa con ese mismo nombre.
+    expect(svg.style.getPropertyValue('--seatInk')).toBe(THEMES.BOSQUE.seatInk);
+    expect(svg.style.getPropertyValue('--topStroke')).toBe(THEMES.BOSQUE.topStroke);
   });
 
   it('viewBoxCoversTheRoomWithPadding', () => {
