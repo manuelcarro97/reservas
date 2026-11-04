@@ -1,0 +1,30 @@
+<section class="card">
+  <h1>Entrar</h1>
+  <form novalidate (submit)="onSubmit($event, email.value, password.value)">
+    <fieldset [disabled]="busy()">
+      <label>
+        Email
+        <input #email type="email" name="email" autocomplete="username" />
+      </label>
+      <label>
+        Contraseña
+        <input #password type="password" name="password" autocomplete="current-password" />
+      </label>
+
+      @if (error(); as message) {
+        <p class="error" role="alert">{{ message }}</p>
+      }
+
+      <button type="submit" class="button">Entrar</button>
+      <p class="or">o</p>
+      <button type="button" class="google" (click)="signInWithGoogle()">
+        Continuar con Google
+      </button>
+    </fieldset>
+  </form>
+
+  <p class="links">
+    <a routerLink="/recuperar">¿Olvidaste tu contraseña?</a>
+    <a routerLink="/registro">Crear cuenta</a>
+  </p>
+</section>

@@ -1,0 +1,25 @@
+<section class="card">
+  <h1>Recuperar contraseña</h1>
+  <p class="hint">Te enviaremos un enlace para elegir una contraseña nueva.</p>
+  <form novalidate (submit)="onSubmit($event, email.value)">
+    <fieldset [disabled]="busy()">
+      <label>
+        Email
+        <input #email type="email" name="email" autocomplete="username" />
+      </label>
+
+      @if (error(); as message) {
+        <p class="error" role="alert">{{ message }}</p>
+      }
+      @if (sentMessage(); as message) {
+        <p class="notice" role="status">{{ message }}</p>
+      }
+
+      <button type="submit" class="button">Enviar enlace</button>
+    </fieldset>
+  </form>
+
+  <p class="links">
+    <a routerLink="/entrar">Volver a entrar</a>
+  </p>
+</section>
