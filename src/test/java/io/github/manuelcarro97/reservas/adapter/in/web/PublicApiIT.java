@@ -3,6 +3,7 @@ package io.github.manuelcarro97.reservas.adapter.in.web;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -90,12 +91,29 @@ class PublicApiIT extends PostgresIT {
 	}
 
 	@Test
+	void getByCodeIncludesPlanAndShiftDetails() throws Exception {
+		String code = createReservation();
+
+		mvc.perform(get("/api/v1/reservations/" + code))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.restaurantName").value("demo"))
+			.andExpect(jsonPath("$.slug").value("demo"))
+			.andExpect(jsonPath("$.theme").value("AZUL"))
+			.andExpect(jsonPath("$.shiftName").value("Cena"))
+			.andExpect(jsonPath("$.shiftStart").value(startsWith("20:00")))
+			.andExpect(jsonPath("$.shiftEnd").value(startsWith("22:00")))
+			.andExpect(content().string(not(containsString("owner-a"))));
+	}
+
+	@Test
 	void cancelReturnsCancelledReservation() throws Exception {
 		String code = createReservation();
 
 		mvc.perform(post("/api/v1/reservations/" + code + "/cancel"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.status").value("CANCELLED"));
+			.andExpect(jsonPath("$.status").value("CANCELLED"))
+			.andExpect(jsonPath("$.shiftName").value("Cena"))
+			.andExpect(jsonPath("$.slug").value("demo"));
 	}
 
 	@Test

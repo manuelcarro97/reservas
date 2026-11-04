@@ -174,8 +174,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 		Reservation reservation = findByCode(code);
 		// Las reservas de un plano borrado se anonimizaron y ya no se consultan: igual que una que no existe. Un plano en
 		// borrador sí sigue visible.
-		visiblePlanOf(reservation);
-		return details(reservation);
+		return details(reservation, visiblePlanOf(reservation));
 	}
 
 	/** Transaccional: el aviso al dueño sale con la confirmación de la transacción. */
@@ -189,7 +188,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 				restaurant.cancellationDeadlineHours());
 		Reservation cancelled = reservations.update(reservation);
 		events.cancelledByCustomer(restaurant, shift.name(), tableLabel(cancelled), cancelled);
-		return details(cancelled);
+		return details(cancelled, restaurant, shift);
 	}
 
 	@Override
@@ -364,8 +363,19 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	}
 
 	private ReservationDetails details(Reservation reservation) {
+		return details(reservation, visiblePlanOf(reservation));
+	}
+
+	private ReservationDetails details(Reservation reservation, Restaurant restaurant) {
+		// findById y no findAll: el turno puede estar oculto (borrado lógico) y la reserva lo sigue mostrando.
+		Shift shift = shifts.findById(restaurant.id(), reservation.shiftId()).orElseThrow(ShiftNotFoundException::new);
+		return details(reservation, restaurant, shift);
+	}
+
+	private ReservationDetails details(Reservation reservation, Restaurant restaurant, Shift shift) {
 		return new ReservationDetails(reservation.code(), reservation.status(), reservation.date(),
-				reservation.shiftId(), reservation.partySize(), tableLabel(reservation));
+				reservation.shiftId(), reservation.partySize(), tableLabel(reservation), restaurant.name(),
+				restaurant.slug(), restaurant.theme(), shift.name(), shift.start(), shift.end());
 	}
 
 	private Reservation pendingReservation(Restaurant restaurant, Long tableId, CreateReservationCommand command) {

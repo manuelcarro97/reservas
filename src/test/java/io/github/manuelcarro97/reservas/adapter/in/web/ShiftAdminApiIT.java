@@ -236,7 +236,9 @@ class ShiftAdminApiIT extends PostgresIT {
 			.andExpect(jsonPath("$[*].shiftId", contains(lunch.id().intValue())));
 		mvc.perform(get("/api/v1/reservations/" + past.code()))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.code").value(past.code()));
+			.andExpect(jsonPath("$.code").value(past.code()))
+			.andExpect(jsonPath("$.shiftName").value("Cena"))
+			.andExpect(jsonPath("$.shiftStart").value(startsWith("20:00")));
 	}
 
 	@Test

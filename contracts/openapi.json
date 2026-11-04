@@ -497,9 +497,26 @@
             "format": "int32",
             "type": "integer"
           },
+          "restaurantName": {
+            "type": "string"
+          },
+          "shiftEnd": {
+            "format": "time-local",
+            "type": "string"
+          },
           "shiftId": {
             "format": "int64",
             "type": "integer"
+          },
+          "shiftName": {
+            "type": "string"
+          },
+          "shiftStart": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
           },
           "status": {
             "enum": [
@@ -511,6 +528,15 @@
             "type": "string"
           },
           "tableLabel": {
+            "type": "string"
+          },
+          "theme": {
+            "enum": [
+              "AZUL",
+              "BOSQUE",
+              "TERRACOTA",
+              "NOCHE"
+            ],
             "type": "string"
           }
         },
