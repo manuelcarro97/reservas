@@ -22,6 +22,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(DomainException.class)
 	ProblemDetail handleDomain(DomainException exception) {
+		return problemOf(exception);
+	}
+
+	/** También lo usan los filtros, que responden fuera de este advice con la misma forma de error. */
+	static ProblemDetail problemOf(DomainException exception) {
 		ProblemDetail problem = problem(statusOf(exception.kind()), exception.getMessage(), exception.code());
 		exception.details().forEach(problem::setProperty);
 		return problem;

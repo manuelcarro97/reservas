@@ -20,6 +20,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.TestPropertySource;
 
+import io.github.manuelcarro97.reservas.adapter.in.web.RateLimitFilter;
 import io.github.manuelcarro97.reservas.application.port.out.ReservationRepositoryPort;
 import io.github.manuelcarro97.reservas.config.AsyncConfig;
 import io.github.manuelcarro97.reservas.application.port.out.RestaurantRepositoryPort;
@@ -55,6 +56,11 @@ public abstract class PostgresIT {
 	@Autowired
 	protected MutableClock clock;
 
+	// El reloj fijo nunca rota la ventana del límite por IP: sin vaciarlo, las peticiones HTTP de todos los tests
+	// (todas desde la misma IP de MockMvc) se acumularían hasta dar 429.
+	@Autowired
+	private RateLimitFilter rateLimiter;
+
 	@Autowired
 	protected RestaurantRepositoryPort restaurants;
 
@@ -80,6 +86,7 @@ public abstract class PostgresIT {
 	@BeforeEach
 	void cleanDatabase() {
 		clock.reset();
+		rateLimiter.clear();
 		List<String> names = jdbc.sql("""
 				SELECT quote_ident(tablename) FROM pg_tables
 				WHERE schemaname = 'public' AND tablename <> 'flyway_schema_history'

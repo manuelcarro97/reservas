@@ -52,6 +52,13 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 			WHERE restaurant_id = :restaurantId
 			""";
 
+	// Mismo version + 1 que arriba. El filtro por nombre deja fuera las ya anonimizadas: segunda pasada, cero filas.
+	private static final String ANONYMIZE_BEFORE = """
+			UPDATE reservation
+			SET customer_name = 'Anonimizado', customer_phone = '-', customer_email = NULL, version = version + 1
+			WHERE reservation_date < :cutoff AND customer_name <> 'Anonimizado'
+			""";
+
 	private final ReservationJpaRepository reservations;
 	private final JdbcClient jdbc;
 
@@ -157,6 +164,11 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 	@Override
 	public int anonymizeRestaurant(long restaurantId) {
 		return jdbc.sql(ANONYMIZE_RESTAURANT).param("restaurantId", restaurantId).update();
+	}
+
+	@Override
+	public int anonymizeBefore(LocalDate cutoff) {
+		return jdbc.sql(ANONYMIZE_BEFORE).param("cutoff", cutoff).update();
 	}
 
 	@Override

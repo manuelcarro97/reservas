@@ -1,5 +1,9 @@
 server:
   port: ${PORT:8080}
+  # El límite por IP usa la dirección que resuelve el contenedor. Con none (por defecto) es la del socket. Detrás de un
+  # proxy, en despliegue, solo native y con los proxies internos del proveedor; nunca framework, que toma el valor más
+  # a la izquierda de X-Forwarded-For, y ese lo escribe el cliente.
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
 
 app:
   firebase:

@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import io.github.manuelcarro97.reservas.application.port.in.AdminReservation;
+import io.github.manuelcarro97.reservas.application.port.in.AnonymizeReservationsUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.CancelReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
@@ -51,9 +53,12 @@ import io.github.manuelcarro97.reservas.domain.service.TableAssigner;
 
 @Service
 class ReservationService implements CreateReservationUseCase, GetReservationUseCase, CancelReservationUseCase,
-		ManageReservationUseCase, ExpirePendingReservationsUseCase {
+		ManageReservationUseCase, ExpirePendingReservationsUseCase, AnonymizeReservationsUseCase {
 
 	private static final int MAX_SUGGESTIONS = 5;
+	private static final int ANONYMIZE_AFTER_DAYS = 30;
+	// "Hoy" para la privacidad es el de Madrid, sea cual sea la zona del plano o la del reloj.
+	private static final ZoneId ANONYMIZATION_ZONE = ZoneId.of("Europe/Madrid");
 
 	private final RestaurantRepositoryPort restaurants;
 	private final ShiftRepositoryPort shifts;
@@ -290,6 +295,12 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	@Override
 	public int expire() {
 		return reservations.cancelPendingStartedBefore(clock.instant());
+	}
+
+	@Override
+	public int anonymizeOld() {
+		LocalDate cutoff = LocalDate.ofInstant(clock.instant(), ANONYMIZATION_ZONE).minusDays(ANONYMIZE_AFTER_DAYS);
+		return reservations.anonymizeBefore(cutoff);
 	}
 
 	/** El plano de una reserva consultada por su código; borrado, da el mismo error que un código que no existe. */

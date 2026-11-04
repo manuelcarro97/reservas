@@ -49,6 +49,13 @@ public interface ReservationRepositoryPort {
 	 */
 	int anonymizeRestaurant(long restaurantId);
 
+	/**
+	 * Anonimiza los datos del cliente (como {@link #anonymizeRestaurant}, subiendo la versión) de las reservas con
+	 * fecha anterior a {@code cutoff} que aún no lo estaban. Devuelve cuántas cambió. No mira el estado ni toca nada
+	 * más: la reserva sigue como estaba.
+	 */
+	int anonymizeBefore(LocalDate cutoff);
+
 	Set<Long> occupiedTableIds(long restaurantId, long shiftId, LocalDate date);
 
 }
