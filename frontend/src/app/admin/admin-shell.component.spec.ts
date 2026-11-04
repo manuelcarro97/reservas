@@ -13,7 +13,7 @@ import { MeResponse } from '../core/api/models/me-response';
 import { FakeAuthSdk, flushPromises, provideFakeAuthSdk } from '../core/auth/testing/fake-auth-sdk';
 import { AccountPage } from './account.page';
 import { AdminShellComponent } from './admin-shell.component';
-import { EditorPage } from './editor/editor.page';
+import { PlaceholderPage } from './placeholder.page';
 import { PlansPage } from './plans.page';
 
 @Component({ template: '<p>entrar</p>' })
@@ -55,7 +55,7 @@ describe('AdminShellComponent', () => {
               { path: '', component: PlansPage },
               { path: 'cuenta', component: AccountPage },
               { path: ':slug', component: ReservationsStub },
-              { path: ':slug/plano', component: EditorPage },
+              { path: ':slug/plano', component: PlaceholderPage },
             ],
           },
           { path: 'entrar', component: LoginStub },

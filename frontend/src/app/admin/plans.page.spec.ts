@@ -10,7 +10,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { ApiConfiguration } from '../core/api/api-configuration';
 import { MeResponse } from '../core/api/models/me-response';
 import { PlanSummaryResponse } from '../core/api/models/plan-summary-response';
-import { EditorPage } from './editor/editor.page';
+import { PlaceholderPage } from './placeholder.page';
 import { MeStore } from './me.store';
 import { PlansPage } from './plans.page';
 
@@ -48,7 +48,7 @@ describe('PlansPage', () => {
         MeStore,
         provideRouter([
           { path: 'panel', component: PlansPage },
-          { path: 'panel/:slug/plano', component: EditorPage },
+          { path: 'panel/:slug/plano', component: PlaceholderPage },
         ]),
       ],
     });

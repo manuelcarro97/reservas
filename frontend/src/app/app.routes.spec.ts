@@ -77,6 +77,39 @@ describe('routes', () => {
     expect(page.querySelector('app-shell')).toBeNull();
   });
 
+  it('everyPlanLinkOfThePanelResolvesToARoute', async () => {
+    await visitWithSession('/panel', { uid: 'uid-1', email: 'dueno@example.com' });
+    backend
+      .expectOne((request) => request.url.endsWith('/api/v1/admin/me'))
+      .flush({
+        email: 'dueno@example.com',
+        demo: false,
+        maxPlans: 3,
+        plans: [{ slug: 'kafe', name: 'Kafé', status: 'DRAFT' }],
+      });
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    const host = harness.fixture.nativeElement as HTMLElement;
+    const hrefs = Array.from(host.querySelectorAll('li.plan a')).map((link) =>
+      link.getAttribute('href'),
+    );
+    expect(hrefs).toEqual([
+      '/panel/kafe',
+      '/panel/kafe/plano',
+      '/panel/kafe/turnos',
+      '/panel/kafe/ajustes',
+    ]);
+
+    for (const href of hrefs) {
+      // `navigateByUrl` rechaza (NG04002) si ninguna ruta casa.
+      await harness.navigateByUrl(href!);
+      harness.detectChanges();
+
+      expect(TestBed.inject(Router).url).toBe(href);
+      expect(host.textContent).toContain('Esta sección llega pronto');
+    }
+  });
+
   it('loginPageLoadsTheFirebaseSdk', async () => {
     await visit('/entrar');
 
