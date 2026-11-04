@@ -50,6 +50,14 @@
   filter: none;
 }
 
+/* Mesa con un problema de plano (editor): roja y con borde grueso para que no dependa solo del color. */
+.t.invalid .top {
+  fill: var(--taken);
+  filter: none;
+  stroke: #8f1f17;
+  stroke-width: 6;
+}
+
 .t.blocked .top {
   fill: #5f6b7a;
   filter: none;
@@ -112,4 +120,14 @@
 /* En el editor, la pared que se arrastra puede salir del encuadre congelado: se sigue viendo. */
 :host(.editing) .plano {
   overflow: visible;
+}
+
+/* En el editor las mesas se arrastran: el gesto táctil no debe desplazar la página ni seleccionar texto. */
+:host(.editing) .t {
+  touch-action: none;
+  user-select: none;
+}
+
+:host(.editing) [data-interactive] .t {
+  cursor: grab;
 }

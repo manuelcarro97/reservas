@@ -1,0 +1,13 @@
+<div class="palette" role="group" aria-label="Añadir mesa">
+  @for (option of options; track option.label) {
+    <button
+      type="button"
+      [attr.aria-label]="option.label"
+      [disabled]="disabled()"
+      (click)="add.emit({ shape: option.shape, seats: option.seats })"
+    >
+      <span class="glyph" [class.round]="option.round" aria-hidden="true"></span>
+      <span aria-hidden="true">{{ option.seats }}</span>
+    </button>
+  }
+</div>

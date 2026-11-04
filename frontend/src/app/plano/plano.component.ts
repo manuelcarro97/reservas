@@ -15,7 +15,8 @@ import { Point, Room, TableLike, isSupportedSeats, roomPolygon } from './geometr
 import { Chair, ROUND_R, chairPositions, rectSize } from './table-drawing';
 import { STATE_COLORS, THEMES, ThemeKey } from './themes';
 
-export type TableState = 'free' | 'selected' | 'pending' | 'taken' | 'blocked';
+/** `invalid`: mesa con un problema de plano (solape, fuera del local…); solo la usa el editor. */
+export type TableState = 'free' | 'selected' | 'pending' | 'taken' | 'blocked' | 'invalid';
 
 /** Mesa del plano; `id` es el que se emite en `tableSelected` y la clave de `states`. */
 export type PlanoTable = TableLike & { id: number };
@@ -86,6 +87,7 @@ const STATE_TEXT: Record<TableState, string> = {
   pending: 'pendiente',
   taken: 'reservada',
   blocked: 'bloqueada',
+  invalid: 'con problema',
 };
 
 /** Baldosa de 100 de lado del suelo: tablas horizontales o verticales cada 20. */

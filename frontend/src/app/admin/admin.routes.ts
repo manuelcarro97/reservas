@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from '../core/auth/auth.guard';
+import { leaveEditorGuard } from './editor/leave-editor.guard';
 
 const placeholder = () => import('./placeholder.page').then((m) => m.PlaceholderPage);
 
@@ -22,6 +23,7 @@ export const adminRoutes: Routes = [
       {
         path: ':slug/plano',
         loadComponent: () => import('./editor/editor.page').then((m) => m.EditorPage),
+        canDeactivate: [leaveEditorGuard],
       },
       { path: ':slug/turnos', loadComponent: placeholder },
       { path: ':slug/ajustes', loadComponent: placeholder },

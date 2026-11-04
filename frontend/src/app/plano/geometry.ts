@@ -315,7 +315,7 @@ export function validateLayout(room: Room, tables: TableLike[]): LayoutProblem[]
 }
 
 /** Huella de la mesa; null si sus plazas o su giro no permiten calcularla. */
-function calculableFootprint(table: TableLike): Rect | null {
+export function calculableFootprint(table: TableLike): Rect | null {
   const calculable =
     isSupportedSeats(table.seats) &&
     (table.rotation === 0 || table.rotation === 90) &&
@@ -370,6 +370,16 @@ function isInside(rect: Rect, roomRectList: Rect[]): boolean {
     0,
   );
   return covered >= area(withInset);
+}
+
+/**
+ * La mesa cabe en el local (a WALL_INSET de las paredes) y no se solapa con ninguna de las huellas dadas. Es la misma
+ * comprobación que `validateLayout`, para una sola mesa: sirve para buscar un hueco sin validar el plano entero por
+ * cada candidato.
+ */
+export function fitsFree(table: TableLike, roomRectList: Rect[], taken: Rect[]): boolean {
+  const own = footprint(table);
+  return isInside(own, roomRectList) && !taken.some((other) => overlaps(own, other));
 }
 
 function overlapsAnother(index: number, footprints: (Rect | null)[]): boolean {

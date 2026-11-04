@@ -73,6 +73,7 @@
     <g
       [attr.class]="'t ' + stateOf(drawn.table.id)"
       [attr.role]="interactive() ? 'button' : 'img'"
+      [attr.data-table-id]="drawn.table.id"
       [attr.tabindex]="isSelectable(drawn.table.id) ? 0 : null"
       [attr.aria-disabled]="interactive() && stateOf(drawn.table.id) === 'blocked' ? 'true' : null"
       [attr.aria-label]="ariaLabel(drawn.table)"

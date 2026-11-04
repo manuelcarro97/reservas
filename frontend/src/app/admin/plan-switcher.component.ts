@@ -64,12 +64,14 @@ export class PlanSwitcherComponent {
       .subscribe((event) => this.current.set(planAndSection(event.urlAfterRedirects, this.router)));
   }
 
-  protected choose(event: Event): void {
-    const slug = (event.target as HTMLSelectElement).value;
-    if (!slug) {
+  protected async choose(event: Event): Promise<void> {
+    const select = event.target as HTMLSelectElement;
+    if (!select.value) {
       return;
     }
     const { section } = this.current();
-    void this.router.navigate(['/panel', slug, ...(section ? section.split('/') : [])]);
+    await this.router.navigate(['/panel', select.value, ...(section ? section.split('/') : [])]);
+    // Si la página no dejó salir (cambios sin guardar en el editor) el selector no debe seguir enseñando el plano elegido.
+    select.value = this.current().slug ?? '';
   }
 }

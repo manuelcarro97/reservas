@@ -7,12 +7,39 @@ h1 {
   color: #5b6877;
 }
 
+/* Controles agrupados por tema; el pulido visual llega en una tarea posterior. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17rem;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.group h2,
+.side h2 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 0.5rem;
 }
 
 .shapes {
@@ -96,4 +123,134 @@ button[aria-pressed='true'] {
 .handle:focus-visible .knob {
   stroke: #0d2137;
   stroke-width: 7;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+button.primary {
+  border-color: #2f9e68;
+  background: #2f9e68;
+  color: #fff;
+  font-weight: 600;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+button.danger {
+  border-color: #d2453b;
+  color: #a1322a;
+}
+
+.busy {
+  color: #5b6877;
+  font-size: 0.9rem;
+}
+
+.error {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #e2a19b;
+  border-radius: 6px;
+  background: #fbeceb;
+  color: #7a2019;
+}
+
+.codes {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-family: ui-monospace, monospace;
+}
+
+.info {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #a9d8bf;
+  border-radius: 6px;
+  background: #e6f5ed;
+}
+
+.problems ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.problems p {
+  margin: 0;
+}
+
+.published,
+.table-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid #d8e0ea;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.published p {
+  margin: 0;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+}
+
+input,
+select,
+textarea {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #c4ccd6;
+  border-radius: 6px;
+  font: inherit;
+}
+
+textarea {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+}
+
+/* Diálogo propio de la página (no window.confirm). */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 33, 55, 0.45);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 26rem;
+  padding: 1.25rem;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.dialog h2,
+.dialog p {
+  margin: 0;
 }

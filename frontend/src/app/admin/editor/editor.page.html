@@ -11,81 +11,272 @@
     <button type="button" (click)="retry()">Reintentar</button>
   }
   @case ('ready') {
-    <h1>Forma del local · {{ planName() }}</h1>
+    <h1>Plano · {{ planName() }}</h1>
 
-    <div class="toolbar">
-      <div class="shapes" role="group" aria-label="Forma del local">
-        @for (option of shapes; track option.shape) {
-          <button
-            type="button"
-            [attr.aria-pressed]="isShape(option.shape)"
-            (click)="store.setShape(option.shape)"
+    <div class="layout">
+      <div class="main">
+        <div class="toolbar">
+          <section class="group">
+            <h2>Forma del local</h2>
+            <div class="row">
+              <div class="shapes" role="group" aria-label="Forma del local">
+                @for (option of shapes; track option.shape) {
+                  <button
+                    type="button"
+                    [attr.aria-pressed]="isShape(option.shape)"
+                    (click)="store.setShape(option.shape)"
+                  >
+                    {{ option.name }}
+                  </button>
+                }
+              </div>
+              <button type="button" (click)="store.rotateRoom()">Girar 90°</button>
+            </div>
+          </section>
+
+          <section class="group">
+            <h2>Tema</h2>
+            <div class="shapes" role="group" aria-label="Tema del plano">
+              @for (option of themes; track option.key) {
+                <button
+                  type="button"
+                  [attr.aria-pressed]="store.theme() === option.key"
+                  (click)="store.setTheme(option.key)"
+                >
+                  {{ option.name }}
+                </button>
+              }
+            </div>
+          </section>
+
+          <section class="group">
+            <h2>Añadir mesa</h2>
+            <app-table-palette
+              [disabled]="
+                store.tables().length >= maxTables || store.saving() || store.publishing()
+              "
+              (add)="addTable($event)"
+            />
+          </section>
+        </div>
+
+        <p class="help">
+          Arrastra los puntos del contorno para cambiar las medidas, o enfócalos y usa las flechas
+          para moverlos de 20 en 20. Arrastra las mesas para colocarlas; con una mesa enfocada, las
+          flechas la mueven de 10 en 10 y Supr la borra.
+        </p>
+
+        <div class="stage">
+          <app-plano
+            class="editing"
+            [room]="store.room()"
+            [tables]="store.tables()"
+            [theme]="store.theme()"
+            [states]="tableStates()"
+            [interactive]="true"
+            [viewBox]="viewBox()"
+            (tableSelected)="selectedId.set($event)"
+            (pointerdown)="onTablePointerDown($event)"
+            (pointermove)="onTablePointerMove($event)"
+            (pointerup)="onTablePointerEnd($event)"
+            (pointercancel)="onTablePointerEnd($event)"
+            (lostpointercapture)="onTablePointerEnd($event)"
+            (keydown)="onTableKeydown($event)"
+          />
+          <svg
+            #overlay
+            class="handles"
+            [attr.viewBox]="viewBox()"
+            role="group"
+            aria-label="Tiradores del contorno del local"
           >
-            {{ option.name }}
-          </button>
+            @for (handle of handles(); track handle.wall) {
+              <g
+                class="handle"
+                role="slider"
+                tabindex="0"
+                [class.active]="dragging() === handle.wall"
+                [attr.aria-label]="handle.label"
+                [attr.aria-valuemin]="handle.min"
+                [attr.aria-valuemax]="handle.max"
+                [attr.aria-valuenow]="handle.value"
+                [attr.aria-valuetext]="handle.value + ' unidades'"
+                [attr.aria-orientation]="orientation(handle)"
+                (pointerdown)="onPointerDown($event, handle)"
+                (pointermove)="onPointerMove($event)"
+                (pointerup)="onPointerEnd($event)"
+                (pointercancel)="onPointerEnd($event)"
+                (lostpointercapture)="onPointerEnd($event)"
+                (keydown)="onKeydown($event, handle)"
+              >
+                <circle class="hit" [attr.cx]="handle.x" [attr.cy]="handle.y" r="28" />
+                <circle class="knob" [attr.cx]="handle.x" [attr.cy]="handle.y" r="14" />
+              </g>
+            }
+          </svg>
+        </div>
+
+        <!-- Debajo del plano: si salen en mitad de un arrastre no empujan el plano. -->
+        @if (store.published() && store.roomChanged()) {
+          <p class="notice" role="status">
+            Este plano está publicado. Si tiene reservas activas a partir de hoy, no podrás guardar
+            un cambio de forma del local hasta cancelarlas.
+          </p>
+        }
+        @if (problemLines().length > 0) {
+          <div class="notice problems" role="status">
+            <p>Corrige esto antes de guardar:</p>
+            <ul>
+              @for (line of problemLines(); track line) {
+                <li>{{ line }}</li>
+              }
+            </ul>
+          </div>
+        }
+        @if (store.tables().length >= maxTables) {
+          <p class="help">Has llegado al máximo de {{ maxTables }} mesas.</p>
         }
       </div>
-      <button type="button" (click)="store.rotateRoom()">Girar 90°</button>
-    </div>
 
-    <p class="help">
-      Arrastra los puntos del contorno para cambiar las medidas, o enfócalos y usa las flechas para
-      moverlos de 20 en 20.
-    </p>
+      <aside class="side">
+        <div class="actions">
+          <button type="button" class="primary" [disabled]="!store.canSave()" (click)="save()">
+            Guardar
+          </button>
+          @if (!store.published()) {
+            <button type="button" [disabled]="!store.canPublish()" (click)="publish()">
+              Publicar
+            </button>
+          }
+          @if (store.saving()) {
+            <span class="busy">Guardando…</span>
+          }
+          @if (store.publishing()) {
+            <span class="busy">Publicando…</span>
+          }
+        </div>
 
-    <div class="stage">
-      <app-plano
-        class="editing"
-        [room]="store.room()"
-        [tables]="store.tables()"
-        [theme]="store.theme()"
-        [viewBox]="viewBox()"
-      />
-      <svg
-        #overlay
-        class="handles"
-        [attr.viewBox]="viewBox()"
-        role="group"
-        aria-label="Tiradores del contorno del local"
-      >
-        @for (handle of handles(); track handle.wall) {
-          <g
-            class="handle"
-            role="slider"
-            tabindex="0"
-            [class.active]="dragging() === handle.wall"
-            [attr.aria-label]="handle.label"
-            [attr.aria-valuemin]="handle.min"
-            [attr.aria-valuemax]="handle.max"
-            [attr.aria-valuenow]="handle.value"
-            [attr.aria-valuetext]="handle.value + ' unidades'"
-            [attr.aria-orientation]="orientation(handle)"
-            (pointerdown)="onPointerDown($event, handle)"
-            (pointermove)="onPointerMove($event)"
-            (pointerup)="onPointerEnd($event)"
-            (pointercancel)="onPointerEnd($event)"
-            (lostpointercapture)="onPointerEnd($event)"
-            (keydown)="onKeydown($event, handle)"
-          >
-            <circle class="hit" [attr.cx]="handle.x" [attr.cy]="handle.y" r="28" />
-            <circle class="knob" [attr.cx]="handle.x" [attr.cy]="handle.y" r="14" />
-          </g>
+        @if (store.saveError(); as message) {
+          <p class="error" role="alert">{{ message }}</p>
         }
-      </svg>
+        @if (store.publishError(); as message) {
+          <p class="error" role="alert">{{ message }}</p>
+        }
+        @if (store.blockingCodes().length > 0) {
+          <ul class="codes" aria-label="Reservas activas">
+            @for (code of store.blockingCodes(); track code) {
+              <li>{{ code }}</li>
+            }
+          </ul>
+        }
+        @if (info(); as text) {
+          <p class="info" role="status">{{ text }}</p>
+        }
+
+        @if (store.published()) {
+          <section class="published">
+            <h2>Plano publicado</h2>
+            <p>
+              <a [href]="publicLink()" target="_blank" rel="noopener">Abrir la página pública</a>
+            </p>
+            <label>
+              <span>Enlace público</span>
+              <input type="text" readonly aria-label="Enlace público" [value]="publicLink()" />
+            </label>
+            <label>
+              <span>Código para incrustar</span>
+              <textarea
+                readonly
+                rows="4"
+                aria-label="Código para incrustar"
+                [value]="embedCode()"
+              ></textarea>
+            </label>
+          </section>
+        }
+
+        @if (selected(); as table) {
+          <section class="table-panel" aria-label="Mesa seleccionada">
+            <h2>{{ tableLabel(table.label) }}</h2>
+            <label>
+              <span>Nombre</span>
+              <input
+                type="text"
+                maxlength="40"
+                aria-label="Nombre de la mesa"
+                [value]="table.label"
+                (input)="rename($event)"
+              />
+            </label>
+            <label>
+              <span>Plazas</span>
+              <select aria-label="Plazas" (change)="setSeats($event)">
+                @for (seats of seatOptions; track seats) {
+                  <option [value]="seats" [selected]="seats === table.seats">{{ seats }}</option>
+                }
+              </select>
+            </label>
+            <div class="shapes" role="group" aria-label="Forma de la mesa">
+              <button
+                type="button"
+                [attr.aria-pressed]="table.shape === 'SQUARE'"
+                (click)="setTableShape('SQUARE')"
+              >
+                Mesa cuadrada
+              </button>
+              <button
+                type="button"
+                [attr.aria-pressed]="table.shape === 'ROUND'"
+                (click)="setTableShape('ROUND')"
+              >
+                Mesa redonda
+              </button>
+            </div>
+            <div class="row">
+              <button type="button" (click)="rotateSelected()">Girar mesa</button>
+              <button type="button" class="danger" (click)="requestDelete(table.id)">
+                Borrar mesa
+              </button>
+            </div>
+          </section>
+        } @else {
+          <p class="help">Elige una mesa del plano para cambiar su nombre, plazas o forma.</p>
+        }
+      </aside>
     </div>
 
-    <!-- Debajo del plano: si salen en mitad de un arrastre no empujan el plano. -->
-    @if (store.published() && store.roomChanged()) {
-      <p class="notice" role="status">
-        Este plano está publicado. Si tiene reservas activas a partir de hoy, no podrás guardar un
-        cambio de forma del local hasta cancelarlas.
-      </p>
-    }
-    @if (misplacedTables().length > 0) {
-      <p class="notice" role="status">
-        Con esta forma, estas mesas quedan fuera del local o demasiado cerca de la pared:
-        {{ misplacedTables().join(', ') }}. Muévelas antes de guardar.
-      </p>
+    @if (dialog(); as current) {
+      <div class="backdrop">
+        <div
+          class="dialog"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="dialog-title"
+          aria-describedby="dialog-text"
+          (keydown.escape)="dismissDialog()"
+        >
+          @if (current.kind === 'leave') {
+            <h2 id="dialog-title">Cambios sin guardar</h2>
+            <p id="dialog-text">Tienes cambios sin guardar. Si sales ahora, se perderán.</p>
+            <div class="row">
+              <button #safe type="button" (click)="answerLeave(false)">Seguir editando</button>
+              <button type="button" class="danger" (click)="answerLeave(true)">
+                Salir sin guardar
+              </button>
+            </div>
+          } @else {
+            <h2 id="dialog-title">Borrar mesa</h2>
+            <p id="dialog-text">
+              ¿Borrar {{ tableLabel(deleting()?.label ?? '') }}? Ya está guardada: si tiene reservas
+              activas, no podrás guardar el cambio.
+            </p>
+            <div class="row">
+              <button #safe type="button" (click)="dismissDialog()">Cancelar</button>
+              <button type="button" class="danger" (click)="confirmDelete()">Sí, borrar</button>
+            </div>
+          }
+        </div>
+      </div>
     }
   }
 }

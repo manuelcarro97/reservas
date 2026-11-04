@@ -85,6 +85,29 @@ describe('PlanoComponent', () => {
     ]);
   });
 
+  it('invalidStateHasItsOwnClassAndScreenReaderText', () => {
+    const fixture = render({ states: { 12: 'invalid' } });
+
+    expect(tableGroups(fixture).map((group) => group.getAttribute('class'))).toEqual([
+      't free',
+      't invalid',
+      't free',
+    ]);
+    expect(tableGroups(fixture)[1].getAttribute('aria-label')).toBe(
+      'Mesa 2, 6 plazas, con problema',
+    );
+  });
+
+  it('marksEachTableGroupWithItsId', () => {
+    const fixture = render();
+
+    expect(tableGroups(fixture).map((group) => group.getAttribute('data-table-id'))).toEqual([
+      '11',
+      '12',
+      '13',
+    ]);
+  });
+
   it('defaultsToFreeAndAcceptsBlocked', () => {
     const fixture = render({ states: { 12: 'blocked' } });
 
