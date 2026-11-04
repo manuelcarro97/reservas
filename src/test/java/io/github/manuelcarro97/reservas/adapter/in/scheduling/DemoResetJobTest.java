@@ -98,6 +98,34 @@ class DemoResetJobTest {
 	}
 
 	@Test
+	void otherFailuresLogTheClassesOfTheCauseChainWithoutAnyMessage() {
+		RuntimeException root = new java.io.UncheckedIOException(new java.io.IOException("token=" + SECRET));
+		DemoResetJob job = jobThatFailsWith(new IllegalStateException("password=" + SECRET,
+				new IllegalArgumentException("user=" + SECRET, root)));
+
+		job.resetNightly();
+
+		assertThat(warnings()).contains(IllegalStateException.class.getName())
+			.contains("caused by " + IllegalArgumentException.class.getName() + " <- "
+					+ java.io.UncheckedIOException.class.getName() + " <- " + java.io.IOException.class.getName())
+			.doesNotContain(SECRET);
+	}
+
+	@Test
+	void aCauseCycleOrAVeryLongChainDoesNotLoopForever() {
+		RuntimeException top = new IllegalStateException("top");
+		RuntimeException chain = top;
+		for (int i = 0; i < 50; i++) {
+			chain = new IllegalStateException("level " + i, chain);
+		}
+		DemoResetJob job = jobThatFailsWith(chain);
+
+		assertThatCode(job::resetNightly).doesNotThrowAnyException();
+
+		assertThat(warnings().split(" <- ").length).isLessThanOrEqualTo(6);
+	}
+
+	@Test
 	void errorsAreNotSwallowedAsFailures() {
 		DemoResetJob job = new DemoResetJob(() -> {
 			throw new OutOfMemoryError("boom");

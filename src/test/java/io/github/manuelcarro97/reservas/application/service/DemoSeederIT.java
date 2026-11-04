@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.awaitility.Awaitility;
+import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,6 +32,11 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionTemplate;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
@@ -362,19 +368,31 @@ class DemoSeederIT extends PostgresIT {
 	// --- fallos ---
 
 	@Test
-	void identityFailureLeavesThePreviousStateAndStillMarksTheDemoAccount() {
+	void identityFailureStillRestoresTheDataAndWarnsAboutTheIdentity() {
 		seeder.reset();
-		plans.updateSettings(DEMO_UID, "demo", new PlanSettings("La Mesa del Puerto", Theme.NOCHE,
+		plans.updateSettings(DEMO_UID, "demo", new PlanSettings("Otro nombre", Theme.NOCHE,
 				demoPlan().restaurant().bookingMode(), 2));
-		long planId = demoPlan().restaurant().id();
 		demoAccount.setUid(null);
 		identity.failEnsureWith(new IdentityProviderException("ensureUser", "UNAVAILABLE, UNKNOWN"));
+		Logger seederLogger = (Logger) LoggerFactory.getLogger(DemoSeeder.class);
+		ListAppender<ILoggingEvent> logs = new ListAppender<>();
+		logs.start();
+		seederLogger.addAppender(logs);
+		try {
+			assertThat(seeder.reset()).isEqualTo(DEMO_UID);
+		}
+		finally {
+			seederLogger.detachAppender(logs);
+		}
 
-		assertThatThrownBy(seeder::reset).isInstanceOf(IdentityProviderException.class)
-			.hasMessageContaining("ensureUser");
-
-		assertThat(demoPlan().restaurant().id()).isEqualTo(planId);
-		assertThat(demoPlan().restaurant().theme()).isEqualTo(Theme.NOCHE);
+		// La base de datos no depende del proveedor de identidad: la demo pública no queda sucia hasta la noche siguiente.
+		assertThat(demoPlan().restaurant().name()).isEqualTo("La Mesa del Puerto");
+		assertThat(demoPlan().restaurant().theme()).isEqualTo(Theme.AZUL);
+		assertThat(count("reservation")).isEqualTo(6);
+		assertThat(logs.list).anySatisfy(event -> {
+			assertThat(event.getLevel()).isEqualTo(Level.WARN);
+			assertThat(event.getFormattedMessage()).contains(DEMO_UID).contains("ensureUser (UNAVAILABLE, UNKNOWN)");
+		});
 		// Aunque falle, la cuenta sigue restringida: si ya existe en el proveedor, no puede borrarse a sí misma.
 		assertThat(demoAccount.isDemo(DEMO_UID)).isTrue();
 	}

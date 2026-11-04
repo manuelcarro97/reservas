@@ -18,7 +18,7 @@ import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderExc
  * <p>
  * Un fallo (el proveedor de identidad, la base de datos) no sale del método: la aplicación sigue arrancada y el
  * siguiente intento es el de la noche. Se registra un solo WARN con el uid y, si es de identidad, sus códigos
- * enumerados; de cualquier otra excepción solo la clase y el primer frame, nunca su mensaje (el de una librería puede
+ * enumerados; de cualquier otra excepción solo la clase, el primer frame y las clases de sus causas, nunca un mensaje (el de una librería puede
  * traer datos de la cuenta de servicio o de las credenciales).
  * <p>
  * La restauración de arranque corre en el hilo que publica el evento, sin {@code @Async}, para que la demo esté
@@ -30,6 +30,8 @@ import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderExc
 class DemoResetJob {
 
 	private static final Logger log = LoggerFactory.getLogger(DemoResetJob.class);
+
+	private static final int MAX_CAUSE_DEPTH = 5;
 
 	private final ResetDemoUseCase resetDemo;
 	private final String uid;
@@ -60,9 +62,23 @@ class DemoResetJob {
 		}
 		catch (RuntimeException failure) {
 			StackTraceElement[] frames = failure.getStackTrace();
-			log.warn("Demo restore {} failed for uid {}: {} at {}", when, uid, failure.getClass().getName(),
-					frames.length > 0 ? frames[0] : "unknown");
+			log.warn("Demo restore {} failed for uid {}: {} at {}{}", when, uid, failure.getClass().getName(),
+					frames.length > 0 ? frames[0] : "unknown", causeChain(failure));
 		}
+	}
+
+	/**
+	 * " caused by A <- B <- C": solo los nombres de clase de las causas, con tope de profundidad (una cadena larga o
+	 * circular no alarga el log). Ningún mensaje.
+	 */
+	private static String causeChain(Throwable failure) {
+		StringBuilder chain = new StringBuilder();
+		Throwable cause = failure.getCause();
+		for (int depth = 0; cause != null && depth < MAX_CAUSE_DEPTH; depth++) {
+			chain.append(depth == 0 ? " caused by " : " <- ").append(cause.getClass().getName());
+			cause = cause.getCause();
+		}
+		return chain.toString();
 	}
 
 }

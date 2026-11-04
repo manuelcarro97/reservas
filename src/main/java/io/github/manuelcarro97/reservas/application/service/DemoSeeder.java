@@ -24,6 +24,7 @@ import io.github.manuelcarro97.reservas.application.port.in.PlanView;
 import io.github.manuelcarro97.reservas.application.port.in.ResetDemoUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.TableChange;
 import io.github.manuelcarro97.reservas.application.port.out.DemoDataCleanerPort;
+import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderException;
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderPort;
 import io.github.manuelcarro97.reservas.application.port.out.RestaurantRepositoryPort;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
@@ -42,7 +43,7 @@ import io.github.manuelcarro97.reservas.domain.model.TableShape;
  * un plano que esos casos de uso rechazarían.
  * <p>
  * La llamada al proveedor de identidad va fuera de la transacción de la base de datos, que tiene bloqueos tomados y no
- * debe esperar una llamada de red. Dentro, cada paso se une a esa misma transacción: si algo falla no queda nada a
+ * debe esperar una llamada de red. Si falla, se registra y la base de datos se restaura igualmente. Dentro, cada paso se une a esa misma transacción: si algo falla no queda nada a
  * medias. Nada aquí captura excepciones dentro de la transacción: tras un error de la base de datos ya no sirve.
  */
 @Service
@@ -144,7 +145,21 @@ class DemoSeeder implements ResetDemoUseCase {
 			log.warn("Demo account credentials are not configured (DEMO_EMAIL, DEMO_PASSWORD): the account is not ensured");
 			return;
 		}
-		identityProvider.ensureUser(ownerUid, email, password);
+		// Los datos de la demo no dependen del proveedor de identidad: si falla, la base de datos se restaura igualmente
+		// (si no, la demo pública quedaría sucia hasta la noche siguiente) y el fallo se registra aparte.
+		try {
+			identityProvider.ensureUser(ownerUid, email, password);
+		}
+		catch (IdentityProviderException failure) {
+			// Su mensaje es seguro por contrato: operación y códigos enumerados.
+			log.warn("Demo account provisioning failed for uid {}: {}", ownerUid, failure.getMessage());
+		}
+		catch (RuntimeException failure) {
+			// Nunca el mensaje: el de una librería externa puede traer datos de la cuenta de servicio.
+			StackTraceElement[] frames = failure.getStackTrace();
+			log.warn("Demo account provisioning failed for uid {}: {} at {}", ownerUid, failure.getClass().getName(),
+					frames.length > 0 ? frames[0] : "unknown");
+		}
 	}
 
 	private void restore() {
