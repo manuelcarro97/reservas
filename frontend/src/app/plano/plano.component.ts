@@ -80,7 +80,7 @@ export class PlanoComponent {
   /** Con `true` las mesas se pueden enfocar y activar con clic, Enter o Espacio. */
   readonly interactive = input(false);
 
-  /** Id de la mesa activada. Se emite en cualquier estado: decide quien escucha si le sirve. */
+  /** Id de la mesa activada. Se emite en todos los estados salvo `blocked` (la mesa que el cliente no puede elegir). */
   readonly tableSelected = output<number>();
 
   protected readonly floorTiles = FLOOR_TILES;
@@ -156,8 +156,13 @@ export class PlanoComponent {
     return `${name}, ${table.seats} plazas, ${STATE_TEXT[this.stateOf(table.id)]}`;
   }
 
+  /** Interactivo y no bloqueada: solo estas mesas se enfocan y emiten `tableSelected`. */
+  protected isSelectable(id: number): boolean {
+    return this.interactive() && this.stateOf(id) !== 'blocked';
+  }
+
   protected activate(table: PlanoTable): void {
-    if (this.interactive()) {
+    if (this.isSelectable(table.id)) {
       this.tableSelected.emit(table.id);
     }
   }

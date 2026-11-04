@@ -77,7 +77,8 @@
     <g
       [attr.class]="'t ' + stateOf(drawn.table.id)"
       [attr.role]="interactive() ? 'button' : 'img'"
-      [attr.tabindex]="interactive() ? 0 : null"
+      [attr.tabindex]="isSelectable(drawn.table.id) ? 0 : null"
+      [attr.aria-disabled]="interactive() && stateOf(drawn.table.id) === 'blocked' ? 'true' : null"
       [attr.aria-label]="ariaLabel(drawn.table)"
       (click)="activate(drawn.table)"
       (keydown)="onKeydown($event, drawn.table)"

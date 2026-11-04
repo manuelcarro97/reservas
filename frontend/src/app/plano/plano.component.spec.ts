@@ -142,6 +142,31 @@ describe('PlanoComponent', () => {
     expect(groups[0].getAttribute('role')).toBe('img');
   });
 
+  it('blockedTableDoesNotEmit', () => {
+    const fixture = render({ interactive: true, states: { 12: 'blocked' } });
+    const emitted: number[] = [];
+    fixture.componentInstance.tableSelected.subscribe((id) => emitted.push(id));
+    const blocked = tableGroups(fixture)[1];
+
+    blocked.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    keydown(blocked, 'Enter');
+    keydown(blocked, ' ');
+    tableGroups(fixture)[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(emitted).toEqual([11]);
+  });
+
+  it('blockedTableIsAriaDisabled', () => {
+    const fixture = render({ interactive: true, states: { 12: 'blocked', 13: 'taken' } });
+    const [free, blocked, taken] = tableGroups(fixture);
+
+    expect(blocked.getAttribute('aria-disabled')).toBe('true');
+    expect(blocked.hasAttribute('tabindex')).toBe(false);
+    expect(free.hasAttribute('aria-disabled')).toBe(false);
+    expect(taken.hasAttribute('aria-disabled')).toBe(false);
+    expect(taken.getAttribute('tabindex')).toBe('0');
+  });
+
   it('twoInstancesHaveDistinctDefIds', () => {
     const first = render();
     const second = render();
