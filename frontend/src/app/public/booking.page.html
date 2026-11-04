@@ -1,0 +1,153 @@
+@switch (store.status()) {
+  @case ('loading') {
+    <p class="state" role="status">Cargando…</p>
+  }
+  @case ('unavailable') {
+    <p class="state" role="alert">Este plano no está disponible</p>
+  }
+  @case ('error') {
+    <p class="state" role="alert">
+      No se pudo cargar el plano. Inténtalo de nuevo en unos minutos.
+    </p>
+  }
+  @case ('ready') {
+    <h1>{{ store.plan()?.name }}</h1>
+
+    @if (store.reservation(); as reservation) {
+      <section class="sheet confirmation" aria-live="polite">
+        <h2>Reserva registrada</h2>
+        <p>Tu código de reserva es</p>
+        <p class="code">{{ reservation.code }}</p>
+        <p>
+          Guárdalo: lo necesitas para consultar o cancelar tu reserva. El local la confirmará
+          pronto.
+        </p>
+        <a class="button" [routerLink]="['/reserva', reservation.code]">Ver mi reserva</a>
+      </section>
+    } @else {
+      <form class="sheet" (submit)="onSubmit($event)">
+        <div class="row">
+          <label>
+            Fecha
+            <input
+              type="date"
+              name="date"
+              [value]="store.date()"
+              [min]="store.today"
+              [max]="store.maxDate"
+              (change)="onDateChange($event)"
+            />
+          </label>
+          <label>
+            Personas
+            <select name="partySize" (change)="onPartySizeChange($event)">
+              @for (size of partySizes(); track size) {
+                <option [value]="size" [selected]="size === store.partySize()">{{ size }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <fieldset class="shifts">
+          <legend>Turno</legend>
+          @if (store.shifts(); as shifts) {
+            @for (shift of shifts; track shift.shiftId) {
+              <button
+                type="button"
+                class="shift"
+                [class.chosen]="shift.shiftId === store.shiftId()"
+                [attr.aria-pressed]="shift.shiftId === store.shiftId()"
+                [disabled]="!shift.available"
+                (click)="store.selectShift(shift.shiftId ?? 0)"
+              >
+                {{ shift.name }} · {{ shift.start?.slice(0, 5) }}
+              </button>
+            } @empty {
+              <p class="hint">Ese día no hay turnos.</p>
+            }
+            @if (store.shiftsFailed()) {
+              <p class="hint" role="alert">
+                No se pudieron cargar los turnos. Prueba con otra fecha.
+              </p>
+            }
+          } @else {
+            <p class="hint" role="status">Cargando turnos…</p>
+          }
+        </fieldset>
+
+        @if (store.freeChoice() && store.shiftId() !== null) {
+          <section class="table-step">
+            <h2>Elige tu mesa</h2>
+            @if (store.occupied() !== null) {
+              <app-plano
+                [room]="store.room()"
+                [tables]="store.tables()"
+                [theme]="store.theme()"
+                [states]="store.tableStates()"
+                [interactive]="true"
+                (tableSelected)="store.selectTable($event)"
+              />
+              @if (store.selectedTable(); as table) {
+                <p class="hint" aria-live="polite">
+                  Mesa {{ table.label }} · {{ table.seats }} plazas
+                </p>
+              } @else {
+                <p class="hint">
+                  Elige una mesa en el plano (las grises no están disponibles para tu grupo).
+                </p>
+              }
+            } @else if (store.occupancyFailed()) {
+              <p class="hint" role="alert">
+                No se pudo cargar el plano de mesas. Elige el turno otra vez.
+              </p>
+            } @else {
+              <p class="hint" role="status">Cargando mesas…</p>
+            }
+          </section>
+        }
+
+        <div class="row">
+          <label>
+            Nombre
+            <input
+              type="text"
+              name="customerName"
+              autocomplete="name"
+              maxlength="100"
+              required
+              [value]="store.customerName()"
+              (input)="onName($event)"
+            />
+          </label>
+          <label>
+            Teléfono
+            <input
+              type="tel"
+              name="customerPhone"
+              autocomplete="tel"
+              maxlength="30"
+              required
+              [value]="store.customerPhone()"
+              (input)="onPhone($event)"
+            />
+          </label>
+        </div>
+
+        @if (store.isDemo()) {
+          <p class="notice">Esta es una demo pública: no uses tu nombre ni teléfono reales.</p>
+        }
+        <p class="privacy">
+          Usamos tu nombre y tu teléfono solo para gestionar esta reserva y contactar contigo si
+          hace falta. El local los ve en su panel y se anonimizan 30 días después de la fecha de la
+          reserva.
+        </p>
+
+        @if (store.error(); as message) {
+          <p class="error" role="alert">{{ message }}</p>
+        }
+        <button type="submit" class="button" [disabled]="!store.canSubmit()">Reservar</button>
+      </form>
+    }
+  }
+}
+<app-powered-by />

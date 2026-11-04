@@ -3,5 +3,11 @@
   "input": "../contracts/openapi.json",
   "output": "src/app/core/api",
   "services": true,
-  "promises": false
+  "promises": false,
+  "customizedResponseType": {
+    "/api/v1/restaurants/{slug}": { "toUse": "json" },
+    "/api/v1/restaurants/{slug}/availability": { "toUse": "json" },
+    "/api/v1/restaurants/{slug}/occupancy": { "toUse": "json" },
+    "/api/v1/restaurants/{slug}/reservations": { "toUse": "json" }
+  }
 }
