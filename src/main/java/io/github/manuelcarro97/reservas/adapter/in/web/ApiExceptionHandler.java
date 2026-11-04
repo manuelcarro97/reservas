@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -31,6 +32,24 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	ProblemDetail handleUnexpected(Exception exception) {
 		log.error("Unexpected error", exception);
 		return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error", "INTERNAL_ERROR");
+	}
+
+	/**
+	 * Un cuerpo que pasó del tope mientras se leía (ver {@link RequestSizeLimitFilter}) llega aquí envuelto por el
+	 * conversor JSON: se busca en la cadena de causas y se responde 413 en vez del 400 de un JSON ilegible.
+	 */
+	@Override
+	protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException exception,
+			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+		for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+			if (cause instanceof RequestBodyTooLargeException) {
+				// Directo y no por handleExceptionInternal, que fija el código INVALID_REQUEST de los 4xx.
+				ProblemDetail problem = problem(HttpStatus.CONTENT_TOO_LARGE, "The request body is too large",
+						"PAYLOAD_TOO_LARGE");
+				return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(problem);
+			}
+		}
+		return super.handleHttpMessageNotReadable(exception, headers, status, request);
 	}
 
 	@Override

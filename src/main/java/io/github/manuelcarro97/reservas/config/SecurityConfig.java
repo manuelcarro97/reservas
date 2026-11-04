@@ -18,6 +18,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import io.github.manuelcarro97.reservas.adapter.in.web.AdminWriteRateLimitFilter;
 import io.github.manuelcarro97.reservas.adapter.in.web.RateLimitFilter;
+import io.github.manuelcarro97.reservas.adapter.in.web.RequestSizeLimitFilter;
 
 @Configuration(proxyBeanMethods = false)
 class SecurityConfig {
@@ -45,10 +46,22 @@ class SecurityConfig {
 		return registration;
 	}
 
+	/** Igual que {@link #rateLimitFilterRegistration}: el tope de tamaño solo vive en la cadena de seguridad (tras CORS). */
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, RateLimitFilter rateLimitFilter,
-			AdminWriteRateLimitFilter adminWriteRateLimitFilter) throws Exception {
+	FilterRegistrationBean<RequestSizeLimitFilter> requestSizeLimitFilterRegistration(
+			RequestSizeLimitFilter requestSizeLimitFilter) {
+		FilterRegistrationBean<RequestSizeLimitFilter> registration = new FilterRegistrationBean<>(
+				requestSizeLimitFilter);
+		registration.setEnabled(false);
+		return registration;
+	}
+
+	@Bean
+	SecurityFilterChain securityFilterChain(HttpSecurity http, RequestSizeLimitFilter requestSizeLimitFilter,
+			RateLimitFilter rateLimitFilter, AdminWriteRateLimitFilter adminWriteRateLimitFilter) throws Exception {
 		return http
+			// Primero: un cuerpo enorme se rechaza sin gastar más trabajo en él.
+			.addFilterBefore(requestSizeLimitFilter, BearerTokenAuthenticationFilter.class)
 			// Antes de autenticar: un token inválido o una ráfaga de peticiones anónimas ya cuentan.
 			.addFilterBefore(rateLimitFilter, BearerTokenAuthenticationFilter.class)
 			// Después de autenticar: el límite por usuario necesita el sub del token ya verificado.
