@@ -4,14 +4,8 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
-import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.http.server.PathContainer;
-import org.springframework.http.server.ServletServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.pattern.PathPattern;
@@ -26,13 +20,13 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * Límite por IP de los endpoints públicos que escriben o consultan por código: 10 altas de reserva por minuto y 30
  * consultas o cancelaciones por código por minuto. El plano, la ocupación y la disponibilidad no se limitan, ni
- * tampoco la administración (va con token). Superado el límite responde 429 con la misma forma de error que el resto
- * de la API y la cabecera {@code Retry-After}.
+ * tampoco la administración (sus escrituras las limita por usuario {@link AdminWriteRateLimitFilter}). Superado el
+ * límite responde 429 con la misma forma de error que el resto de la API y la cabecera {@code Retry-After}.
  * <p>
  * La IP es {@code getRemoteAddr()} y nunca se lee {@code X-Forwarded-For} a mano: detrás de un proxy el contenedor la
  * resuelve según {@code server.forward-headers-strategy}. Es un filtro de la cadena de seguridad (se registra en
  * {@code SecurityConfig}), no un filtro de servlet suelto: por eso su respuesta no pasa por
- * {@link ApiExceptionHandler} y construye el error con el mismo helper, {@link ApiExceptionHandler#problem}.
+ * {@link ApiExceptionHandler}: lo construye {@link RateLimitedResponse} con el mismo helper de errores.
  */
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
@@ -46,11 +40,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	private static final PathPattern LOOKUPS_PATH = PathPatternParser.defaultInstance
 		.parse("/api/v1/reservations/**");
 
-	private static final String RATE_LIMITED_DETAIL = "Too many requests, try again later";
 
 	private final FixedWindowRateLimiter bookings;
 	private final FixedWindowRateLimiter lookups;
-	private final JacksonJsonHttpMessageConverter converter = new JacksonJsonHttpMessageConverter();
 
 	public RateLimitFilter(Clock clock) {
 		this.bookings = new FixedWindowRateLimiter(clock, BOOKINGS_PER_MINUTE, WINDOW);
@@ -70,7 +62,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 		if (limiter != null) {
 			String ip = request.getRemoteAddr();
 			if (!limiter.tryAcquire(ip)) {
-				reject(request, response, limiter.retryAfterSeconds(ip));
+				RateLimitedResponse.write(response, limiter.retryAfterSeconds(ip));
 				return;
 			}
 		}
@@ -87,15 +79,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
 			return lookups;
 		}
 		return null;
-	}
-
-	private void reject(HttpServletRequest request, HttpServletResponse response, long retryAfterSeconds)
-			throws IOException {
-		ProblemDetail problem = ApiExceptionHandler.problem(HttpStatus.TOO_MANY_REQUESTS, RATE_LIMITED_DETAIL,
-				"RATE_LIMITED");
-		response.setStatus(problem.getStatus());
-		response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
-		converter.write(problem, MediaType.APPLICATION_PROBLEM_JSON, new ServletServerHttpResponse(response));
 	}
 
 }

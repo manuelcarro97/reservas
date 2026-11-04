@@ -14,8 +14,10 @@ import io.github.manuelcarro97.reservas.application.port.in.ManageShiftsUseCase;
 import io.github.manuelcarro97.reservas.application.port.out.ReservationRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.RestaurantRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.ShiftRepositoryPort;
+import io.github.manuelcarro97.reservas.domain.exception.ClosureDateOutOfRangeException;
 import io.github.manuelcarro97.reservas.domain.exception.ClosureHasReservationsException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftHasReservationsException;
+import io.github.manuelcarro97.reservas.domain.exception.ShiftLimitReachedException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftNotFoundException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftOverlapException;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
@@ -25,6 +27,11 @@ import io.github.manuelcarro97.reservas.domain.model.Shift;
 @Service
 @Transactional
 class ShiftAdminService implements ManageShiftsUseCase {
+
+	/** Turnos visibles por plano: sin tope, un cliente con token podría crear filas sin límite en una base pequeña. */
+	static final int MAX_SHIFTS = 10;
+	/** Un cierre se puede poner hasta este número de días después de hoy. */
+	static final int MAX_CLOSURE_DAYS_AHEAD = 90;
 
 	private final RestaurantRepositoryPort restaurants;
 	private final ShiftRepositoryPort shifts;
@@ -48,6 +55,11 @@ class ShiftAdminService implements ManageShiftsUseCase {
 	@Override
 	public Shift add(String ownerUid, String slug, String name, LocalTime start, LocalTime end, Set<DayOfWeek> days) {
 		Restaurant plan = lockOwned(ownerUid, slug);
+		// findAll solo trae los turnos visibles: uno borrado (oculto) no cuenta. El cupo se lee con el plano bloqueado,
+		// así que dos altas a la vez no pasan del tope.
+		if (shifts.findAll(plan.id()).size() >= MAX_SHIFTS) {
+			throw new ShiftLimitReachedException(MAX_SHIFTS);
+		}
 		Shift shift = new Shift(null, plan.id(), name, start, end, days);
 		requireNoOverlap(shift);
 		return shifts.save(shift);
@@ -89,6 +101,11 @@ class ShiftAdminService implements ManageShiftsUseCase {
 	@Override
 	public void addClosure(String ownerUid, String slug, LocalDate date, String reason) {
 		Restaurant plan = lockOwned(ownerUid, slug);
+		// "Hoy" en la zona del plano, como en el resto de reglas de fechas.
+		LocalDate today = LocalDate.ofInstant(clock.instant(), plan.zone());
+		if (date.isBefore(today) || date.isAfter(today.plusDays(MAX_CLOSURE_DAYS_AHEAD))) {
+			throw new ClosureDateOutOfRangeException(MAX_CLOSURE_DAYS_AHEAD);
+		}
 		if (reservations.hasActive(plan.id(), date)) {
 			throw new ClosureHasReservationsException();
 		}

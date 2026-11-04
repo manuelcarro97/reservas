@@ -333,7 +333,8 @@ class ShiftAdminApiIT extends PostgresIT {
 	void listAndRemoveClosures() throws Exception {
 		addClosure("2026-12-25", "Navidad").andExpect(status().isCreated());
 		addClosure("2026-12-24", "Nochebuena").andExpect(status().isCreated());
-		addClosure("2026-11-20", "Pasado").andExpect(status().isCreated());
+		// Un cierre pasado ya no se puede crear por la API: se inserta directamente para probar el filtro de la lista.
+		restaurants.addClosure(plan.id(), LocalDate.of(2026, 11, 20), "Pasado");
 
 		send(get(CLOSURES).param("from", "2026-12-01")).andExpect(status().isOk())
 			.andExpect(jsonPath("$", contains("2026-12-24", "2026-12-25")));
@@ -390,6 +391,123 @@ class ShiftAdminApiIT extends PostgresIT {
 				""")).andExpect(status().isCreated());
 
 		send(get(SHIFTS)).andExpect(jsonPath("$[*].name", hasItem("Merienda")));
+	}
+
+	// --- topes de escritura ---
+
+	/** Deja el plano con {@code count} turnos visibles: la cena y horas sueltas de una hora, sin solaparse. */
+	private void givenShifts(int count) {
+		for (int i = 0; i < count - 1; i++) {
+			shifts.save(new Shift(null, plan.id(), "Hora " + i, LocalTime.of(6 + i, 0), LocalTime.of(7 + i, 0),
+					EnumSet.allOf(DayOfWeek.class)));
+		}
+	}
+
+	private ResultActions addShiftAt(String start, String end) throws Exception {
+		return send(post(SHIFTS).contentType(MediaType.APPLICATION_JSON).content("""
+				{"name":"Extra","start":"%s","end":"%s","days":["MONDAY"]}
+				""".formatted(start, end)));
+	}
+
+	@Test
+	void eleventhVisibleShiftReturns409ShiftLimit() throws Exception {
+		givenShifts(10);
+
+		addShiftAt("16:00", "17:00").andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("SHIFT_LIMIT"));
+
+		send(get(SHIFTS)).andExpect(jsonPath("$.length()").value(10));
+	}
+
+	@Test
+	void tenthVisibleShiftIsAllowed() throws Exception {
+		givenShifts(9);
+
+		addShiftAt("16:00", "17:00").andExpect(status().isCreated());
+	}
+
+	@Test
+	void deletingAShiftMakesRoomForAnother() throws Exception {
+		givenShifts(10);
+		Shift removable = shifts.findAll(plan.id()).getFirst();
+		deleteShift(removable.id()).andExpect(status().isNoContent());
+
+		addShiftAt("16:00", "17:00").andExpect(status().isCreated());
+	}
+
+	@Test
+	void hiddenShiftsDoNotCountForTheLimit() throws Exception {
+		givenShifts(10);
+		givenReservation(plan, dinner, table, PAST_DATE, 2);
+		deleteShift(dinner.id()).andExpect(status().isNoContent());
+		assertThat(hiddenInDatabase(dinner.id())).isTrue();
+
+		addShiftAt("16:00", "17:00").andExpect(status().isCreated());
+	}
+
+	@Test
+	void shiftLimitIsPerPlan() throws Exception {
+		givenShifts(10);
+		Restaurant other = givenRestaurant("otro-local", "owner-a");
+
+		send(post("/api/v1/admin/restaurants/otro-local/shifts").contentType(MediaType.APPLICATION_JSON).content("""
+				{"name":"Cena","start":"20:00","end":"22:00","days":["MONDAY"]}
+				""")).andExpect(status().isCreated());
+		assertThat(other.id()).isNotEqualTo(plan.id());
+	}
+
+	@Test
+	void shiftTimesWithSecondsAreRejectedOnCreate() throws Exception {
+		addShiftAt("16:00:30", "17:00").andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+		addShiftAt("16:00", "17:00:15").andExpect(status().isBadRequest());
+		addShiftAt("16:00:00.500", "17:00").andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void shiftTimesWithSecondsAreRejectedOnReschedule() throws Exception {
+		reschedule(dinner.id(), """
+				{"start":"21:00:30","end":"23:00","days":["MONDAY"]}
+				""").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+		reschedule(dinner.id(), """
+				{"start":"21:00","end":"23:00:01","days":["MONDAY"]}
+				""").andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void shiftTimesInWholeMinutesAreAccepted() throws Exception {
+		addShiftAt("16:00:00", "17:45").andExpect(status().isCreated());
+	}
+
+	@Test
+	void closureOnTodayAndNinetyDaysAheadIsAllowed() throws Exception {
+		// MutableClock.START: 2026-12-01 en Madrid.
+		addClosure("2026-12-01", "Hoy").andExpect(status().isCreated());
+		addClosure("2027-03-01", "En 90 dias").andExpect(status().isCreated());
+	}
+
+	@Test
+	void closureYesterdayReturns422() throws Exception {
+		addClosure("2026-11-30", "Ayer").andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.code").value("CLOSURE_DATE_OUT_OF_RANGE"));
+	}
+
+	@Test
+	void closureBeyondNinetyDaysReturns422() throws Exception {
+		addClosure("2027-03-02", "Muy lejos").andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.code").value("CLOSURE_DATE_OUT_OF_RANGE"));
+
+		assertThat(restaurants.isClosed(plan.id(), LocalDate.of(2027, 3, 2))).isFalse();
+	}
+
+	/** A las 23:30Z en Madrid ya es el 2: "hoy" es el de la zona del plano y el 1 ya es pasado. */
+	@Test
+	void closureWindowStartsTodayInThePlanZone() throws Exception {
+		clock.set(Instant.parse("2026-12-01T23:30:00Z"));
+
+		addClosure("2026-12-01", "Ayer en Madrid").andExpect(status().isUnprocessableContent());
+		addClosure("2026-12-02", "Hoy en Madrid").andExpect(status().isCreated());
+		addClosure("2027-03-02", "En 90 dias en Madrid").andExpect(status().isCreated());
 	}
 
 	private ResultActions addClosure(String date, String reason) throws Exception {

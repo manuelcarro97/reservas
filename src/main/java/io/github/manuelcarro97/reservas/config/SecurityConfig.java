@@ -16,6 +16,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import io.github.manuelcarro97.reservas.adapter.in.web.AdminWriteRateLimitFilter;
 import io.github.manuelcarro97.reservas.adapter.in.web.RateLimitFilter;
 
 @Configuration(proxyBeanMethods = false)
@@ -34,11 +35,24 @@ class SecurityConfig {
 		return registration;
 	}
 
+	/** Igual que {@link #rateLimitFilterRegistration}: el límite de escrituras del panel solo vive en la cadena de seguridad. */
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, RateLimitFilter rateLimitFilter) throws Exception {
+	FilterRegistrationBean<AdminWriteRateLimitFilter> adminWriteRateLimitFilterRegistration(
+			AdminWriteRateLimitFilter adminWriteRateLimitFilter) {
+		FilterRegistrationBean<AdminWriteRateLimitFilter> registration = new FilterRegistrationBean<>(
+				adminWriteRateLimitFilter);
+		registration.setEnabled(false);
+		return registration;
+	}
+
+	@Bean
+	SecurityFilterChain securityFilterChain(HttpSecurity http, RateLimitFilter rateLimitFilter,
+			AdminWriteRateLimitFilter adminWriteRateLimitFilter) throws Exception {
 		return http
 			// Antes de autenticar: un token inválido o una ráfaga de peticiones anónimas ya cuentan.
 			.addFilterBefore(rateLimitFilter, BearerTokenAuthenticationFilter.class)
+			// Después de autenticar: el límite por usuario necesita el sub del token ya verificado.
+			.addFilterAfter(adminWriteRateLimitFilter, BearerTokenAuthenticationFilter.class)
 			// API sin cookies ni sesión: la identidad llega en el token Bearer de Firebase, así que no hay CSRF.
 			.csrf(AbstractHttpConfigurer::disable)
 			.cors(Customizer.withDefaults())
