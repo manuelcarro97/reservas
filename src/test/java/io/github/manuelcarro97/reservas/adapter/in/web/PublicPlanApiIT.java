@@ -77,6 +77,7 @@ class PublicPlanApiIT extends PostgresIT {
 			.andExpect(jsonPath("$.theme").value("AZUL"))
 			.andExpect(jsonPath("$.bookingMode").value("FREE_CHOICE"))
 			.andExpect(jsonPath("$.cancellationDeadlineHours").value(2))
+			.andExpect(jsonPath("$.timeZone").value("Europe/Madrid"))
 			.andExpect(jsonPath("$.room.shape").value("RECTANGLE"))
 			.andExpect(jsonPath("$.room.width").value(1200))
 			.andExpect(jsonPath("$.room.height").value(800))

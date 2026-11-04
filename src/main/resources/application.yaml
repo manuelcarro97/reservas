@@ -44,3 +44,8 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+
+springdoc:
+  # Sin esto springdoc declara las respuestas como */* y el cliente Angular generado pide blob, así que el cuerpo (y el
+  # code de los errores) no llegaría como JSON. La API es solo JSON.
+  default-produces-media-type: application/json
