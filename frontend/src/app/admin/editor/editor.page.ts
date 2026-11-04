@@ -67,7 +67,7 @@ export class EditorPage {
   protected readonly status = signal<EditorStatus>('loading');
   protected readonly shapes = SHAPES;
   protected readonly planName = signal('');
-  protected readonly dragging = signal<Handle['kind'] | null>(null);
+  protected readonly dragging = signal<string | null>(null);
 
   private readonly slug = signal('');
   private readonly retries = new Subject<void>();
@@ -147,7 +147,7 @@ export class EditorPage {
       start: { x: event.clientX, y: event.clientY },
       scale,
     };
-    this.dragging.set(handle.kind);
+    this.dragging.set(handle.wall);
     this.store.beginDrag();
   }
 

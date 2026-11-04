@@ -55,12 +55,12 @@
         role="group"
         aria-label="Tiradores del contorno del local"
       >
-        @for (handle of handles(); track handle.kind) {
+        @for (handle of handles(); track handle.wall) {
           <g
             class="handle"
             role="slider"
             tabindex="0"
-            [class.active]="dragging() === handle.kind"
+            [class.active]="dragging() === handle.wall"
             [attr.aria-label]="handle.label"
             [attr.aria-valuemin]="handle.min"
             [attr.aria-valuemax]="handle.max"

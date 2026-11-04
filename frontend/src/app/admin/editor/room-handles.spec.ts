@@ -1,5 +1,5 @@
-import { Room, RoomShape, roomProblems, roomRects } from '../../plano/geometry';
-import { Handle, HandleKind, applyHandleDrag, applyHandleValue, handlesFor } from './room-handles';
+import { Point, Room, RoomShape, roomPolygon, roomProblems } from '../../plano/geometry';
+import { Handle, applyHandleDrag, handlesFor, moveHandleBy, moveHandleTo } from './room-handles';
 
 function room(
   shape: RoomShape,
@@ -12,169 +12,361 @@ function room(
   return { shape, width, height, cutWidth, cutDepth, rotation };
 }
 
+const SQUARE = room('SQUARE', 800, 800);
 const RECTANGLE = room('RECTANGLE', 1200, 560);
 const L = room('L', 1000, 900, 480, 480);
 const U = room('U', 1100, 820, 420, 440);
 const T = room('T', 1100, 900, 340, 520);
+const SHAPES = [SQUARE, RECTANGLE, L, U, T];
+const ROTATIONS = [0, 90, 180, 270];
 
-function handle(of: Room, kind: HandleKind): Handle {
-  const found = handlesFor(of).find((candidate) => candidate.kind === kind);
+function handle(of: Room, wall: string): Handle {
+  const found = handlesFor(of).find((candidate) => candidate.wall === wall);
   if (!found) {
-    throw new Error(`Sin tirador ${kind}`);
+    throw new Error(`Sin tirador ${wall}`);
   }
   return found;
 }
 
+function byLabel(of: Room, label: string): Handle {
+  const found = handlesFor(of).find((candidate) => candidate.label === label);
+  if (!found) {
+    throw new Error(`Sin tirador "${label}"`);
+  }
+  return found;
+}
+
+/** Líneas de pared del contorno tal como se ve: `v:x` para las verticales y `h:y` para las horizontales. */
+function lines(of: Room, shift: Point = { x: 0, y: 0 }): Set<string> {
+  const polygon = roomPolygon(of);
+  const found = new Set<string>();
+  polygon.forEach((from, index) => {
+    const to = polygon[(index + 1) % polygon.length];
+    found.add(from.x === to.x ? `v:${from.x + shift.x}` : `h:${from.y + shift.y}`);
+  });
+  return found;
+}
+
 function bounds(of: Room): { width: number; height: number } {
-  const rects = roomRects(of);
+  const polygon = roomPolygon(of);
   return {
-    width: Math.max(...rects.map((rect) => rect.x2)),
-    height: Math.max(...rects.map((rect) => rect.y2)),
+    width: Math.max(...polygon.map((point) => point.x)),
+    height: Math.max(...polygon.map((point) => point.y)),
   };
 }
 
 describe('room handles', () => {
   it('handleDragSnapsTo20', () => {
-    const width = handle(RECTANGLE, 'width');
+    const width = handle(RECTANGLE, 'right');
     expect(applyHandleDrag(RECTANGLE, width, 27, 0).width).toBe(1220);
     expect(applyHandleDrag(RECTANGLE, width, 31, 0).width).toBe(1240);
     expect(applyHandleDrag(RECTANGLE, width, 9, 0).width).toBe(1200);
     expect(applyHandleDrag(RECTANGLE, width, -31, 0).width).toBe(1160);
-    const height = handle(RECTANGLE, 'height');
+    const height = handle(RECTANGLE, 'bottom');
     expect(applyHandleDrag(RECTANGLE, height, 0, 27).height).toBe(580);
+    // Las paredes de arriba y de la izquierda también redondean.
+    expect(applyHandleDrag(RECTANGLE, handle(RECTANGLE, 'left'), -27, 0).width).toBe(1220);
+    expect(applyHandleDrag(RECTANGLE, handle(RECTANGLE, 'top'), 0, -31).height).toBe(600);
   });
 
   it('handleDragClampsToRange', () => {
-    const width = handle(RECTANGLE, 'width');
-    expect(applyHandleDrag(RECTANGLE, width, 5000, 0).width).toBe(2000);
-    expect(applyHandleDrag(RECTANGLE, width, -5000, 0).width).toBe(400);
-    const height = handle(RECTANGLE, 'height');
-    expect(applyHandleDrag(RECTANGLE, height, 0, 5000).height).toBe(2000);
-    expect(applyHandleDrag(RECTANGLE, height, 0, -5000).height).toBe(400);
-    // Los límites de los huecos: al menos 200 y que quede 200 de local a cada lado.
-    expect(applyHandleDrag(L, handle(L, 'cutWidth'), 5000, 0).cutWidth).toBe(200);
-    expect(applyHandleDrag(L, handle(L, 'cutWidth'), -5000, 0).cutWidth).toBe(800);
-    expect(applyHandleDrag(L, handle(L, 'cutDepth'), 0, 5000).cutDepth).toBe(200);
-    expect(applyHandleDrag(L, handle(L, 'cutDepth'), 0, -5000).cutDepth).toBe(700);
+    const right = handle(RECTANGLE, 'right');
+    expect(applyHandleDrag(RECTANGLE, right, 5000, 0).width).toBe(2000);
+    expect(applyHandleDrag(RECTANGLE, right, -5000, 0).width).toBe(400);
+    const bottom = handle(RECTANGLE, 'bottom');
+    expect(applyHandleDrag(RECTANGLE, bottom, 0, 5000).height).toBe(2000);
+    expect(applyHandleDrag(RECTANGLE, bottom, 0, -5000).height).toBe(400);
+    expect(applyHandleDrag(RECTANGLE, handle(RECTANGLE, 'left'), -5000, 0).width).toBe(2000);
+    expect(applyHandleDrag(RECTANGLE, handle(RECTANGLE, 'top'), 0, 5000).height).toBe(400);
+    // Los límites del entrante: al menos 200 y que quede 200 de local a cada lado.
+    expect(applyHandleDrag(L, handle(L, 'notchInner'), 5000, 0).cutWidth).toBe(200);
+    expect(applyHandleDrag(L, handle(L, 'notchInner'), -5000, 0).cutWidth).toBe(800);
+    expect(applyHandleDrag(L, handle(L, 'notchTop'), 0, 5000).cutDepth).toBe(200);
+    expect(applyHandleDrag(L, handle(L, 'notchTop'), 0, -5000).cutDepth).toBe(700);
   });
 
   it('lShapeHasCutHandles', () => {
-    const kinds = (of: Room) =>
+    const walls = (of: Room) =>
       handlesFor(of)
-        .map((candidate) => candidate.kind)
+        .map((candidate) => candidate.wall)
         .sort();
-    expect(kinds(L)).toEqual(['cutDepth', 'cutWidth', 'height', 'width']);
-    expect(kinds(U)).toEqual(['cutDepth', 'cutWidth', 'height', 'width']);
-    expect(kinds(T)).toEqual(['cutDepth', 'cutWidth', 'height', 'width']);
-    expect(kinds(RECTANGLE)).toEqual(['height', 'width']);
-    expect(kinds(room('SQUARE', 800, 800))).toEqual(['height', 'width']);
+    expect(walls(L)).toEqual(['bottom', 'left', 'notchInner', 'notchTop', 'right', 'top']);
+    expect(walls(U)).toEqual([
+      'bottomLeft',
+      'bottomRight',
+      'innerLeft',
+      'innerRight',
+      'left',
+      'notchTop',
+      'right',
+      'top',
+    ]);
+    expect(walls(T)).toEqual([
+      'left',
+      'right',
+      'shoulderLeft',
+      'shoulderRight',
+      'stemBottom',
+      'stemLeft',
+      'stemRight',
+      'top',
+    ]);
+    expect(walls(RECTANGLE)).toEqual(['bottom', 'left', 'right', 'top']);
+    expect(walls(SQUARE)).toEqual(['bottom', 'left', 'right', 'top']);
   });
 
-  it('tiene nombre, valor y rango para el lector de pantalla', () => {
-    const width = handle(RECTANGLE, 'width');
-    expect(width).toMatchObject({ label: 'Ancho del local', value: 1200, min: 400, max: 2000 });
-    expect(handle(RECTANGLE, 'height').label).toBe('Alto del local');
-    expect(handle(L, 'cutWidth')).toMatchObject({
-      label: 'Ancho del hueco',
+  it('hay un tirador en el punto medio de cada pared, en cada forma y giro', () => {
+    for (const base of SHAPES) {
+      for (const rotation of ROTATIONS) {
+        const turned = { ...base, rotation };
+        const polygon = roomPolygon(turned);
+        const middles = polygon
+          .map((from, index) => {
+            const to = polygon[(index + 1) % polygon.length];
+            return `${(from.x + to.x) / 2},${(from.y + to.y) / 2}`;
+          })
+          .sort();
+        const handles = handlesFor(turned)
+          .map((candidate) => `${candidate.x},${candidate.y}`)
+          .sort();
+        expect(handles, `${base.shape} ${rotation}`).toEqual(middles);
+      }
+    }
+  });
+
+  it('cada tirador tiene un nombre distinto, también girado', () => {
+    for (const base of SHAPES) {
+      for (const rotation of ROTATIONS) {
+        const labels = handlesFor({ ...base, rotation }).map((candidate) => candidate.label);
+        expect(new Set(labels).size, `${base.shape} ${rotation}: ${labels}`).toBe(labels.length);
+      }
+    }
+  });
+
+  it('nombra las paredes por el lado en que se ven', () => {
+    const labels = (of: Room) =>
+      handlesFor(of)
+        .map((candidate) => candidate.label)
+        .sort();
+    expect(labels(RECTANGLE)).toEqual([
+      'Pared derecha',
+      'Pared inferior',
+      'Pared izquierda',
+      'Pared superior',
+    ]);
+    // Girado, la pared de la derecha sigue siendo la de la derecha.
+    expect(labels({ ...RECTANGLE, rotation: 90 })).toEqual(labels(RECTANGLE));
+    expect(labels(L)).toEqual([
+      'Pared derecha',
+      'Pared inferior',
+      'Pared interior horizontal del entrante',
+      'Pared interior vertical del entrante',
+      'Pared izquierda',
+      'Pared superior',
+    ]);
+    expect(labels(U)).toEqual([
+      'Pared derecha',
+      'Pared inferior derecha',
+      'Pared inferior izquierda',
+      'Pared interior derecha del entrante',
+      'Pared interior horizontal del entrante',
+      'Pared interior izquierda del entrante',
+      'Pared izquierda',
+      'Pared superior',
+    ]);
+    expect(byLabel({ ...U, rotation: 270 }, 'Pared derecha superior')).toBeTruthy();
+    expect(byLabel({ ...U, rotation: 270 }, 'Pared derecha inferior')).toBeTruthy();
+    expect(byLabel(T, 'Pared interior vertical izquierda del entrante').wall).toBe('stemLeft');
+    expect(byLabel(T, 'Pared interior horizontal izquierda del entrante').wall).toBe(
+      'shoulderLeft',
+    );
+  });
+
+  it('tiene valor y rango para el lector de pantalla', () => {
+    expect(byLabel(RECTANGLE, 'Pared derecha')).toMatchObject({ value: 1200, min: 400, max: 2000 });
+    expect(byLabel(RECTANGLE, 'Pared inferior')).toMatchObject({ value: 560, min: 400, max: 2000 });
+    expect(byLabel(L, 'Pared interior vertical del entrante')).toMatchObject({
       value: 480,
       min: 200,
       max: 800,
     });
-    expect(handle(U, 'cutWidth')).toMatchObject({ max: 700 });
-    expect(handle(L, 'cutDepth')).toMatchObject({
-      label: 'Fondo del hueco',
+    expect(byLabel(L, 'Pared interior horizontal del entrante')).toMatchObject({
       value: 480,
       min: 200,
       max: 700,
     });
-    expect(handle(T, 'cutWidth').label).toBe('Ancho del pie');
-    expect(handle(T, 'cutDepth').label).toBe('Largo del pie');
+    expect(byLabel(U, 'Pared interior derecha del entrante')).toMatchObject({ min: 200, max: 700 });
   });
 
-  it('el ancho mínimo de U y T deja sitio al hueco', () => {
-    expect(handle(U, 'width').min).toBe(600);
-    expect(handle(T, 'width').min).toBe(600);
-    expect(handle(L, 'width').min).toBe(400);
-  });
-
-  it('al achicar el local se recortan los huecos para que siga siendo válido', () => {
-    const narrower = applyHandleDrag(U, handle(U, 'width'), -5000, 0);
-    expect(narrower.width).toBe(600);
-    expect(narrower.cutWidth).toBe(200);
+  it('la pared exterior del local con entrante no se pasa del hueco', () => {
+    // Mover la pared derecha de la L con el entrante pegado a ella lo arrastra: no puede bajar de 200 de entrante.
+    const narrower = applyHandleDrag(L, handle(L, 'right'), -5000, 0);
+    expect(narrower).toMatchObject({ width: 720, cutWidth: 200 });
     expect(roomProblems(narrower)).toEqual([]);
-    const shorter = applyHandleDrag(L, handle(L, 'height'), 0, -5000);
-    expect(shorter.height).toBe(400);
-    expect(shorter.cutDepth).toBe(200);
+    // En la U y la T queda 200 de local a cada lado del entrante.
+    const u = applyHandleDrag(U, handle(U, 'right'), -5000, 0);
+    expect(u.width).toBe(820);
+    expect(roomProblems(u)).toEqual([]);
+    const shorter = applyHandleDrag(L, handle(L, 'top'), 0, 5000);
+    // No baja de 680: el entrante de 480 necesita 200 de local debajo.
+    expect(shorter.height).toBe(680);
     expect(roomProblems(shorter)).toEqual([]);
-  });
-
-  it('el local cuadrado conserva el mismo ancho y alto', () => {
-    const square = room('SQUARE', 800, 800);
-    const wider = applyHandleDrag(square, handle(square, 'width'), 200, 0);
-    expect(wider).toMatchObject({ width: 1000, height: 1000 });
-    const lower = applyHandleDrag(square, handle(square, 'height'), 0, -200);
-    expect(lower).toMatchObject({ width: 600, height: 600 });
-    expect(roomProblems(wider)).toEqual([]);
-  });
-
-  it('en U y T el hueco está centrado: el tirador del lado mueve el ancho al doble', () => {
-    expect(applyHandleDrag(U, handle(U, 'cutWidth'), 20, 0).cutWidth).toBe(460);
-    expect(applyHandleDrag(T, handle(T, 'cutWidth'), -20, 0).cutWidth).toBe(300);
-    expect(applyHandleDrag(L, handle(L, 'cutWidth'), -20, 0).cutWidth).toBe(500);
-    expect(applyHandleDrag(U, handle(U, 'cutDepth'), 0, -20).cutDepth).toBe(460);
-  });
-
-  it('los tiradores de tamaño están en el borde derecho e inferior del local girado', () => {
-    for (const rotation of [0, 90, 180, 270]) {
-      const turned = { ...L, rotation };
-      const { width, height } = bounds(turned);
-      const sizeKinds = rotation % 180 === 0 ? ['width', 'height'] : ['height', 'width'];
-      const horizontal = handle(turned, sizeKinds[0] as HandleKind);
-      const vertical = handle(turned, sizeKinds[1] as HandleKind);
-      expect(horizontal.x).toBe(width);
-      expect(vertical.y).toBe(height);
-      // Arrastrar hacia fuera agranda, también girado.
-      expect(applyHandleDrag(turned, horizontal, 40, 0)[sizeKinds[0] as 'width' | 'height']).toBe(
-        turned[sizeKinds[0] as 'width' | 'height'] + 40,
-      );
-      expect(applyHandleDrag(turned, vertical, 0, 40)[sizeKinds[1] as 'width' | 'height']).toBe(
-        turned[sizeKinds[1] as 'width' | 'height'] + 40,
-      );
-    }
-  });
-
-  it('el tirador del hueco sigue al puntero con el local girado', () => {
-    // Con giro de 90 el fondo del hueco crece hacia la derecha en pantalla (en 0, hacia arriba).
-    const turned = { ...L, rotation: 90 };
-    const depth = handle(turned, 'cutDepth');
-    expect(applyHandleDrag(turned, depth, 40, 0).cutDepth).toBe(520);
-    expect(applyHandleDrag(turned, depth, 0, 40).cutDepth).toBe(480);
-    const half = { ...U, rotation: 180 };
-    expect(applyHandleDrag(half, handle(half, 'cutDepth'), 0, 40).cutDepth).toBe(480);
-  });
-
-  it('los tiradores están sobre el contorno del local', () => {
-    for (const base of [RECTANGLE, L, U, T]) {
-      for (const rotation of [0, 90, 180, 270]) {
-        const turned = { ...base, rotation };
-        const rects = roomRects(turned);
-        for (const candidate of handlesFor(turned)) {
-          const touches = rects.some(
-            (rect) =>
-              candidate.x >= rect.x1 &&
-              candidate.x <= rect.x2 &&
-              candidate.y >= rect.y1 &&
-              candidate.y <= rect.y2,
+    for (const base of [L, U, T]) {
+      for (const candidate of handlesFor(base)) {
+        for (const direction of [-5000, 5000]) {
+          const moved = applyHandleDrag(
+            base,
+            candidate,
+            candidate.direction.x * direction,
+            candidate.direction.y * direction,
           );
-          expect(touches, `${base.shape} ${rotation} ${candidate.kind}`).toBe(true);
+          expect(roomProblems(moved), `${base.shape} ${candidate.wall} ${direction}`).toEqual([]);
         }
       }
     }
   });
 
-  it('applyHandleValue fija el valor con el mismo redondeo y los mismos límites', () => {
-    expect(applyHandleValue(RECTANGLE, handle(RECTANGLE, 'width'), 1250).width).toBe(1260);
-    expect(applyHandleValue(RECTANGLE, handle(RECTANGLE, 'width'), 3000).width).toBe(2000);
-    expect(applyHandleValue(L, handle(L, 'cutDepth'), 100).cutDepth).toBe(200);
+  it('el local cuadrado conserva el mismo ancho y alto', () => {
+    const wider = applyHandleDrag(SQUARE, handle(SQUARE, 'right'), 200, 0);
+    expect(wider).toMatchObject({ width: 1000, height: 1000 });
+    const lower = applyHandleDrag(SQUARE, handle(SQUARE, 'bottom'), 0, -200);
+    expect(lower).toMatchObject({ width: 600, height: 600 });
+    expect(roomProblems(wider)).toEqual([]);
+    for (const wall of ['top', 'left', 'right', 'bottom']) {
+      const moved = applyHandleDrag(SQUARE, handle(SQUARE, wall), -40, -40);
+      expect(moved.width).toBe(moved.height);
+    }
+  });
+
+  it('en U y T el entrante está centrado: una pared interior mueve la simétrica y el ancho cambia el doble', () => {
+    for (const base of [U, T]) {
+      for (const rotation of ROTATIONS) {
+        const turned = { ...base, rotation };
+        const walls = base === U ? ['innerLeft', 'innerRight'] : ['stemLeft', 'stemRight'];
+        for (const wall of walls) {
+          const tirador = handle(turned, wall);
+          // 20 unidades de plano hacia fuera: el ancho del entrante crece 40.
+          const move = moveHandleBy(
+            turned,
+            tirador,
+            tirador.direction.x * 20,
+            tirador.direction.y * 20,
+          );
+          expect(move.room.cutWidth).toBe(base.cutWidth + 40);
+          expect(move.room).toMatchObject({ width: base.width, height: base.height });
+          expect(move.shift).toEqual({ x: 0, y: 0 });
+          // Las dos paredes interiores se han movido 20 en sentidos opuestos: sigue centrado.
+          const before = [...lines(turned)].sort();
+          const after = [...lines(move.room)].sort();
+          expect(after).not.toEqual(before);
+          const centred = roomProblems(move.room);
+          expect(centred).toEqual([]);
+        }
+      }
+    }
+    expect(applyHandleDrag(U, handle(U, 'innerRight'), 20, 0).cutWidth).toBe(460);
+    expect(applyHandleDrag(U, handle(U, 'innerLeft'), -20, 0).cutWidth).toBe(460);
+    expect(applyHandleDrag(T, handle(T, 'stemRight'), -20, 0).cutWidth).toBe(300);
+    expect(applyHandleDrag(L, handle(L, 'notchInner'), -20, 0).cutWidth).toBe(500);
+    expect(applyHandleDrag(U, handle(U, 'notchTop'), 0, -20).cutDepth).toBe(460);
+  });
+
+  it('arrastrar hacia fuera agranda la medida de cualquier pared, en cada forma y giro', () => {
+    for (const base of SHAPES) {
+      for (const rotation of ROTATIONS) {
+        const turned = { ...base, rotation };
+        for (const candidate of handlesFor(turned)) {
+          const out = 20 / candidate.gain;
+          const moved = applyHandleDrag(
+            turned,
+            candidate,
+            candidate.direction.x * out,
+            candidate.direction.y * out,
+          );
+          expect(moved[candidate.kind], `${base.shape} ${rotation} ${candidate.wall}`).toBe(
+            turned[candidate.kind] + 20,
+          );
+        }
+      }
+    }
+  });
+
+  it('mover una pared solo mueve esa línea del contorno; las demás se quedan quietas respecto a las mesas', () => {
+    for (const base of [RECTANGLE, L]) {
+      for (const rotation of ROTATIONS) {
+        const turned = { ...base, rotation };
+        for (const candidate of handlesFor(turned)) {
+          const move = moveHandleBy(
+            turned,
+            candidate,
+            candidate.direction.x * 40,
+            candidate.direction.y * 40,
+          );
+          // Las líneas de antes, desplazadas lo que se desplazan las mesas, menos la pared movida.
+          const before = lines(turned, move.shift);
+          const after = lines(move.room);
+          const changed = [...after].filter((line) => !before.has(line));
+          const label = `${base.shape} ${rotation} ${candidate.wall}`;
+          expect(changed.length, label).toBe(1);
+          const moved =
+            candidate.direction.x !== 0
+              ? `v:${candidate.x + move.shift.x + 40 * candidate.direction.x}`
+              : `h:${candidate.y + move.shift.y + 40 * candidate.direction.y}`;
+          expect(changed[0], label).toBe(moved);
+        }
+      }
+    }
+  });
+
+  it('mover la pared izquierda deja la derecha fija y las mesas en su sitio', () => {
+    const left = handle(RECTANGLE, 'left');
+    const move = moveHandleBy(RECTANGLE, left, -40, 0);
+    expect(move.room.width).toBe(1240);
+    // Las mesas se desplazan lo que crece el local por la izquierda: no se mueven respecto a la pared derecha.
+    expect(move.shift).toEqual({ x: 40, y: 0 });
+    expect(bounds(move.room).width - move.shift.x).toBe(bounds(RECTANGLE).width);
+    const top = moveHandleBy(RECTANGLE, handle(RECTANGLE, 'top'), 0, -60);
+    expect(top.room.height).toBe(620);
+    expect(top.shift).toEqual({ x: 0, y: 60 });
+    // Las paredes de la derecha y de abajo no desplazan las mesas.
+    expect(moveHandleBy(RECTANGLE, handle(RECTANGLE, 'right'), 40, 0).shift).toEqual({
+      x: 0,
+      y: 0,
+    });
+    expect(moveHandleBy(RECTANGLE, handle(RECTANGLE, 'bottom'), 0, 40).shift).toEqual({
+      x: 0,
+      y: 0,
+    });
+  });
+
+  it('con el local girado las paredes de la izquierda y de arriba que se ven desplazan las mesas', () => {
+    for (const rotation of ROTATIONS) {
+      const turned = { ...L, rotation };
+      for (const candidate of handlesFor(turned)) {
+        if (candidate.wall === 'notchInner' || candidate.wall === 'notchTop') {
+          continue;
+        }
+        const move = moveHandleBy(
+          turned,
+          candidate,
+          candidate.direction.x * 40,
+          candidate.direction.y * 40,
+        );
+        const farSide = bounds(turned);
+        const onNearSide = candidate.direction.x < 0 || candidate.direction.y < 0;
+        const expected = onNearSide
+          ? { x: candidate.direction.x < 0 ? 40 : 0, y: candidate.direction.y < 0 ? 40 : 0 }
+          : { x: 0, y: 0 };
+        expect(move.shift, `L ${rotation} ${candidate.wall} ${farSide.width}`).toEqual(expected);
+      }
+    }
+  });
+
+  it('moveHandleTo fija el valor con el mismo redondeo y los mismos límites', () => {
+    expect(moveHandleTo(RECTANGLE, handle(RECTANGLE, 'right'), 1250).room.width).toBe(1260);
+    expect(moveHandleTo(RECTANGLE, handle(RECTANGLE, 'right'), 3000).room.width).toBe(2000);
+    expect(moveHandleTo(L, handle(L, 'notchTop'), 100).room.cutDepth).toBe(200);
+    // Subir el valor de la pared izquierda mueve las mesas.
+    expect(moveHandleTo(RECTANGLE, handle(RECTANGLE, 'left'), 1240).shift).toEqual({ x: 40, y: 0 });
   });
 });

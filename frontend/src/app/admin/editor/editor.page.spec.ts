@@ -141,10 +141,10 @@ describe('EditorPage', () => {
     await open();
     expect(page.querySelector('h1')?.textContent).toContain('Kafé del Puerto');
     expect(page.querySelector('app-plano')).not.toBeNull();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1200');
-    expect(slider('Ancho del local').getAttribute('aria-valuemin')).toBe('400');
-    expect(slider('Ancho del local').getAttribute('aria-valuemax')).toBe('2000');
-    expect(slider('Alto del local').getAttribute('aria-valuenow')).toBe('560');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1200');
+    expect(slider('Pared derecha').getAttribute('aria-valuemin')).toBe('400');
+    expect(slider('Pared derecha').getAttribute('aria-valuemax')).toBe('2000');
+    expect(slider('Pared inferior').getAttribute('aria-valuenow')).toBe('560');
     expect(pressed('Alargada')).toBe(true);
   });
 
@@ -183,45 +183,49 @@ describe('EditorPage', () => {
     await click('Reintentar');
     expectPlan('kafe').flush(PLAN);
     await settle();
-    expect(slider('Ancho del local')).toBeTruthy();
+    expect(slider('Pared derecha')).toBeTruthy();
   });
 
   it('las flechas mueven el tirador de 20 en 20 sin llamar a la API', async () => {
     await open();
-    await press('Ancho del local', 'ArrowRight');
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1220');
-    await press('Ancho del local', 'ArrowUp');
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1240');
-    await press('Ancho del local', 'ArrowLeft');
-    await press('Ancho del local', 'ArrowDown');
-    await press('Ancho del local', 'ArrowDown');
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1180');
-    await press('Alto del local', 'ArrowRight');
-    expect(slider('Alto del local').getAttribute('aria-valuenow')).toBe('580');
+    await press('Pared derecha', 'ArrowRight');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1220');
+    await press('Pared derecha', 'ArrowUp');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1240');
+    await press('Pared derecha', 'ArrowLeft');
+    await press('Pared derecha', 'ArrowDown');
+    await press('Pared derecha', 'ArrowDown');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1180');
+    await press('Pared inferior', 'ArrowRight');
+    expect(slider('Pared inferior').getAttribute('aria-valuenow')).toBe('580');
     // Otras teclas no hacen nada.
-    await press('Alto del local', 'a');
-    expect(slider('Alto del local').getAttribute('aria-valuenow')).toBe('580');
+    await press('Pared inferior', 'a');
+    expect(slider('Pared inferior').getAttribute('aria-valuenow')).toBe('580');
   });
 
   it('las flechas respetan el límite del rango', async () => {
     await open();
-    const max = slider('Ancho del local');
+    const max = slider('Pared derecha');
     for (let i = 0; i < 60; i++) {
       max.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     }
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('2000');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('2000');
   });
 
   it('cambiar de forma pone los tiradores del hueco', async () => {
     await open();
-    expect(page.querySelector('[aria-label="Ancho del hueco"]')).toBeNull();
+    expect(page.querySelector('[aria-label="Pared interior vertical del entrante"]')).toBeNull();
     await click('En L');
     expect(pressed('En L')).toBe(true);
     expect(pressed('Alargada')).toBe(false);
-    expect(slider('Ancho del hueco').getAttribute('aria-valuenow')).toBe('480');
-    expect(slider('Fondo del hueco').getAttribute('aria-valuenow')).toBe('480');
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1000');
+    expect(slider('Pared interior vertical del entrante').getAttribute('aria-valuenow')).toBe(
+      '480',
+    );
+    expect(slider('Pared interior horizontal del entrante').getAttribute('aria-valuenow')).toBe(
+      '480',
+    );
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1000');
   });
 
   it('Girar 90° cambia el giro del local y de sus mesas', async () => {
@@ -236,89 +240,89 @@ describe('EditorPage', () => {
   it('arrastrar un tirador cambia el local desde donde empezó, redondeando a 20, sin llamar a la API', async () => {
     await open();
     stubScreenMatrix();
-    const width = slider('Ancho del local');
+    const width = slider('Pared derecha');
     pointer('pointerdown', width, 1200, 280);
     pointer('pointermove', width, 1204, 280);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1200');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1200');
     pointer('pointermove', width, 1227, 280);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1220');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1220');
     pointer('pointermove', width, 1231, 290);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1240');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1240');
     pointer('pointerup', width, 1231, 290);
     pointer('pointermove', width, 1500, 290);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1240');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1240');
   });
 
   it('la escala del arrastre se fija al empezar aunque la matriz cambie durante él', async () => {
     await open();
     // 0,5 píxeles por unidad: 10 px = 20 unidades.
     const setZoom = stubScreenMatrix(0.5);
-    const width = slider('Ancho del local');
+    const width = slider('Pared derecha');
     pointer('pointerdown', width, 300, 100);
     pointer('pointermove', width, 310, 100);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1220');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1220');
     // El viewBox crece con el ancho y el navegador cambia la escala: no debe notarse.
     setZoom(0.05);
     pointer('pointermove', width, 320, 100);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1240');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1240');
     setZoom(4);
     pointer('pointermove', width, 330, 100);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1260');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1260');
     pointer('pointermove', width, 304, 100);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1200');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1200');
   });
 
   it('con el local girado 90 o 270 el arrastre horizontal mueve el alto y el vertical el ancho', async () => {
     await open();
     await click('Girar 90°');
     const setZoom = stubScreenMatrix(0.5);
-    const height = slider('Alto del local');
+    const height = slider('Pared derecha');
     pointer('pointerdown', height, 300, 100);
     pointer('pointermove', height, 310, 100);
     setZoom(0.1);
     pointer('pointermove', height, 320, 100);
     await settle();
-    expect(slider('Alto del local').getAttribute('aria-valuenow')).toBe('600');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('600');
     pointer('pointerup', height, 320, 100);
 
     await click('Girar 90°');
     await click('Girar 90°');
     expect(page.querySelector('svg.handles')).not.toBeNull();
     const setZoom270 = stubScreenMatrix(0.5);
-    const width = slider('Ancho del local');
+    const width = slider('Pared inferior');
     pointer('pointerdown', width, 300, 100);
     pointer('pointermove', width, 300, 110);
     setZoom270(0.1);
     pointer('pointermove', width, 300, 120);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1240');
+    expect(slider('Pared inferior').getAttribute('aria-valuenow')).toBe('1240');
     pointer('pointerup', width, 300, 120);
   });
 
   it('perder la captura del puntero termina el arrastre', async () => {
     await open();
     stubScreenMatrix();
-    const width = slider('Ancho del local');
+    const width = slider('Pared derecha');
     pointer('pointerdown', width, 1200, 280);
     pointer('pointermove', width, 1220, 280);
     pointer('lostpointercapture', width, 1220, 280);
     pointer('pointermove', width, 1300, 280);
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1220');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1220');
   });
 
   it('las flechas con Alt, Ctrl o Meta no mueven el tirador', async () => {
     await open();
     for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
-      slider('Ancho del local').dispatchEvent(
+      slider('Pared derecha').dispatchEvent(
         new KeyboardEvent('keydown', {
           key: 'ArrowRight',
           bubbles: true,
@@ -328,23 +332,61 @@ describe('EditorPage', () => {
       );
     }
     await settle();
-    expect(slider('Ancho del local').getAttribute('aria-valuenow')).toBe('1200');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1200');
   });
 
   it('los tiradores dicen su orientación y su valor con unidades', async () => {
     await open();
-    expect(slider('Ancho del local').getAttribute('aria-orientation')).toBe('horizontal');
-    expect(slider('Alto del local').getAttribute('aria-orientation')).toBe('vertical');
-    expect(slider('Ancho del local').getAttribute('aria-valuetext')).toBe('1200 unidades');
+    expect(slider('Pared derecha').getAttribute('aria-orientation')).toBe('horizontal');
+    expect(slider('Pared inferior').getAttribute('aria-orientation')).toBe('vertical');
+    expect(slider('Pared derecha').getAttribute('aria-valuetext')).toBe('1200 unidades');
     await click('Girar 90°');
-    // Girado, el ancho del local se mueve en vertical.
-    expect(slider('Ancho del local').getAttribute('aria-orientation')).toBe('vertical');
+    // Los nombres son por el lado en que se ve la pared: la derecha sigue moviéndose en horizontal.
+    expect(slider('Pared derecha').getAttribute('aria-orientation')).toBe('horizontal');
+    expect(slider('Pared derecha').getAttribute('aria-valuetext')).toBe('560 unidades');
+  });
+
+  it('hay un tirador por cada pared y todos tienen nombre', async () => {
+    await open(L_PLAN);
+    const labels = Array.from(page.querySelectorAll('[role="slider"]')).map((el) =>
+      el.getAttribute('aria-label'),
+    );
+    expect(labels.length).toBe(6);
+    expect(new Set(labels).size).toBe(6);
+    expect(labels).toContain('Pared izquierda');
+    expect(labels).toContain('Pared superior');
+  });
+
+  it('mover la pared izquierda con el ratón desplaza las mesas y deja la derecha donde estaba', async () => {
+    await open();
+    stubScreenMatrix();
+    const plano = harness.fixture.debugElement.query((el) => el.name === 'app-plano');
+    const left = slider('Pared izquierda');
+    pointer('pointerdown', left, 0, 280);
+    pointer('pointermove', left, -40, 280);
+    await settle();
+    expect(slider('Pared izquierda').getAttribute('aria-valuenow')).toBe('1240');
+    expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1240');
+    expect(plano.componentInstance.tables()[0]).toMatchObject({ x: 240, y: 450 });
+    // Volver al punto de partida deja las mesas donde estaban.
+    pointer('pointermove', left, 0, 280);
+    await settle();
+    expect(plano.componentInstance.tables()[0]).toMatchObject({ x: 200, y: 450 });
+    pointer('pointerup', left, 0, 280);
+  });
+
+  it('las flechas en la pared de arriba mueven las mesas con el origen', async () => {
+    await open();
+    const plano = harness.fixture.debugElement.query((el) => el.name === 'app-plano');
+    await press('Pared superior', 'ArrowRight');
+    expect(slider('Pared superior').getAttribute('aria-valuenow')).toBe('580');
+    expect(plano.componentInstance.tables()[0]).toMatchObject({ x: 200, y: 470 });
   });
 
   it('con el plano publicado, cambiar la forma avisa de las reservas activas', async () => {
     await open(L_PLAN);
     expect(page.querySelector('.notice')).toBeNull();
-    await press('Ancho del hueco', 'ArrowRight');
+    await press('Pared interior vertical del entrante', 'ArrowRight');
     expect(page.querySelector('.notice')?.textContent).toContain('reservas activas');
   });
 
@@ -367,6 +409,6 @@ describe('EditorPage', () => {
     expectPlan('otro').flush(L_PLAN);
     await settle();
     expect(page.querySelector('h1')?.textContent).toContain('Otro');
-    expect(slider('Ancho del hueco')).toBeTruthy();
+    expect(slider('Pared interior vertical del entrante')).toBeTruthy();
   });
 });

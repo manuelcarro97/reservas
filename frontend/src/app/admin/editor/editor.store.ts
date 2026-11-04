@@ -4,7 +4,7 @@ import { PlanResponse } from '../../core/api/models/plan-response';
 import { Room, RoomShape, roomRects, rotatePoint, validateLayout } from '../../plano/geometry';
 import { PlanoTable } from '../../plano/plano.component';
 import { ThemeKey } from '../../plano/themes';
-import { Handle, applyHandleDrag, applyHandleValue } from './room-handles';
+import { Handle, WallMove, moveHandleBy, moveHandleTo } from './room-handles';
 
 /** Medidas de cada forma al elegirla; son las de la referencia visual aprobada (variantes-plano.html). */
 export const SHAPE_DEFAULTS: Record<
@@ -34,8 +34,8 @@ export class EditorStore {
   private readonly themeState = signal<ThemeKey>('AZUL');
   /** Lo último cargado o guardado; `dirty` y `roomChanged` comparan contra esto. */
   private readonly saved = signal({ room: JSON.stringify(EMPTY_ROOM), all: '' });
-  /** Local al empezar el arrastre en curso, para calcular desde ahí el desplazamiento total. */
-  private dragStart: Room | null = null;
+  /** Local y mesas al empezar el arrastre en curso, para calcular desde ahí el desplazamiento total. */
+  private dragStart: { room: Room; tables: EditorTable[] } | null = null;
   /** Los ids temporales solo bajan: nunca se repite uno mientras la página siga abierta. */
   private lastTemporaryId = 0;
 
@@ -112,9 +112,9 @@ export class EditorStore {
     this.roomState.set({ ...room, rotation: (room.rotation + 90) % 360 });
   }
 
-  /** Empieza un arrastre: `dragHandle` calcula desde el local de ahora hasta `endDrag`. */
+  /** Empieza un arrastre: `dragHandle` calcula desde el local y las mesas de ahora hasta `endDrag`. */
   beginDrag(): void {
-    this.dragStart = this.room();
+    this.dragStart = { room: this.room(), tables: this.tables() };
   }
 
   endDrag(): void {
@@ -122,16 +122,29 @@ export class EditorStore {
   }
 
   /**
-   * Mueve el tirador (`dx`, `dy`) unidades de plano. Dentro de un arrastre son el desplazamiento total desde
-   * `beginDrag`; fuera, se suman al local de ahora.
+   * Mueve la pared del tirador (`dx`, `dy`) unidades de plano. Dentro de un arrastre son el desplazamiento total
+   * desde `beginDrag`; fuera, se suman al local de ahora. Si la pared está en el lado del origen (izquierda, arriba)
+   * las mesas se desplazan con el origen para quedarse donde estaban respecto a las paredes que no se mueven.
    */
   dragHandle(handle: Handle, dx: number, dy: number): void {
-    this.roomState.set(applyHandleDrag(this.dragStart ?? this.room(), handle, dx, dy));
+    const base = this.dragStart ?? { room: this.room(), tables: this.tables() };
+    this.apply(base, moveHandleBy(base.room, handle, dx, dy));
   }
 
-  /** Fija la medida del tirador (teclado). */
+  /** Fija la medida principal del tirador (teclado). */
   setHandleValue(handle: Handle, value: number): void {
-    this.roomState.update((room) => applyHandleValue(room, handle, value));
+    const base = { room: this.room(), tables: this.tables() };
+    this.apply(base, moveHandleTo(base.room, handle, value));
+  }
+
+  private apply(base: { tables: EditorTable[] }, move: WallMove): void {
+    this.roomState.set(move.room);
+    const { x, y } = move.shift;
+    this.tablesState.set(
+      x === 0 && y === 0
+        ? base.tables
+        : base.tables.map((table) => ({ ...table, x: table.x + x, y: table.y + y })),
+    );
   }
 
   /** Añade una mesa nueva con un id temporal negativo y devuelve ese id. */

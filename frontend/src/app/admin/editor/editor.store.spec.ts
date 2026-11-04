@@ -155,14 +155,42 @@ describe('EditorStore', () => {
   });
 
   it('dragHandle mueve la medida y marca cambios', () => {
-    const width = handlesFor(store.room()).find((handle) => handle.kind === 'width') as Handle;
+    const width = handlesFor(store.room()).find((handle) => handle.wall === 'right') as Handle;
     store.dragHandle(width, 41, 0);
     expect(store.room().width).toBe(1040);
     expect(store.dirty()).toBe(true);
   });
 
+  it('mover la pared izquierda o la de arriba desplaza las mesas; la derecha y la de abajo no', () => {
+    const wall = (name: string) =>
+      handlesFor(store.room()).find((handle) => handle.wall === name) as Handle;
+    const start = store.tables();
+    store.beginDrag();
+    store.dragHandle(wall('left'), -40, 0);
+    expect(store.room().width).toBe(1040);
+    store.tables().forEach((table, index) => {
+      expect({ x: table.x, y: table.y }).toEqual({ x: start[index].x + 40, y: start[index].y });
+    });
+    // Se calcula desde el principio del arrastre: volver deja las mesas como estaban.
+    store.dragHandle(wall('left'), 0, 0);
+    expect(store.tables()).toEqual(start);
+    store.dragHandle(wall('top'), 0, -20);
+    store.tables().forEach((table, index) => {
+      expect({ x: table.x, y: table.y }).toEqual({ x: start[index].x, y: start[index].y + 20 });
+    });
+    store.endDrag();
+    store.load(PLAN);
+    store.dragHandle(wall('bottom'), 0, 40);
+    store.dragHandle(wall('right'), 40, 0);
+    expect(store.tables()).toEqual(start);
+    // Las mesas no cambian de sitio respecto a las paredes que no se mueven.
+    store.load(PLAN);
+    store.dragHandle(wall('left'), -40, 0);
+    expect(validateLayout(store.room(), store.tables())).toEqual(validateLayout(L_ROOM, start));
+  });
+
   it('un arrastre se calcula desde donde empezó, no desde el último movimiento', () => {
-    const width = handlesFor(store.room()).find((handle) => handle.kind === 'width') as Handle;
+    const width = handlesFor(store.room()).find((handle) => handle.wall === 'right') as Handle;
     store.beginDrag();
     for (const total of [4, 8, 12, 16, 24]) {
       store.dragHandle(width, total, 0);
