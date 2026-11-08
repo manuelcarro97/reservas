@@ -515,31 +515,27 @@ describe('ShiftsPage', () => {
       expect(alertText()).toBeNull();
     });
 
-    it('closureWithReservationsShowsTheMessageAndAnyCodes', async () => {
+    it('closureWithReservationsShowsTheMessageAndCodes', async () => {
       await open();
       type('closure-date', '2026-11-12');
 
       await submit('closure-form');
       expectApi('POST', 'restaurants/kafe/closures').flush(
-        problem({ code: 'CLOSURE_HAS_RESERVATIONS', reservations: ['KAFE23456789ABCD'] }),
+        problem({
+          code: 'CLOSURE_HAS_RESERVATIONS',
+          reservations: ['KAFE23456789ABCD', 'KAFEZZZZ99998888'],
+        }),
         { status: 409, statusText: 'Conflict' },
       );
       await settle();
 
       expect(alertText()).toContain('reservas activas');
       expect(alertText()).toContain('KAFE23456789ABCD');
+      expect(alertText()).toContain('KAFEZZZZ99998888');
+      expect(page.querySelectorAll('[role="alert"] li')).toHaveLength(2);
       expect(closureItems()).toHaveLength(0);
-
-      // El backend de hoy no manda los códigos de un día cerrado: el mensaje sale igual, sin lista.
-      await submit('closure-form');
-      expectApi('POST', 'restaurants/kafe/closures').flush(
-        problem({ code: 'CLOSURE_HAS_RESERVATIONS' }),
-        { status: 409, statusText: 'Conflict' },
-      );
-      await settle();
-
-      expect(alertText()).toContain('reservas activas');
-      expect(page.querySelectorAll('[role="alert"] li')).toHaveLength(0);
+      // La fecha escrita se conserva para volver a probar tras cancelar las reservas.
+      expect(field('closure-date').value).toBe('2026-11-12');
     });
 
     it('removeClosureErrorsShowTheMessage', async () => {

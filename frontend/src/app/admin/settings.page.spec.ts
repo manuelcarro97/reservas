@@ -231,6 +231,7 @@ describe('SettingsPage', () => {
     });
 
     it.each([
+      [400, 'INVALID_REQUEST', 'Revisa el nombre y el plazo de cancelación.'],
       [400, 'BAD_REQUEST', 'No se pudieron guardar los ajustes'],
       [404, 'RESTAURANT_NOT_FOUND', 'ya no existe'],
       [429, 'RATE_LIMITED', 'Demasiadas acciones seguidas, espera un momento'],
@@ -512,6 +513,33 @@ describe('SettingsPage', () => {
 
       expect(TestBed.inject(Router).url).toBe('/panel');
       expect(TestBed.inject(MeStore).plans()).toEqual([]);
+    });
+
+    it('deletePlanDoesNotLeaveAnotherPlanTheOwnerMovedTo', async () => {
+      await openDeleteForm();
+
+      type('confirmSlug', 'kafe');
+      await click('Borrar el plano');
+      const deletion = expectApi('DELETE', 'restaurants/kafe');
+      // Mientras el borrado está en vuelo, el dueño cambia de plano desde la cabecera.
+      await harness.navigateByUrl('/panel/otro/ajustes');
+      expectApi('GET', 'restaurants/otro').flush({ slug: 'otro', name: 'Otro local' });
+      await settle();
+      deletion.flush(null, { status: 204, statusText: 'No Content' });
+      await settle();
+      // Se actualizan los datos del dueño, pero no se le saca del plano en el que está.
+      expectApi('GET', 'me').flush(
+        meWith({ plans: [{ slug: 'otro', name: 'Otro local', status: 'DRAFT' }] }),
+      );
+      await settle();
+
+      expect(TestBed.inject(Router).url).toBe('/panel/otro/ajustes');
+      expect(field('name').value).toBe('Otro local');
+      expect(
+        TestBed.inject(MeStore)
+          .plans()
+          .map((plan) => plan.slug),
+      ).toEqual(['otro']);
     });
 
     it('deletePlanConflictShowsCodes', async () => {

@@ -73,8 +73,6 @@ describe('admin errors', () => {
     const closure = conflict('CLOSURE_HAS_RESERVATIONS', ['KAFE2']);
     expect(adminErrorMessage(closure, 'otro')).toContain('reservas activas');
     expect(blockingReservations(closure)).toEqual(['KAFE2']);
-    // El backend aún no manda los códigos de un día cerrado: sin ellos, la lista queda vacía.
-    expect(blockingReservations(conflict('CLOSURE_HAS_RESERVATIONS'))).toEqual([]);
 
     expect(adminErrorMessage(conflict('SHIFT_OVERLAP'), 'otro')).toContain('solapa');
     expect(adminErrorMessage(conflict('SHIFT_LIMIT'), 'otro')).toContain('máximo de 10 turnos');

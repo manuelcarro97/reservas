@@ -28,7 +28,7 @@ const MESSAGES: Record<string, string> = {
   SHIFT_LIMIT: 'Has llegado al máximo de 10 turnos. Borra uno para poder añadir otro.',
   SHIFT_NOT_FOUND: 'Ese turno ya no existe. Se ha actualizado la lista.',
   CLOSURE_HAS_RESERVATIONS:
-    'Ese día tiene reservas activas. Cancélalas desde Reservas antes de cerrarlo.',
+    'Ese día tiene reservas activas. Cancela estas reservas antes de cerrarlo:',
   CLOSURE_DATE_OUT_OF_RANGE: 'Solo se pueden cerrar días desde hoy hasta dentro de 90 días.',
   TELEGRAM_UNAVAILABLE: 'Telegram no está disponible en este servidor.',
 };
@@ -61,7 +61,6 @@ const RESERVATION_CONFLICTS = new Set([
  * Códigos de las reservas que impiden un borrado (409 `PLAN_HAS_RESERVATIONS`), un cambio de la forma del local
  * (409 `ROOM_LOCKED`), quitar o reducir mesas (409 `TABLE_HAS_RESERVATIONS`), cambiar o borrar un turno (409
  * `SHIFT_HAS_RESERVATIONS`) o cerrar un día (409 `CLOSURE_HAS_RESERVATIONS`), en la propiedad `reservations`.
- * El backend aún no manda los códigos de un día cerrado: sin ellos la lista sale vacía.
  */
 export function blockingReservations(error: HttpErrorResponse): string[] {
   const code = errorCode(error);

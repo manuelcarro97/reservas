@@ -20,6 +20,7 @@ import { TelegramStatusResponse } from '../core/api/models/telegram-status-respo
 import { AdminAccountControllerService } from '../core/api/services/admin-account-controller.service';
 import { AdminPlanControllerService } from '../core/api/services/admin-plan-controller.service';
 import { AdminTelegramControllerService } from '../core/api/services/admin-telegram-controller.service';
+import { errorCode } from '../core/api-errors';
 import { ActionFailureComponent } from './action-failure.component';
 import { ActionFailure, actionFailure } from './admin-errors';
 import { embedSnippet } from './embed-snippet';
@@ -53,6 +54,8 @@ const MODES: readonly { value: BookingMode; label: string; help: string }[] = [
 ];
 
 const SAVE_FAILED = 'No se pudieron guardar los ajustes. Inténtalo de nuevo.';
+/** El 400 `INVALID_REQUEST` de los ajustes: el texto general habla del enlace de un plano nuevo, que aquí no se toca. */
+const INVALID_SETTINGS = 'Revisa el nombre y el plazo de cancelación.';
 const DELETE_FAILED = 'No se pudo borrar el plano. Inténtalo de nuevo.';
 const TELEGRAM_LINK_FAILED = 'No se pudo vincular Telegram. Inténtalo de nuevo.';
 const TELEGRAM_UNLINK_FAILED = 'No se pudo desvincular Telegram. Inténtalo de nuevo.';
@@ -249,7 +252,11 @@ export class SettingsPage {
       this.store.refresh();
     } catch (error) {
       if (slug === this.slug) {
-        this.failure.set(this.failureOf(error, SAVE_FAILED));
+        this.failure.set(
+          error instanceof HttpErrorResponse && errorCode(error) === 'INVALID_REQUEST'
+            ? { message: INVALID_SETTINGS, reservations: [] }
+            : this.failureOf(error, SAVE_FAILED),
+        );
       }
     } finally {
       if (slug === this.slug) {
@@ -363,7 +370,10 @@ export class SettingsPage {
     }
     // La cabecera y la lista de planos salen de MeStore.
     this.store.refresh();
-    await this.router.navigate(['/panel']);
+    // Si mientras tanto el dueño pasó a otro plano, se queda en él: solo se actualizan sus datos.
+    if (slug === this.slug) {
+      await this.router.navigate(['/panel']);
+    }
   }
 
   private failureOf(error: unknown, fallback: string): ActionFailure {
