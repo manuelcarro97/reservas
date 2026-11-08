@@ -71,7 +71,8 @@ describe('AdminShellComponent', () => {
   });
 
   afterEach(() => {
-    http.verify();
+    // Las consultas de avisos que se cancelan al cerrar la sesión o el panel no son un descuido.
+    http.verify({ ignoreCancelled: true });
   });
 
   async function settle(): Promise<void> {
@@ -212,6 +213,81 @@ describe('AdminShellComponent', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  function feedRequests(): TestRequest[] {
+    return http.match((request) => request.url.endsWith('/api/v1/admin/feed'));
+  }
+
+  /** El dueño `uid` está dentro cuando se abre el panel: el SDK ya cargado avisa de su sesión. */
+  async function signIn(uid: string): Promise<TestRequest[]> {
+    await flushPromises();
+    sdk.emit({ uid, email: `${uid}@example.com` });
+    await settle();
+    return feedRequests();
+  }
+
+  it('sessionEndedInAnotherTabSendsThePanelToLogin', async () => {
+    await open('/panel');
+    expect(host.querySelectorAll('li.plan')).toHaveLength(2);
+    await signIn('uid-a');
+
+    sdk.emit(null);
+    await settle();
+    await flushPromises();
+
+    expect(TestBed.inject(Router).url).toBe('/entrar');
+    expect(host.querySelector('li.plan')).toBeNull();
+    expect(host.querySelector('header')).toBeNull();
+  });
+
+  it('anotherOwnerSignedInElsewhereSendsThePanelToLoginInsteadOfShowingTheirData', async () => {
+    await open('/panel');
+    await signIn('uid-a');
+
+    sdk.emit({ uid: 'uid-b', email: 'otro@example.com' });
+    await settle();
+    await flushPromises();
+
+    expect(TestBed.inject(Router).url).toBe('/entrar');
+    // Ni los planos de A ni los avisos de B se pintan: el panel entero se retira y el feed de B no sigue.
+    expect(host.querySelector('li.plan')).toBeNull();
+    expect(host.querySelector('app-toast')).toBeNull();
+    const [feedOfB] = feedRequests();
+    expect(feedOfB?.cancelled ?? true).toBe(true);
+  });
+
+  it('renewingTheTokenOfTheSameOwnerKeepsThePanelOpen', async () => {
+    await open('/panel');
+    await signIn('uid-a');
+
+    sdk.emit({ uid: 'uid-a', email: 'nuevo@example.com' });
+    await settle();
+    await flushPromises();
+
+    expect(TestBed.inject(Router).url).toBe('/panel');
+    expect(host.querySelectorAll('li.plan')).toHaveLength(2);
+    expect(feedRequests()).toHaveLength(0);
+  });
+
+  it('signOutNavigatesToLoginOnlyOnce', async () => {
+    await open('/panel');
+    await signIn('uid-a');
+    // Como el SDK real: al salir avisa de que ya no hay sesión, y eso también manda a /entrar.
+    sdk.signOut = () => {
+      sdk.emit(null);
+      return Promise.resolve();
+    };
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
+
+    Array.from(host.querySelectorAll<HTMLButtonElement>('header button'))
+      .find((button) => button.textContent?.includes('Salir'))!
+      .click();
+    await settle();
+    await flushPromises();
+
+    expect(navigate.mock.calls.filter(([url]) => url === '/entrar')).toHaveLength(1);
+    expect(TestBed.inject(Router).url).toBe('/entrar');
   });
 
   it('eachVisitToThePanelLoadsItsOwnData', async () => {

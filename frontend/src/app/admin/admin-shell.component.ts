@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { MeStore } from './me.store';
@@ -11,6 +18,9 @@ import { PlanSwitcherComponent } from './plan-switcher.component';
  * marco público (`ShellComponent`), que no puede inyectar `AuthService` para no descargar Firebase en las páginas
  * públicas. Provee el `MeStore` que comparten la cabecera y las páginas del panel, y el `FeedService`, que consulta
  * los avisos mientras el panel está abierto.
+ *
+ * El panel pertenece al dueño con el que se abrió. Si la sesión cambia en otra pestaña (se cierra, o entra otro
+ * dueño), se sale a `/entrar`: seguir aquí dejaría pintados los planos del anterior y mezclaría los avisos del nuevo.
  */
 @Component({
   selector: 'app-admin-shell',
@@ -28,8 +38,23 @@ export class AdminShellComponent {
   protected readonly feed = inject(FeedService);
   protected readonly signOutError = signal<string | null>(null);
 
+  /** Solo cuenta quién es, no su email ni su token: renovarlos no cambia el valor. */
+  private readonly uid = computed(() => this.auth.user()?.uid ?? null);
+  /** Dueño con el que se abrió el panel; hasta que el SDK avisa de su sesión no hay ninguno. */
+  private ownerUid: string | null = null;
+  /** Salida a `/entrar` en curso: Salir y el cambio de sesión que provoca no navegan dos veces. */
+  private leaving: Promise<boolean> | null = null;
+
   constructor() {
     inject(MeStore).refresh();
+    effect(() => {
+      const uid = this.uid();
+      if (this.ownerUid === null) {
+        this.ownerUid = uid;
+      } else if (uid !== this.ownerUid) {
+        void this.leaveToLogin();
+      }
+    });
   }
 
   protected async signOut(): Promise<void> {
@@ -40,6 +65,11 @@ export class AdminShellComponent {
       this.signOutError.set('No se pudo salir. Inténtalo de nuevo.');
       return;
     }
-    await this.router.navigateByUrl('/entrar');
+    await this.leaveToLogin();
+  }
+
+  private leaveToLogin(): Promise<boolean> {
+    this.leaving ??= this.router.navigateByUrl('/entrar');
+    return this.leaving;
   }
 }
