@@ -27,7 +27,8 @@ const MESSAGES: Record<string, string> = {
   SHIFT_OVERLAP: 'Este turno se solapa con otro. Cambia las horas o los días.',
   SHIFT_LIMIT: 'Has llegado al máximo de 10 turnos. Borra uno para poder añadir otro.',
   SHIFT_NOT_FOUND: 'Ese turno ya no existe. Se ha actualizado la lista.',
-  CLOSURE_HAS_RESERVATIONS: 'Ese día tiene reservas activas. Cancélalas antes de cerrarlo:',
+  CLOSURE_HAS_RESERVATIONS:
+    'Ese día tiene reservas activas. Cancélalas desde Reservas antes de cerrarlo.',
   CLOSURE_DATE_OUT_OF_RANGE: 'Solo se pueden cerrar días desde hoy hasta dentro de 90 días.',
   TELEGRAM_UNAVAILABLE: 'Telegram no está disponible en este servidor.',
 };
