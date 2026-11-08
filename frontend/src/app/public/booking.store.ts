@@ -81,7 +81,7 @@ export function addDays(isoDate: string, days: number): string {
   return localIsoDate(new Date(year, month - 1, day + days));
 }
 
-function toRoom(dto: RoomDto | undefined): Room {
+export function toRoom(dto: RoomDto | undefined): Room {
   return {
     shape: dto?.shape ?? 'RECTANGLE',
     width: dto?.width ?? 0,
@@ -92,7 +92,7 @@ function toRoom(dto: RoomDto | undefined): Room {
   };
 }
 
-function toTable(dto: TableDto): PlanoTable {
+export function toTable(dto: TableDto): PlanoTable {
   return {
     id: dto.id ?? 0,
     label: dto.label ?? '',

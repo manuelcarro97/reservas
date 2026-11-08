@@ -1,0 +1,195 @@
+@switch (store.status()) {
+  @case ('loading') {
+    <p class="state" role="status">Cargando las reservas…</p>
+  }
+  @case ('notFound') {
+    <p class="state" role="alert">Este plano no existe.</p>
+    <p><a routerLink="/panel">Volver a tus planos</a></p>
+  }
+  @case ('error') {
+    <p class="state" role="alert">No se pudo cargar el plano.</p>
+    <button type="button" (click)="retry()">Reintentar</button>
+  }
+  @case ('ready') {
+    <h1>Reservas · {{ store.planName() }}</h1>
+
+    <div class="toolbar">
+      <label>
+        Fecha
+        <input type="date" name="date" [value]="store.date()" (change)="onDateChange($event)" />
+      </label>
+      <fieldset class="shifts">
+        <legend>Turno</legend>
+        @for (shift of store.shifts(); track shift.id) {
+          <button
+            type="button"
+            [attr.aria-pressed]="shift.id === store.shiftId()"
+            (click)="store.selectShift(shift.id ?? 0)"
+          >
+            {{ shift.name }} · {{ shift.start?.slice(0, 5) }}
+          </button>
+        } @empty {
+          <span class="hint">Ese día no hay turnos.</span>
+        }
+      </fieldset>
+    </div>
+
+    <div class="tabs" role="group" aria-label="Qué reservas ver">
+      <button
+        type="button"
+        [attr.aria-pressed]="store.tab() === 'day'"
+        (click)="store.setTab('day')"
+      >
+        Del día
+      </button>
+      <button
+        type="button"
+        [attr.aria-pressed]="store.tab() === 'pending'"
+        (click)="store.setTab('pending')"
+      >
+        Pendientes ({{ store.pending().length }})
+      </button>
+    </div>
+
+    @if (store.error(); as message) {
+      <p class="error" role="alert">{{ message }}</p>
+    }
+    @if (store.notice(); as message) {
+      <p class="notice" role="status">{{ message }}</p>
+    }
+    @if (store.loadFailed()) {
+      <p class="error" role="alert">
+        No se pudieron cargar los datos.
+        <button type="button" (click)="store.refresh()">Reintentar</button>
+      </p>
+    }
+
+    @if (store.questionText(); as question) {
+      <div class="question" role="group" aria-label="Confirmación">
+        <p>{{ question.text }}</p>
+        <button type="button" [disabled]="store.busy()" (click)="store.answerYes()">
+          {{ question.yes }}
+        </button>
+        <button type="button" (click)="store.dismissQuestion()">No</button>
+      </div>
+    }
+
+    @if (store.assigning(); as target) {
+      <section class="assign" aria-label="Elegir mesa">
+        <p>
+          Mesa para {{ target.customerName }} ({{ target.partySize }} personas): elige una
+          sugerencia o haz clic en una mesa libre del plano.
+        </p>
+        @if (store.suggestions(); as suggestions) {
+          @if (suggestions.length > 0) {
+            <div class="suggestions">
+              @for (suggestion of suggestions; track suggestion.tableId) {
+                <button
+                  type="button"
+                  [disabled]="store.busy()"
+                  (click)="store.assign(target, suggestion.tableId ?? 0)"
+                >
+                  {{ tableName(suggestion.label ?? '') }} · {{ suggestion.seats }} plazas
+                </button>
+              }
+            </div>
+          } @else {
+            <p class="hint">Ninguna mesa libre sirve para este grupo en este turno.</p>
+          }
+        } @else {
+          <p class="hint" role="status">Buscando mesas…</p>
+        }
+        <button type="button" (click)="store.cancelAssign()">Dejar de elegir mesa</button>
+      </section>
+    }
+
+    @if (store.tab() === 'day') {
+      <app-plano
+        [room]="store.room()"
+        [tables]="store.tables()"
+        [theme]="store.theme()"
+        [states]="store.tableStates()"
+        [interactive]="store.assigning() !== null"
+        (tableSelected)="store.selectTable($event)"
+      />
+      <p class="legend">Gris: pendiente de confirmar. Rojo: reservada.</p>
+    }
+
+    @let rows = store.tab() === 'day' ? store.dayRows() : store.pendingRows();
+    @if (store.tab() === 'pending' || store.day() !== null) {
+      <ul class="reservations">
+        @for (reservation of rows; track reservation.id) {
+          <li
+            class="reservation"
+            [class.inactive]="
+              reservation.status === 'CANCELLED' || reservation.status === 'NO_SHOW'
+            "
+          >
+            <div class="summary">
+              <strong class="name">{{ reservation.customerName }}</strong>
+              <span class="when">{{ store.whenText(reservation, store.tab() === 'pending') }}</span>
+              <span>{{ reservation.partySize }} personas</span>
+              <span class="table">{{ tableText(reservation) }}</span>
+              <span class="status">{{ statusText(reservation) }}</span>
+              <span class="phone">{{ reservation.customerPhone }}</span>
+              <span class="code">{{ reservation.code }}</span>
+            </div>
+            <div class="actions">
+              @if (reservation.status === 'PENDING') {
+                <button
+                  type="button"
+                  [disabled]="store.busy()"
+                  (click)="store.confirm(reservation)"
+                >
+                  Confirmar
+                </button>
+                <button
+                  type="button"
+                  [disabled]="store.busy()"
+                  (click)="store.ask('reject', reservation)"
+                >
+                  Rechazar
+                </button>
+              }
+              @if (reservation.status === 'CONFIRMED') {
+                <button
+                  type="button"
+                  [disabled]="store.busy()"
+                  (click)="store.ask('cancel', reservation)"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  [disabled]="store.busy()"
+                  (click)="store.ask('noShow', reservation)"
+                >
+                  No presentado
+                </button>
+              }
+              @if (reservation.status === 'PENDING' || reservation.status === 'CONFIRMED') {
+                <button
+                  type="button"
+                  [disabled]="store.busy()"
+                  (click)="store.startAssign(reservation)"
+                >
+                  {{ reservation.tableId ? 'Cambiar mesa' : 'Asignar mesa' }}
+                </button>
+              }
+            </div>
+          </li>
+        } @empty {
+          <li class="hint">
+            {{
+              store.tab() === 'day'
+                ? 'No hay reservas en este turno.'
+                : 'No hay reservas pendientes.'
+            }}
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="state" role="status">Cargando las reservas…</p>
+    }
+  }
+}

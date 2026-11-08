@@ -18,8 +18,12 @@ export const adminRoutes: Routes = [
     children: [
       { path: '', loadComponent: () => import('./plans.page').then((m) => m.PlansPage) },
       { path: 'cuenta', loadComponent: () => import('./account.page').then((m) => m.AccountPage) },
-      // Provisionales: cada tarea (F8 Turnos y Ajustes, F9 Reservas) sustituye la suya.
-      { path: ':slug', loadComponent: placeholder },
+      {
+        path: ':slug',
+        loadComponent: () =>
+          import('./reservations/reservations.page').then((m) => m.ReservationsPage),
+      },
+      // Provisionales: cada tarea (F10 Turnos y Ajustes) sustituye la suya.
       {
         path: ':slug/plano',
         loadComponent: () => import('./editor/editor.page').then((m) => m.EditorPage),

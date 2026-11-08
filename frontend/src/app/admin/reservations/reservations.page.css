@@ -1,0 +1,98 @@
+h1 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+}
+
+.state,
+.hint,
+.legend {
+  color: #5b6877;
+}
+
+/* Funcional y sobrio; el pulido visual llega en una tarea posterior. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.shifts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+button[aria-pressed='true'] {
+  font-weight: 700;
+  outline: 2px solid #2f9e68;
+}
+
+.error {
+  color: #b3261e;
+}
+
+.notice {
+  color: #1f6f4a;
+}
+
+.question,
+.assign {
+  border: 1px solid #c4ccd6;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+app-plano {
+  display: block;
+  max-width: 48rem;
+}
+
+.reservations {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.reservation {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid #e1e6ec;
+  padding: 0.6rem 0;
+}
+
+.reservation.inactive {
+  color: #7a8696;
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

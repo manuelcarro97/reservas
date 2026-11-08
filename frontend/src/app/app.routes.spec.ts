@@ -106,7 +106,21 @@ describe('routes', () => {
       harness.detectChanges();
 
       expect(TestBed.inject(Router).url).toBe(href);
-      if (href === '/panel/kafe/plano') {
+      if (href === '/panel/kafe') {
+        // Las reservas del día ya existen: piden el plano y, con él, la lista del día y los pendientes.
+        await flushPromises();
+        backend
+          .expectOne((request) => request.url.endsWith('/api/v1/admin/restaurants/kafe'))
+          .flush({ slug: 'kafe', name: 'Kafé', status: 'DRAFT', tables: [], shifts: [] });
+        await harness.fixture.whenStable();
+        harness.detectChanges();
+        backend
+          .match((request) => request.url.endsWith('/api/v1/admin/restaurants/kafe/reservations'))
+          .forEach((request) => request.flush([]));
+        await harness.fixture.whenStable();
+        harness.detectChanges();
+        expect(host.textContent).toContain('Reservas · Kafé');
+      } else if (href === '/panel/kafe/plano') {
         // El editor ya existe: pide el plano al abrirse (el interceptor espera al token, de ahí el await).
         await flushPromises();
         backend
