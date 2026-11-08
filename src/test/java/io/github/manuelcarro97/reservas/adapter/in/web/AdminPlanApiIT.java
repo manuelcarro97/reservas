@@ -74,6 +74,14 @@ class AdminPlanApiIT extends PostgresIT {
 	}
 
 	@Test
+	void getReturnsTheTimeZoneOfThePlan() throws Exception {
+		createPlan("owner-a", "mi-local").andExpect(status().isCreated());
+
+		as("owner-a", get(PLANS + "/mi-local")).andExpect(status().isOk())
+			.andExpect(jsonPath("$.timeZone").value("Europe/Madrid"));
+	}
+
+	@Test
 	void responseNeverContainsOwnerUid() throws Exception {
 		String created = createPlan("owner-a", "mi-local").andReturn().getResponse().getContentAsString();
 		String read = as("owner-a", get(PLANS + "/mi-local")).andReturn().getResponse().getContentAsString();

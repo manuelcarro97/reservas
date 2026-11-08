@@ -363,6 +363,9 @@
               "NOCHE"
             ],
             "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
           }
         },
         "type": "object"
