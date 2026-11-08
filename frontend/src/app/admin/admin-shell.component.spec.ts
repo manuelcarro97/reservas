@@ -41,9 +41,11 @@ describe('AdminShellComponent', () => {
   let sdk: FakeAuthSdk;
   let harness: RouterTestingHarness;
   let host: HTMLElement;
+  let refuseNextLeave: boolean;
 
   beforeEach(async () => {
     sdk = new FakeAuthSdk();
+    refuseNextLeave = false;
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -57,7 +59,18 @@ describe('AdminShellComponent', () => {
               { path: '', component: PlansPage },
               { path: 'cuenta', component: AccountPage },
               { path: ':slug', component: ReservationsStub },
-              { path: ':slug/plano', component: EditorStub },
+              {
+                path: ':slug/plano',
+                component: EditorStub,
+                // Como `leaveEditorGuard` con cambios sin guardar: el dueño puede decidir quedarse.
+                canDeactivate: [
+                  () => {
+                    const stay = refuseNextLeave;
+                    refuseNextLeave = false;
+                    return !stay;
+                  },
+                ],
+              },
             ],
           },
           { path: 'entrar', component: LoginStub },
@@ -287,6 +300,29 @@ describe('AdminShellComponent', () => {
     await flushPromises();
 
     expect(navigate.mock.calls.filter(([url]) => url === '/entrar')).toHaveLength(1);
+    expect(TestBed.inject(Router).url).toBe('/entrar');
+  });
+
+  it('signOutStillLeavesAfterAPageRefusedToBeLeftTheFirstTime', async () => {
+    await open('/panel/tapas/plano');
+    await signIn('uid-a');
+    const signOutButton = () =>
+      Array.from(host.querySelectorAll<HTMLButtonElement>('header button')).find((button) =>
+        button.textContent?.includes('Salir'),
+      )!;
+
+    // El dueño sale, la página (el editor con cambios sin guardar) le pregunta y se queda.
+    refuseNextLeave = true;
+    signOutButton().click();
+    await settle();
+    await flushPromises();
+    expect(TestBed.inject(Router).url).toBe('/panel/tapas/plano');
+
+    // Salir otra vez no puede reutilizar la navegación que ya terminó en `false`.
+    signOutButton().click();
+    await settle();
+    await flushPromises();
+
     expect(TestBed.inject(Router).url).toBe('/entrar');
   });
 

@@ -69,7 +69,9 @@ export class AdminShellComponent {
   }
 
   private leaveToLogin(): Promise<boolean> {
-    this.leaving ??= this.router.navigateByUrl('/entrar');
+    // Solo mientras dura: si la página se negó a que se saliera (editor con cambios sin guardar), el siguiente intento
+    // tiene que navegar de nuevo.
+    this.leaving ??= this.router.navigateByUrl('/entrar').finally(() => (this.leaving = null));
     return this.leaving;
   }
 }
