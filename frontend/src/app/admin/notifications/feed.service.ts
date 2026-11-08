@@ -37,6 +37,18 @@ export const BROWSER_NOTIFICATION = new InjectionToken<typeof Notification | nul
   },
 );
 
+/**
+ * El dueño tiene el panel delante: pestaña visible y con foco. Entonces basta el mensaje emergente; el contador del
+ * título, el sonido y la notificación del navegador son para cuando no está mirando. Se inyecta para simularlo.
+ */
+export const TAB_IN_VIEW = new InjectionToken<() => boolean>('TAB_IN_VIEW', {
+  providedIn: 'root',
+  factory: () => {
+    const document = inject(DOCUMENT);
+    return () => document.visibilityState === 'visible' && document.hasFocus();
+  },
+});
+
 /** Mensaje emergente: `text` lo formatea el backend; `slug` es el plano al que lleva al hacer clic. */
 export interface FeedToast {
   id: number;
@@ -76,6 +88,7 @@ export class FeedService {
   private readonly now = inject(NOW);
   private readonly notification = inject(BROWSER_NOTIFICATION);
   private readonly document = inject(DOCUMENT);
+  private readonly tabInView = inject(TAB_IN_VIEW);
 
   private readonly unseen = signal(0);
   private readonly toastList = signal<readonly FeedToast[]>([]);
@@ -85,6 +98,8 @@ export class FeedService {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private request: Subscription | undefined;
   private since = '';
+  /** Ya respondió la consulta de referencia del arranque: desde entonces lo que llega son avisos. */
+  private referenced = false;
   private titleChanged = false;
   private nextToastId = 1;
   private readonly remembered = new Set<string>();
@@ -152,10 +167,16 @@ export class FeedService {
     }
   }
 
+  /**
+   * La primera consulta es de referencia y sale al instante: con `since` = hora del navegador, que puede ir
+   * adelantada, solo sirve para conocer la hora del servidor. Sus eventos no se avisan (ya existían al abrir el
+   * panel) y su `now` es el primer `since` real; así un reloj adelantado no esconde reservas.
+   */
   private start(): void {
     this.since = this.now().toISOString();
+    this.referenced = false;
     this.listen();
-    this.schedule();
+    this.poll();
   }
 
   /** Para la consulta y deja el servicio como nuevo: el siguiente dueño no hereda avisos ni contador. */
@@ -183,7 +204,13 @@ export class FeedService {
       next: (feed) => {
         try {
           this.since = feed.now ?? this.since;
-          this.receive(feed.events ?? []);
+          if (this.referenced) {
+            this.receive(feed.events ?? []);
+          } else {
+            // Referencia: se marcan como vistos para que el solape del servidor no los avise después.
+            (feed.events ?? []).forEach((event) => this.remember(event));
+            this.referenced = true;
+          }
         } finally {
           this.schedule();
         }
@@ -198,15 +225,22 @@ export class FeedService {
     if (fresh.length === 0) {
       return;
     }
-    this.unseen.update((count) => count + fresh.length);
-    this.pageTitle.setTitle(`(${this.unseen()}) ${PAGE_TITLE}`);
-    this.titleChanged = true;
+    // Con el panel delante basta el mensaje; el resto es para quien no está mirando.
+    const inView = this.tabInView();
+    if (!inView) {
+      this.unseen.update((count) => count + fresh.length);
+      this.pageTitle.setTitle(`(${this.unseen()}) ${PAGE_TITLE}`);
+      this.titleChanged = true;
+    }
     for (const event of fresh) {
       this.addToast(event);
-      this.browserNotification(event);
+      if (!inView) {
+        this.browserNotification(event);
+      }
+      // La lista de reservas abierta se recarga también con el panel a la vista.
       this.newEvents.next(event);
     }
-    if (!this.muted()) {
+    if (!inView && !this.muted()) {
       this.chime.play();
     }
   }

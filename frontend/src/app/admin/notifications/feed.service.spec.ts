@@ -13,7 +13,7 @@ import { FeedEvent } from '../../core/api/models/feed-event';
 import { AuthUser } from '../../core/auth/auth-sdk';
 import { AuthService } from '../../core/auth/auth.service';
 import { Chime } from './chime.service';
-import { BROWSER_NOTIFICATION, FeedService } from './feed.service';
+import { BROWSER_NOTIFICATION, FeedService, TAB_IN_VIEW } from './feed.service';
 
 const START = new Date('2026-11-09T10:00:00.000Z');
 const OWNER: AuthUser = { uid: 'uid-1', email: 'dueno@example.com' };
@@ -44,8 +44,11 @@ describe('FeedService', () => {
   let chime: { play: ReturnType<typeof vi.fn>; unlock: ReturnType<typeof vi.fn> };
   let title: Title;
   let feed: FeedService;
+  /** Si el dueño tiene el panel a la vista (pestaña visible y con foco). Por defecto no: así avisa todo. */
+  let inView: boolean;
 
   beforeEach(() => {
+    inView = false;
     vi.useFakeTimers();
     vi.setSystemTime(START);
     localStorage.clear();
@@ -75,6 +78,7 @@ describe('FeedService', () => {
         { provide: AuthService, useValue: { user } },
         { provide: Chime, useValue: chime },
         { provide: BROWSER_NOTIFICATION, useValue: notification },
+        { provide: TAB_IN_VIEW, useValue: () => inView },
         FeedService,
       ],
     });
@@ -84,9 +88,15 @@ describe('FeedService', () => {
   }
 
   /** Crea el servicio y deja que arranque (el efecto que mira la sesión corre en el primer `tick`). */
-  function start(): void {
+  function startRaw(): void {
     feed = TestBed.inject(FeedService);
     TestBed.tick();
+  }
+
+  /** Arranca y responde la consulta de referencia del primer instante (sin eventos); su `now` es el primer `since`. */
+  function start(referenceNow = START.toISOString()): void {
+    startRaw();
+    expectFeed().flush({ events: [], now: referenceNow });
   }
 
   function expectFeed(): TestRequest {
@@ -107,7 +117,9 @@ describe('FeedService', () => {
   }
 
   it('pollsEvery30Seconds', () => {
-    start();
+    startRaw();
+    // La consulta de referencia sale al arrancar; las demás, cada 30 s desde que responde la anterior.
+    expectFeed().flush({ events: [], now: new Date().toISOString() });
 
     vi.advanceTimersByTime(POLL_MS - 1);
     expectNoFeed();
@@ -127,10 +139,10 @@ describe('FeedService', () => {
   });
 
   it('usesServerNowAsNextSince', () => {
-    start();
+    start('2026-11-09T10:00:00.250Z');
 
-    // La primera vez, la hora del navegador; después, siempre el `now` del servidor.
-    expect(poll([], '2026-11-09T10:00:30.500Z')).toBe(START.toISOString());
+    // Siempre el `now` del servidor, empezando por el de la consulta de referencia.
+    expect(poll([], '2026-11-09T10:00:30.500Z')).toBe('2026-11-09T10:00:00.250Z');
     expect(poll([], '2026-11-09T10:01:00.250Z')).toBe('2026-11-09T10:00:30.500Z');
     expect(poll([])).toBe('2026-11-09T10:01:00.250Z');
   });
@@ -145,9 +157,63 @@ describe('FeedService', () => {
     expect(feed.toasts()).toHaveLength(1);
   });
 
+  it('keepsTheSinceWhenTheResponseHasNoNow', () => {
+    start('2026-11-09T10:00:05.000Z');
+    vi.advanceTimersByTime(POLL_MS);
+    expectFeed().flush({ events: [] });
+
+    expect(poll([])).toBe('2026-11-09T10:00:05.000Z');
+  });
+
+  it('referenceQueryRunsAtStartWithTheClientTimeAndShowsNothing', () => {
+    const subscriber = vi.fn();
+    FakeNotification.permission = 'granted';
+    startRaw();
+    feed.events.subscribe(subscriber);
+
+    const reference = expectFeed();
+    expect(reference.request.params.get('since')).toBe(START.toISOString());
+    reference.flush({ events: [event(1)], now: '2026-11-09T10:00:00.400Z' });
+
+    // Lo que ya existía al abrir el panel no es un aviso: ni mensaje, ni contador, ni sonido, ni evento.
+    expect(feed.toasts()).toEqual([]);
+    expect(feed.pendingCount()).toBe(0);
+    expect(chime.play).not.toHaveBeenCalled();
+    expect(FakeNotification.created).toEqual([]);
+    expect(subscriber).not.toHaveBeenCalled();
+
+    // Queda marcado como visto: el solape del servidor no lo avisa después. El `since` real es el `now` de la referencia.
+    expect(poll([event(1)])).toBe('2026-11-09T10:00:00.400Z');
+    expect(feed.toasts()).toEqual([]);
+    poll([event(2)]);
+    expect(feed.toasts().map((toast) => toast.text)).toEqual(['Nueva reserva 2']);
+  });
+
+  it('aFailedReferenceQueryIsRetriedAsAReferenceAfter30Seconds', () => {
+    startRaw();
+    expectFeed().flush(null, { status: 503, statusText: 'Unavailable' });
+    expectNoFeed();
+
+    // A los 30 s se reintenta con el mismo `since`, y lo que traiga sigue sin ser un aviso.
+    expect(poll([event(1)], '2026-11-09T10:00:31.000Z')).toBe(START.toISOString());
+    expect(feed.toasts()).toEqual([]);
+    expect(feed.pendingCount()).toBe(0);
+
+    expect(poll([event(2)])).toBe('2026-11-09T10:00:31.000Z');
+    expect(feed.toasts().map((toast) => toast.text)).toEqual(['Nueva reserva 2']);
+  });
+
+  it('aClockAheadOfTheServerDoesNotHideReservations', () => {
+    // El reloj del navegador va 90 s adelantado: la referencia devuelve la hora del servidor, que es la que vale.
+    start('2026-11-09T09:58:30.000Z');
+
+    expect(poll([event(7)])).toBe('2026-11-09T09:58:30.000Z');
+    expect(feed.toasts()).toHaveLength(1);
+  });
+
   it('doesNotPollWithoutASession', () => {
     user.set(null);
-    start();
+    startRaw();
 
     vi.advanceTimersByTime(POLL_MS * 2);
 
@@ -156,11 +222,10 @@ describe('FeedService', () => {
 
   it('startsWhenTheSessionArrives', () => {
     user.set(null);
-    start();
+    startRaw();
 
     user.set(OWNER);
     TestBed.tick();
-    vi.advanceTimersByTime(POLL_MS);
 
     expectFeed().flush({ events: [], now: new Date().toISOString() });
   });
@@ -426,10 +491,100 @@ describe('FeedService', () => {
     vi.setSystemTime(new Date('2026-11-09T11:00:00.000Z'));
     user.set({ uid: 'uid-2', email: 'otro@example.com' });
     TestBed.tick();
+    // La referencia vuelve a salir con la hora actual del navegador.
+    const reference = expectFeed();
+    expect(reference.request.params.get('since')).toBe('2026-11-09T11:00:00.000Z');
+    reference.flush({ events: [], now: '2026-11-09T10:59:59.000Z' });
 
-    // `since` vuelve a ser la hora actual y la reserva 1 ya no cuenta como vista.
-    expect(poll([event(1)])).toBe('2026-11-09T11:00:00.000Z');
+    // Su `since` es el `now` del servidor y la reserva 1 ya no cuenta como vista.
+    expect(poll([event(1)])).toBe('2026-11-09T10:59:59.000Z');
     expect(feed.pendingCount()).toBe(1);
+  });
+
+  it('switchingDirectlyFromOneOwnerToAnotherRestartsASingleLoopFromScratch', () => {
+    start();
+    poll([event(1)]);
+    expect(feed.toasts()).toHaveLength(1);
+    expect(feed.pendingCount()).toBe(1);
+
+    // A→B sin pasar por `null`.
+    user.set({ uid: 'uid-2', email: 'otro@example.com' });
+    TestBed.tick();
+    expect(feed.toasts()).toEqual([]);
+    expect(feed.pendingCount()).toBe(0);
+    expect(title.getTitle()).toBe('Reservas');
+    expectFeed().flush({ events: [], now: '2026-11-09T10:00:31.000Z' });
+
+    // Un solo bucle: cada intervalo sale una consulta, no dos.
+    poll([event(1)]);
+    expect(feed.pendingCount()).toBe(1);
+    poll([]);
+    poll([]);
+  });
+
+  it('afterSignOutFocusAndGesturesDoNothing', () => {
+    start();
+    poll([event(1)]);
+    user.set(null);
+    TestBed.tick();
+    document.title = 'Otra página';
+
+    window.dispatchEvent(new Event('focus'));
+    document.dispatchEvent(new Event('visibilitychange'));
+    document.dispatchEvent(new Event('pointerdown'));
+    document.dispatchEvent(new Event('keydown'));
+
+    expect(chime.unlock).not.toHaveBeenCalled();
+    expect(title.getTitle()).toBe('Otra página');
+  });
+
+  describe('whenThePanelIsInView', () => {
+    it('showsTheToastButNoCounterSoundOrBrowserNotification', () => {
+      const subscriber = vi.fn();
+      FakeNotification.permission = 'granted';
+      inView = true;
+      start();
+      feed.events.subscribe(subscriber);
+
+      poll([event(1)]);
+
+      expect(feed.toasts().map((toast) => toast.text)).toEqual(['Nueva reserva 1']);
+      expect(feed.pendingCount()).toBe(0);
+      expect(title.getTitle()).toBe('Reservas');
+      expect(chime.play).not.toHaveBeenCalled();
+      expect(FakeNotification.created).toEqual([]);
+      // La lista de reservas abierta se recarga igualmente.
+      expect(subscriber).toHaveBeenCalledTimes(1);
+    });
+
+    it('aTabOutOfViewGetsEverything', () => {
+      const subscriber = vi.fn();
+      FakeNotification.permission = 'granted';
+      inView = false;
+      start();
+      feed.events.subscribe(subscriber);
+
+      poll([event(1)]);
+
+      expect(feed.toasts()).toHaveLength(1);
+      expect(feed.pendingCount()).toBe(1);
+      expect(title.getTitle()).toBe('(1) Reservas');
+      expect(chime.play).toHaveBeenCalledTimes(1);
+      expect(FakeNotification.created).toHaveLength(1);
+      expect(subscriber).toHaveBeenCalledTimes(1);
+    });
+
+    it('theChoiceIsMadeForEachBatch', () => {
+      start();
+
+      inView = true;
+      poll([event(1)]);
+      inView = false;
+      poll([event(2)]);
+
+      expect(feed.pendingCount()).toBe(1);
+      expect(chime.play).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('stopsWhenItsOwnerIsDestroyed', () => {
@@ -451,5 +606,25 @@ describe('FeedService', () => {
     document.dispatchEvent(new Event('pointerdown'));
 
     expect(chime.unlock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('TAB_IN_VIEW', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(document, 'visibilityState');
+  });
+
+  function inView(visibility: DocumentVisibilityState, focused: boolean): boolean {
+    Object.defineProperty(document, 'visibilityState', { value: visibility, configurable: true });
+    vi.spyOn(document, 'hasFocus').mockReturnValue(focused);
+    return TestBed.inject(TAB_IN_VIEW)();
+  }
+
+  it('isInViewOnlyWhenTheTabIsVisibleAndFocused', () => {
+    expect(inView('visible', true)).toBe(true);
+    expect(inView('visible', false)).toBe(false);
+    expect(inView('hidden', true)).toBe(false);
+    expect(inView('hidden', false)).toBe(false);
   });
 });

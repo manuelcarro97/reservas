@@ -195,6 +195,10 @@ describe('AdminShellComponent', () => {
     try {
       sdk.emit({ uid: 'uid-1', email: 'dueno@example.com' });
       TestBed.tick();
+      // Consulta de referencia al abrir, y después una cada 30 s.
+      http
+        .expectOne((request) => request.url.endsWith('/api/v1/admin/feed'))
+        .flush({ events: [], now: new Date().toISOString() });
       vi.advanceTimersByTime(30_000);
       http
         .expectOne((request) => request.url.endsWith('/api/v1/admin/feed'))
