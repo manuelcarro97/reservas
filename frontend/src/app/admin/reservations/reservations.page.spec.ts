@@ -15,6 +15,7 @@ import { TableOccupancy } from '../../core/api/models/table-occupancy';
 import { TableSuggestion } from '../../core/api/models/table-suggestion';
 import { NOW } from '../../public/booking.store';
 import { ReservationsPage } from './reservations.page';
+import { isRealDate } from './reservations.store';
 import { OPEN_WINDOW } from './whatsapp';
 
 const EVERY_DAY = [
@@ -34,6 +35,7 @@ const PLAN: PlanResponse = {
   slug: 'kafe',
   name: 'Kafé del Puerto',
   status: 'PUBLISHED',
+  timeZone: 'Europe/Madrid',
   theme: 'AZUL',
   bookingMode: 'ASSIGNED',
   room: { shape: 'RECTANGLE', width: 1200, height: 800, cutWidth: 0, cutDepth: 0, rotation: 0 },
@@ -113,6 +115,8 @@ interface Screen {
   day?: AdminReservation[];
   pending?: AdminReservation[];
   occupancy?: TableOccupancy[];
+  /** Día que la página debe pedir al abrir (el de la zona del plano); por defecto TODAY. */
+  date?: string;
 }
 
 describe('ReservationsPage', () => {
@@ -187,14 +191,12 @@ describe('ReservationsPage', () => {
     harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/panel/kafe');
     request('GET', '/api/v1/admin/restaurants/kafe').flush(screen.plan ?? PLAN);
-    // La zona horaria solo la trae el plano público.
-    request('GET', '/api/v1/restaurants/kafe').flush({ slug: 'kafe', timeZone: 'Europe/Madrid' });
     await settle();
     // Turno por defecto: el primero del día por hora de inicio.
     const first = [...((screen.plan ?? PLAN).shifts ?? [])].sort((a, b) =>
       (a.start ?? '').localeCompare(b.start ?? ''),
     )[0];
-    await flushScreen(TODAY, first?.id ?? null, screen);
+    await flushScreen(screen.date ?? TODAY, first?.id ?? null, screen);
     page = harness.routeNativeElement as HTMLElement;
   }
 
@@ -289,31 +291,14 @@ describe('ReservationsPage', () => {
     expect(page.querySelector<HTMLInputElement>('input[type="date"]')?.value).toBe(TODAY);
   });
 
-  it('fallsBackToTheBrowserDayWhenThePublicPlanFails', async () => {
-    harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/panel/kafe');
-    request('GET', '/api/v1/admin/restaurants/kafe').flush(PLAN);
-    request('GET', '/api/v1/restaurants/kafe').flush({}, { status: 404, statusText: 'Not Found' });
-    await settle();
-    // La zona del navegador no se fija en el test: basta con que la página siga viva con alguna fecha.
-    const date = harness.routeNativeElement?.querySelector<HTMLInputElement>('input[type="date"]');
-    expect(date?.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expectDay(date?.value ?? '').flush([]);
-    expectPending().flush([]);
-    expectOccupancy(date?.value ?? '', 11).flush([]);
-  });
+  it('aDraftPlanAlsoUsesItsOwnTimeZoneWithoutAskingThePublicPlan', async () => {
+    // 23:30 UTC del 9: en Los Ángeles (UTC-8) sigue siendo día 9, en Madrid ya es día 10.
+    await open({
+      plan: { ...PLAN, status: 'DRAFT', timeZone: 'America/Los_Angeles' },
+      date: '2026-11-09',
+    });
 
-  it('doesNotAskTheTimeZoneOfADraftPlan', async () => {
-    harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/panel/kafe');
-    request('GET', '/api/v1/admin/restaurants/kafe').flush({ ...PLAN, status: 'DRAFT' });
-    await settle();
-
-    http.expectNone('/api/v1/restaurants/kafe');
-    const date = harness.routeNativeElement?.querySelector<HTMLInputElement>('input[type="date"]');
-    expectDay(date?.value ?? '').flush([]);
-    expectPending().flush([]);
-    expectOccupancy(date?.value ?? '', 11).flush([]);
+    expect(page.querySelector<HTMLInputElement>('input[type="date"]')?.value).toBe('2026-11-09');
   });
 
   it('showsThatThePlanDoesNotExist', async () => {
@@ -370,6 +355,64 @@ describe('ReservationsPage', () => {
     expect(rows().map((item) => item.querySelector('.name')?.textContent?.trim())).toEqual([
       'Luis',
     ]);
+  });
+
+  it('anInvalidDateKeepsTheCurrentOneInTheInputAndSaysSo', async () => {
+    await open({ day: [ANA] });
+    const input = page.querySelector<HTMLInputElement>('input[type="date"]') as HTMLInputElement;
+
+    // Campo borrado y año fuera del rango del servidor: no se pide nada y el campo vuelve a la fecha válida.
+    for (const value of ['', '1999-12-31']) {
+      input.value = value;
+      input.dispatchEvent(new Event('change'));
+      await settle();
+
+      expect(input.value).toBe(TODAY);
+      expect(alertText()).toContain('Elige una fecha válida');
+    }
+    expect(rows().length).toBe(1);
+
+    input.value = '2026-11-12';
+    input.dispatchEvent(new Event('change'));
+    await settle();
+    expectDay('2026-11-12').flush([]);
+    expectOccupancy('2026-11-12', 11).flush(OCCUPANCY);
+    await settle();
+
+    expect(page.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('switchingPlanCancelsTheReadsOfThePreviousOne', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/panel/kafe');
+    request('GET', '/api/v1/admin/restaurants/kafe').flush(PLAN);
+    await settle();
+    // Las tres lecturas de "kafe" quedan en vuelo.
+    const inFlight = [expectDay(TODAY), expectPending(), expectOccupancy(TODAY, 11)];
+
+    await harness.navigateByUrl('/panel/otro');
+
+    // Si respondieran después, pisarían la pantalla de "otro": tienen que haberse cancelado.
+    expect(inFlight.map((pending) => pending.cancelled)).toEqual([true, true, true]);
+    http
+      .expectOne((candidate) => candidate.url.endsWith('/api/v1/admin/restaurants/otro'))
+      .flush({ ...PLAN, slug: 'otro', name: 'Otro' });
+    await settle();
+    const forOther = (query: (request: { params: { has(name: string): boolean } }) => boolean) =>
+      http.expectOne(
+        (candidate) =>
+          candidate.url.endsWith('/api/v1/admin/restaurants/otro/reservations') && query(candidate),
+      );
+    forOther((candidate) => candidate.params.has('date')).flush([]);
+    forOther((candidate) => !candidate.params.has('date')).flush([{ ...MARTA, id: 50 }]);
+    http
+      .expectOne((candidate) => candidate.url.endsWith('/api/v1/admin/restaurants/otro/occupancy'))
+      .flush(OCCUPANCY);
+    await settle();
+    page = harness.routeNativeElement as HTMLElement;
+
+    expect(button(page, 'Pendientes (1)')).toBeTruthy();
+    expect(page.textContent).toContain('Reservas · Otro');
   });
 
   it('pendingTabListsEveryPendingReservationWithItsDate', async () => {
@@ -583,6 +626,7 @@ describe('ReservationsPage', () => {
     await flushScreen(TODAY, 11, { day: [{ ...masked, status: 'CANCELLED' }] });
 
     expect(openWindow).not.toHaveBeenCalled();
+    expect(page.querySelector('a.whatsapp')).toBeNull();
     expect(row('Luis').textContent).toContain('Cancelada');
   });
 
@@ -602,7 +646,53 @@ describe('ReservationsPage', () => {
     expect(openWindow).not.toHaveBeenCalled();
   });
 
-  it('anUnprocessableAssignmentShowsTheMessageAndReloads', async () => {
+  /** Marta con la asignación abierta y la mesa 1 pulsada, lista para responder al PUT. */
+  async function assignMartaToTable1(): Promise<TestRequest> {
+    await click(row('Marta'), 'Asignar mesa');
+    request('GET', '/api/v1/admin/reservations/3/suggestions').flush([]);
+    await settle();
+    table(1).dispatchEvent(new Event('click'));
+    await settle();
+    return request('PUT', '/api/v1/admin/reservations/3/table');
+  }
+
+  it('anUnprocessableAssignmentKeepsTheChoiceOpenAndReloads', async () => {
+    await open({ day: [MARTA], pending: [MARTA] });
+
+    // El plano de la página estaba viejo: la mesa 1 ya no tiene plazas para el grupo.
+    (await assignMartaToTable1()).flush(
+      { code: 'TABLE_TOO_SMALL' },
+      { status: 422, statusText: 'Unprocessable Content' },
+    );
+    await settle();
+    await flushScreen(TODAY, 11, { day: [MARTA], pending: [MARTA] });
+
+    expect(alertText()).toContain('menos plazas');
+    expect(page.querySelector('.assign')).not.toBeNull();
+  });
+
+  it('aMissingTableReloadsThePlano', async () => {
+    await open({ day: [MARTA], pending: [MARTA] });
+
+    (await assignMartaToTable1()).flush(
+      { code: 'TABLE_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    await settle();
+    // El dueño borró la mesa desde otro sitio: se vuelve a leer el plano, no solo la ocupación.
+    request('GET', '/api/v1/admin/restaurants/kafe').flush({
+      ...PLAN,
+      tables: (PLAN.tables ?? []).slice(1),
+    });
+    await settle();
+    await flushScreen(TODAY, 11, { day: [MARTA], pending: [MARTA] });
+
+    expect(page.querySelector('g.t[data-table-id="1"]')).toBeNull();
+    expect(page.querySelector('g.t[data-table-id="2"]')).not.toBeNull();
+    expect(alertText()).toContain('ya no existe');
+  });
+
+  it('aTakenTableAfterAssigningShowsTheMessageAndReloads', async () => {
     await open({ day: [MARTA], pending: [MARTA] });
 
     await click(row('Marta'), 'Asignar mesa');
@@ -618,6 +708,121 @@ describe('ReservationsPage', () => {
     await flushScreen(TODAY, 11, { day: [MARTA], pending: [MARTA] });
 
     expect(alertText()).toContain('ya está ocupada');
+  });
+
+  it('aTableRequiredAnswerFromTheServerOpensTheAssignment', async () => {
+    // La página cree que Ana tiene mesa, pero el servidor dice que no.
+    await open({ day: [ANA], pending: [ANA] });
+
+    await click(row('Ana'), 'Confirmar');
+    request('POST', '/api/v1/admin/reservations/1/confirm').flush(
+      { code: 'TABLE_REQUIRED' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    await settle();
+    request('GET', '/api/v1/admin/reservations/1/suggestions').flush([]);
+    await flushScreen(TODAY, 11, { day: [{ ...ANA, tableId: undefined }], pending: [ANA] });
+
+    expect(page.querySelector('.assign')).not.toBeNull();
+    expect(alertText()).toContain('Asigna una mesa antes de confirmar');
+    expect(openWindow).not.toHaveBeenCalled();
+  });
+
+  it('aMissingReservationShowsTheMessageAndReloads', async () => {
+    await open({ day: [ANA], pending: [ANA] });
+
+    await click(row('Ana'), 'Confirmar');
+    request('POST', '/api/v1/admin/reservations/1/confirm').flush(
+      { code: 'RESERVATION_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    await settle();
+    await flushScreen(TODAY, 11, { day: [], pending: [] });
+
+    expect(alertText()).toContain('Esa reserva ya no existe');
+    expect(rows()).toEqual([]);
+  });
+
+  it('actionButtonsWaitWhileAnActionIsInFlight', async () => {
+    await open({ day: [ANA, MARTA], pending: [ANA, MARTA] });
+
+    await click(row('Ana'), 'Confirmar');
+
+    expect(button(row('Marta'), 'Asignar mesa').disabled).toBe(true);
+    expect(button(row('Ana'), 'Confirmar').disabled).toBe(true);
+    request('POST', '/api/v1/admin/reservations/1/confirm').flush(details(ANA, 'CONFIRMED'));
+    await settle();
+    await flushScreen(TODAY, 11, {
+      day: [{ ...ANA, status: 'CONFIRMED' }, MARTA],
+      pending: [MARTA],
+    });
+    expect(button(row('Marta'), 'Asignar mesa').disabled).toBe(false);
+  });
+
+  it('finishingAnActionKeepsAnUnrelatedAssignmentOpen', async () => {
+    await open({ day: [ANA, MARTA], pending: [ANA, MARTA] });
+
+    await click(row('Marta'), 'Asignar mesa');
+    request('GET', '/api/v1/admin/reservations/3/suggestions').flush([]);
+    await settle();
+    await click(row('Ana'), 'Confirmar');
+    request('POST', '/api/v1/admin/reservations/1/confirm').flush(details(ANA, 'CONFIRMED'));
+    await settle();
+    await flushScreen(TODAY, 11, {
+      day: [{ ...ANA, status: 'CONFIRMED' }, MARTA],
+      pending: [MARTA],
+    });
+
+    // La asignación de Marta no tiene que ver con la de Ana: sigue abierta.
+    expect(page.querySelector('.assign')?.textContent).toContain('Marta');
+  });
+
+  it('theAssignmentOfTheReservationThatWasActedOnCloses', async () => {
+    await open({ day: [ANA], pending: [ANA] });
+
+    await click(row('Ana'), 'Cambiar mesa');
+    request('GET', '/api/v1/admin/reservations/1/suggestions').flush([]);
+    await settle();
+    await click(row('Ana'), 'Rechazar');
+    await click(page, 'Sí, rechazar');
+    request('POST', '/api/v1/admin/reservations/1/cancel').flush(details(ANA, 'CANCELLED'));
+    await settle();
+    await flushScreen(TODAY, 11, { day: [{ ...ANA, status: 'CANCELLED' }] });
+
+    expect(page.querySelector('.assign')).toBeNull();
+  });
+
+  it('keepsAVisibleWhatsappLinkAsBackupUntilTheViewChanges', async () => {
+    await open({ day: [ANA], pending: [ANA] });
+
+    await click(row('Ana'), 'Confirmar');
+    request('POST', '/api/v1/admin/reservations/1/confirm').flush(details(ANA, 'CONFIRMED'));
+    await settle();
+    await flushScreen(TODAY, 11, { day: [{ ...ANA, status: 'CONFIRMED' }], pending: [] });
+
+    const link = page.querySelector<HTMLAnchorElement>('a.whatsapp');
+    expect(link?.textContent?.trim()).toBe('Abrir WhatsApp');
+    expect(link?.getAttribute('href')).toBe(openWindow.mock.calls[0][0]);
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toBe('noopener');
+
+    await click(page, 'Pendientes (0)');
+
+    expect(page.querySelector('a.whatsapp')).toBeNull();
+  });
+
+  it('theWhatsappLinkGoesAwayWithTheNextAction', async () => {
+    await open({ day: [ANA, LUIS], pending: [ANA] });
+
+    await click(row('Ana'), 'Confirmar');
+    request('POST', '/api/v1/admin/reservations/1/confirm').flush(details(ANA, 'CONFIRMED'));
+    await settle();
+    await flushScreen(TODAY, 11, { day: [{ ...ANA, status: 'CONFIRMED' }, LUIS], pending: [] });
+    expect(page.querySelector('a.whatsapp')).not.toBeNull();
+
+    await click(row('Luis'), 'No presentado');
+
+    expect(page.querySelector('a.whatsapp')).toBeNull();
   });
 
   it('rateLimitedAsksToWait', async () => {
@@ -640,5 +845,19 @@ describe('ReservationsPage', () => {
 
     expect(page.querySelector('li.reservation img')).toBeNull();
     expect(row('<img').textContent).toContain('<img src=x onerror=alert(1)>');
+  });
+});
+
+describe('isRealDate', () => {
+  it('acceptsOnlyDatesThatExistInTheCalendar', () => {
+    expect(isRealDate('2026-11-12')).toBe(true);
+    expect(isRealDate('2024-02-29')).toBe(true);
+    expect(isRealDate('2025-02-29')).toBe(false);
+    expect(isRealDate('2026-02-30')).toBe(false);
+    expect(isRealDate('2026-13-45')).toBe(false);
+    expect(isRealDate('1999-12-31')).toBe(false);
+    expect(isRealDate('2101-01-01')).toBe(false);
+    expect(isRealDate('')).toBe(false);
+    expect(isRealDate('12/11/2026')).toBe(false);
   });
 });

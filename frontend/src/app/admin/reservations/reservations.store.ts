@@ -10,7 +10,6 @@ import { TableSuggestion } from '../../core/api/models/table-suggestion';
 import { AdminPlanControllerService } from '../../core/api/services/admin-plan-controller.service';
 import { AdminReservationControllerService } from '../../core/api/services/admin-reservation-controller.service';
 import { AdminRestaurantControllerService } from '../../core/api/services/admin-restaurant-controller.service';
-import { PublicReservationControllerService } from '../../core/api/services/public-reservation-controller.service';
 import { errorCode } from '../../core/api-errors';
 import { PlanoTable, TableState } from '../../plano/plano.component';
 import { knownTheme } from '../../plano/themes';
@@ -68,6 +67,22 @@ const DONE_MESSAGES: Record<ActionKind, (name: string) => string> = {
   noShow: (name) => `${name} marcado como no presentado.`,
 };
 
+const INVALID_DATE_MESSAGE = 'Elige una fecha válida.';
+
+/** `YYYY-MM-DD` que existe en el calendario (rechaza `2026-13-45` y `2026-02-30`) y que el backend acepta. */
+export function isRealDate(isoDate: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) {
+    return false;
+  }
+  const [year, month, day] = match.slice(1).map(Number);
+  if (year < MIN_YEAR || year > MAX_YEAR) {
+    return false;
+  }
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
 /** Estas respuestas significan que la reserva ya no está como la página la tenía: se cierra la asignación. */
 const STALE_RESERVATION_CODES = [
   'RESERVATION_NOT_FOUND',
@@ -119,7 +134,6 @@ function opensOn(shift: ShiftResponse, isoDate: string): boolean {
 @Injectable()
 export class ReservationsStore {
   private readonly plans = inject(AdminPlanControllerService);
-  private readonly publicApi = inject(PublicReservationControllerService);
   private readonly reservationsApi = inject(AdminReservationControllerService);
   private readonly restaurantApi = inject(AdminRestaurantControllerService);
   private readonly pendingApi = inject(PendingReservationsService);
@@ -129,8 +143,11 @@ export class ReservationsStore {
   private slug = '';
   private loadRequest: Subscription | undefined;
   private actionRequest: Subscription | undefined;
-  private readonly dayRequests = new Subject<string>();
-  private readonly pendingRequests = new Subject<void>();
+  private planReload: Subscription | undefined;
+  /** `null` cancela la petición en vuelo sin pedir otra (al cambiar de plano, la respuesta vieja no debe llegar). */
+  private readonly dayRequests = new Subject<string | null>();
+  /** `false` cancela la petición en vuelo sin pedir otra. */
+  private readonly pendingRequests = new Subject<boolean>();
   /** `null` cancela la petición en vuelo sin pedir otra. */
   private readonly occupancyRequests = new Subject<{ date: string; shiftId: number } | null>();
   private readonly suggestionRequests = new Subject<number | null>();
@@ -152,6 +169,11 @@ export class ReservationsStore {
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
+  /**
+   * Enlace de WhatsApp de la última acción, por si el navegador bloqueó la pestaña (`window.open` llega después de
+   * una respuesta HTTP, ya no es un clic). Se quita con la siguiente acción o al cambiar de vista.
+   */
+  readonly whatsappUrl = signal<string | null>(null);
   readonly question = signal<Question | null>(null);
   /** Reserva a la que se está eligiendo mesa. */
   readonly assigning = signal<AdminReservation | null>(null);
@@ -220,12 +242,14 @@ export class ReservationsStore {
     this.dayRequests
       .pipe(
         switchMap((date) =>
-          // El `pending()` generado es la lista del día (`?date=`): springdoc nombra las dos variantes del endpoint
-          // `pending` y el snapshot se quedó con la de la fecha. Los pendientes de todos los días: PendingReservationsService.
-          this.reservationsApi.pending({ slug: this.slug, date }).pipe(
-            map((list) => ({ list, failed: false })),
-            catchError(() => of({ list: null, failed: true })),
-          ),
+          date === null
+            ? EMPTY
+            : // El `pending()` generado es la lista del día (`?date=`): springdoc nombra las dos variantes del endpoint
+              // `pending` y el snapshot se quedó con la de la fecha. Los pendientes de todos los días: PendingReservationsService.
+              this.reservationsApi.pending({ slug: this.slug, date }).pipe(
+                map((list) => ({ list, failed: false })),
+                catchError(() => of({ list: null, failed: true })),
+              ),
         ),
         takeUntilDestroyed(),
       )
@@ -236,11 +260,13 @@ export class ReservationsStore {
 
     this.pendingRequests
       .pipe(
-        switchMap(() =>
-          this.pendingApi.list(this.slug).pipe(
-            map((list) => ({ list, failed: false })),
-            catchError(() => of({ list: null, failed: true })),
-          ),
+        switchMap((read) =>
+          read
+            ? this.pendingApi.list(this.slug).pipe(
+                map((list) => ({ list, failed: false })),
+                catchError(() => of({ list: null, failed: true })),
+              )
+            : EMPTY,
         ),
         takeUntilDestroyed(),
       )
@@ -292,6 +318,7 @@ export class ReservationsStore {
     inject(DestroyRef).onDestroy(() => {
       this.loadRequest?.unsubscribe();
       this.actionRequest?.unsubscribe();
+      this.planReload?.unsubscribe();
     });
   }
 
@@ -299,6 +326,7 @@ export class ReservationsStore {
     this.slug = slug;
     this.loadRequest?.unsubscribe();
     this.actionRequest?.unsubscribe();
+    this.planReload?.unsubscribe();
     this.status.set('loading');
     this.plan.set(null);
     this.tab.set('day');
@@ -309,57 +337,62 @@ export class ReservationsStore {
     this.resetMessages();
     this.cancelAssign();
     this.busy.set(false);
+    // Las lecturas del plano anterior que sigan en vuelo no deben pisar la pantalla del nuevo.
+    this.dayRequests.next(null);
+    this.pendingRequests.next(false);
     this.occupancyRequests.next(null);
 
-    this.loadRequest = this.plans
-      .get({ slug })
-      .pipe(
-        // El plano del dueño no trae la zona horaria; solo la trae el público, y solo si está publicado. Si no se
-        // puede leer, "hoy" es el del navegador.
-        switchMap((plan) =>
-          plan.status === 'PUBLISHED'
-            ? this.publicApi.plan({ slug }).pipe(
-                map((published) => published.timeZone),
-                catchError(() => of(undefined)),
-                map((timeZone) => ({ plan, timeZone })),
-              )
-            : of({ plan, timeZone: undefined }),
-        ),
-      )
-      .subscribe({
-        next: ({ plan, timeZone }) => {
-          this.plan.set(plan);
-          this.date.set(todayIn(timeZone, this.now()));
-          this.shiftId.set(this.shifts()[0]?.id ?? null);
-          this.status.set('ready');
-          this.refresh();
-        },
-        error: (error: HttpErrorResponse) =>
-          this.status.set(error.status === 404 ? 'notFound' : 'error'),
-      });
+    this.loadRequest = this.plans.get({ slug }).subscribe({
+      next: (plan) => {
+        this.plan.set(plan);
+        // "Hoy" es el de la zona del local, no el del navegador.
+        this.date.set(todayIn(plan.timeZone, this.now()));
+        this.shiftId.set(this.shifts()[0]?.id ?? null);
+        this.status.set('ready');
+        this.refresh();
+      },
+      error: (error: HttpErrorResponse) =>
+        this.status.set(error.status === 404 ? 'notFound' : 'error'),
+    });
+  }
+
+  /** Vuelve a leer el plano (mesas y turnos) sin tocar fecha ni turno elegidos. */
+  private reloadPlan(): void {
+    this.planReload?.unsubscribe();
+    this.planReload = this.plans.get({ slug: this.slug }).subscribe({
+      next: (plan) => this.plan.set(plan),
+      // Si falla se queda el plano que había; la próxima recarga lo intenta otra vez.
+      error: () => undefined,
+    });
   }
 
   /** Vuelve a leer del servidor la lista del día, los pendientes y la ocupación. */
   refresh(): void {
     this.loadFailed.set(false);
     this.dayRequests.next(this.date());
-    this.pendingRequests.next();
+    this.pendingRequests.next(true);
     this.requestOccupancy();
   }
 
   setTab(tab: Tab): void {
+    this.resetMessages();
     this.tab.set(tab);
   }
 
-  setDate(date: string): void {
-    const year = Number(date.slice(0, 4));
-    // Un valor vacío o a medio escribir no pide nada.
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || year < MIN_YEAR || year > MAX_YEAR) {
-      return;
+  /**
+   * Cambia de fecha. Devuelve `false` si el valor no es una fecha válida (campo borrado, mes 13, año fuera de rango):
+   * no se pide nada, se avisa, y quien llama debe devolver al campo la fecha que sigue vigente.
+   */
+  setDate(date: string): boolean {
+    if (!isRealDate(date)) {
+      this.resetMessages();
+      this.error.set(INVALID_DATE_MESSAGE);
+      return false;
     }
     if (date === this.date()) {
-      return;
+      return true;
     }
+    this.resetMessages();
     this.cancelAssign();
     this.question.set(null);
     this.date.set(date);
@@ -372,12 +405,14 @@ export class ReservationsStore {
     this.loadFailed.set(false);
     this.dayRequests.next(date);
     this.requestOccupancy();
+    return true;
   }
 
   selectShift(shiftId: number): void {
     if (shiftId === this.shiftId()) {
       return;
     }
+    this.resetMessages();
     this.cancelAssign();
     this.question.set(null);
     this.shiftId.set(shiftId);
@@ -415,6 +450,10 @@ export class ReservationsStore {
    * a ellos: el plano y su ocupación tienen que ser los del turno de la reserva.
    */
   startAssign(reservation: AdminReservation, message: string | null = null): void {
+    // Con una acción en vuelo la página va a recargarse: no se abre otra elección encima.
+    if (this.busy()) {
+      return;
+    }
     this.question.set(null);
     this.resetMessages();
     this.error.set(message);
@@ -440,6 +479,13 @@ export class ReservationsStore {
     this.assigning.set(null);
     this.suggestions.set(null);
     this.suggestionRequests.next(null);
+  }
+
+  /** Cierra la elección de mesa solo si es la de esta reserva: la de otra no tiene que ver con lo que acaba de pasar. */
+  private cancelAssignOf(reservation: AdminReservation): void {
+    if (this.assigning()?.id === reservation.id) {
+      this.cancelAssign();
+    }
   }
 
   /** Clic en una mesa del plano mientras se elige mesa. */
@@ -500,7 +546,7 @@ export class ReservationsStore {
     this.actionRequest = call.subscribe({
       next: (details) => {
         this.busy.set(false);
-        this.cancelAssign();
+        this.cancelAssignOf(reservation);
         this.notice.set(DONE_MESSAGES[kind](reservation.customerName ?? ''));
         this.refresh();
         // Al no presentado no se le escribe.
@@ -531,7 +577,9 @@ export class ReservationsStore {
       arrivalTime: details.arrivalTime ?? reservation.arrivalTime,
       code: details.code ?? reservation.code ?? '',
     });
-    this.openWindow(whatsappLink(phone, text));
+    const url = whatsappLink(phone, text);
+    this.whatsappUrl.set(url);
+    this.openWindow(url);
   }
 
   shiftName(shiftId: number | undefined): string {
@@ -556,6 +604,7 @@ export class ReservationsStore {
   private resetMessages(): void {
     this.error.set(null);
     this.notice.set(null);
+    this.whatsappUrl.set(null);
   }
 
   /** Una acción falló: se muestra el motivo y, si el servidor vio otra cosa que la página, se vuelve a leer todo. */
@@ -572,7 +621,11 @@ export class ReservationsStore {
       this.error.set((code && ERROR_MESSAGES[code]) || adminErrorMessage(error, GENERIC_ERROR));
     }
     if (code && STALE_RESERVATION_CODES.includes(code)) {
-      this.cancelAssign();
+      this.cancelAssignOf(reservation);
+    }
+    if (code === 'TABLE_NOT_FOUND') {
+      // Las mesas que la página tenía están viejas: hay que volver a leer el plano, no solo la ocupación.
+      this.reloadPlan();
     }
     if (error.status === 404 || error.status === 409 || error.status === 422) {
       this.refresh();

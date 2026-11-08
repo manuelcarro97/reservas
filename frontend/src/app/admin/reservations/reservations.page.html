@@ -55,7 +55,12 @@
       <p class="error" role="alert">{{ message }}</p>
     }
     @if (store.notice(); as message) {
-      <p class="notice" role="status">{{ message }}</p>
+      <p class="notice" role="status">
+        {{ message }}
+        @if (store.whatsappUrl(); as url) {
+          <a class="whatsapp" [href]="url" target="_blank" rel="noopener">Abrir WhatsApp</a>
+        }
+      </p>
     }
     @if (store.loadFailed()) {
       <p class="error" role="alert">

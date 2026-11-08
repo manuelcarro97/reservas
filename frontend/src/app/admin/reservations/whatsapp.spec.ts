@@ -9,6 +9,11 @@ describe('whatsapp', () => {
     expect(whatsappLink('+44 7700 900123', 'Hola')).toBe('https://wa.me/447700900123?text=Hola');
   });
 
+  it('whatsappDoesNotDoubleTheSpainPrefix', () => {
+    expect(whatsappLink('+34 612 345 678', 'Hola')).toBe('https://wa.me/34612345678?text=Hola');
+    expect(whatsappLink('0034612345678', 'Hola')).toBe('https://wa.me/34612345678?text=Hola');
+  });
+
   it('whatsappDropsTheDoubleZeroPrefix', () => {
     expect(whatsappLink('0044 7700 900123', 'Hola')).toBe('https://wa.me/447700900123?text=Hola');
   });

@@ -45,7 +45,12 @@ export class ReservationsPage {
   }
 
   protected onDateChange(event: Event): void {
-    this.store.setDate((event.target as HTMLInputElement).value);
+    const input = event.target as HTMLInputElement;
+    // Un valor que no vale (campo borrado, año imposible) no cambia la fecha del store, y su señal no cambia: sin
+    // esto el campo se quedaría mostrando una fecha que la página no está usando.
+    if (!this.store.setDate(input.value)) {
+      input.value = this.store.date();
+    }
   }
 
   protected statusText(reservation: AdminReservation): string {
