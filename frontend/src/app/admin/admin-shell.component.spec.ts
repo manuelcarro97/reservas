@@ -187,6 +187,29 @@ describe('AdminShellComponent', () => {
     expect(host.querySelector('header [role="alert"]')?.textContent).toContain('No se pudo salir');
   });
 
+  it('panelPollsTheFeedWhileSignedInAndStopsOnSignOut', async () => {
+    await open('/panel');
+    // El SDK ya está cargado y su listener registrado; a partir de aquí todo es síncrono con reloj falso.
+    await flushPromises();
+    vi.useFakeTimers();
+    try {
+      sdk.emit({ uid: 'uid-1', email: 'dueno@example.com' });
+      TestBed.tick();
+      vi.advanceTimersByTime(30_000);
+      http
+        .expectOne((request) => request.url.endsWith('/api/v1/admin/feed'))
+        .flush({ events: [], now: new Date().toISOString() });
+
+      sdk.emit(null);
+      TestBed.tick();
+      vi.advanceTimersByTime(60_000);
+
+      http.expectNone((request) => request.url.endsWith('/api/v1/admin/feed'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('eachVisitToThePanelLoadsItsOwnData', async () => {
     await open('/panel');
     await harness.navigateByUrl('/entrar');
