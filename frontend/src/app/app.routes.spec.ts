@@ -44,6 +44,30 @@ describe('routes', () => {
     expect(loadSdk).not.toHaveBeenCalled();
   });
 
+  it('rootRedirectsToLogin', async () => {
+    await visit('/');
+
+    expect(TestBed.inject(Router).url).toBe('/entrar');
+  });
+
+  it('unknownUrlShowsNotFoundWithALinkToLoginAndNeverLoadsTheFirebaseSdk', async () => {
+    await visit('/no/existe/esta/pagina');
+    const host = harness.fixture.nativeElement as HTMLElement;
+
+    expect(host.textContent).toContain('Página no encontrada');
+    expect(host.querySelector('main a[href="/entrar"]')).not.toBeNull();
+    // La URL no se reescribe: el visitante ve lo que escribió.
+    expect(TestBed.inject(Router).url).toBe('/no/existe/esta/pagina');
+    expect(loadSdk).not.toHaveBeenCalled();
+  });
+
+  it('unknownUrlUnderThePanelAlsoShowsNotFoundInsteadOfFailingTheNavigation', async () => {
+    await visit('/panel/kafe/no-existe');
+    const host = harness.fixture.nativeElement as HTMLElement;
+
+    expect(host.textContent).toContain('Página no encontrada');
+  });
+
   /** Navega a una ruta con guard: mientras espera la sesión, el SDK la comunica. */
   async function visitWithSession(url: string, user: { uid: string; email: string } | null) {
     const navigation = harness.navigateByUrl(url);

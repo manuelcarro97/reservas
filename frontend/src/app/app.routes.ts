@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { BookingPage } from './public/booking.page';
+import { NotFoundPage } from './public/not-found.page';
 import { ReservationPage } from './public/reservation.page';
 import { ShellComponent } from './shell/shell.component';
 
@@ -29,6 +30,10 @@ export const routes: Routes = [
         path: 'recuperar',
         loadComponent: () => import('./admin/auth/reset.page').then((m) => m.ResetPage),
       },
+      // Sin portada propia todavía: la raíz lleva a la entrada del dueño. La portada de verdad la decide el pulido visual.
+      { path: '', pathMatch: 'full', redirectTo: '/entrar' },
+      // Último: lo que no casó con nada. Página pública, sin Firebase.
+      { path: '**', component: NotFoundPage },
     ],
   },
 ];
