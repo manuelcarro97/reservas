@@ -33,9 +33,6 @@ interface ReservationJpaRepository extends JpaRepository<ReservationEntity, Long
 			""")
 	List<ReservationEntity> changedSince(Collection<Long> restaurantIds, Instant since);
 
-	boolean existsByRestaurantIdAndDateAndStatusIn(long restaurantId, LocalDate date,
-			Collection<ReservationStatus> statuses);
-
 	@Query("""
 			select r.tableId from ReservationEntity r
 			where r.restaurantId = :restaurantId and r.shiftId = :shiftId and r.date = :date

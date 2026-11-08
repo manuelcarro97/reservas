@@ -38,8 +38,6 @@ public interface ReservationRepositoryPort {
 	 */
 	List<Reservation> changedSince(Collection<Long> restaurantIds, Instant since);
 
-	boolean hasActive(long restaurantId, LocalDate date);
-
 	int cancelPendingStartedBefore(Instant now);
 
 	/**

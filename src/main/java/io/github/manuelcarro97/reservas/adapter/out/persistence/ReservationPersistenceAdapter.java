@@ -156,12 +156,6 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 	}
 
 	@Override
-	public boolean hasActive(long restaurantId, LocalDate date) {
-		return reservations.existsByRestaurantIdAndDateAndStatusIn(restaurantId, date,
-				List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED));
-	}
-
-	@Override
 	public int cancelPendingStartedBefore(Instant now) {
 		return jdbc.sql(CANCEL_EXPIRED_PENDING).param("now", Timestamp.from(now)).update();
 	}

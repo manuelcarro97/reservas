@@ -106,8 +106,13 @@ class ShiftAdminService implements ManageShiftsUseCase {
 		if (date.isBefore(today) || date.isAfter(today.plusDays(MAX_CLOSURE_DAYS_AHEAD))) {
 			throw new ClosureDateOutOfRangeException(MAX_CLOSURE_DAYS_AHEAD);
 		}
-		if (reservations.hasActive(plan.id(), date)) {
-			throw new ClosureHasReservationsException();
+		List<String> codes = reservations.findActiveFrom(plan.id(), date)
+			.stream()
+			.filter(reservation -> reservation.date().equals(date))
+			.map(Reservation::code)
+			.toList();
+		if (!codes.isEmpty()) {
+			throw new ClosureHasReservationsException(codes);
 		}
 		// Cerrar un día ya cerrado no cambia nada; comprobarlo aquí evita una violación de unicidad que dejaría la
 		// transacción abortada.

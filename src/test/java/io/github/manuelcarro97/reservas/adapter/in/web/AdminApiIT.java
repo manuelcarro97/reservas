@@ -1,6 +1,7 @@
 package io.github.manuelcarro97.reservas.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -162,12 +163,13 @@ class AdminApiIT extends PostgresIT {
 
 	@Test
 	void closureOverActiveReservationReturns409() throws Exception {
-		givenReservation();
+		Reservation reservation = givenReservation();
 
 		adminPost("/api/v1/admin/restaurants/demo/closures", """
 				{"date":"2026-12-02","reason":"Reforma"}
 				""").andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("CLOSURE_HAS_RESERVATIONS"));
+			.andExpect(jsonPath("$.code").value("CLOSURE_HAS_RESERVATIONS"))
+			.andExpect(jsonPath("$.reservations", contains(reservation.code())));
 	}
 
 	@Test

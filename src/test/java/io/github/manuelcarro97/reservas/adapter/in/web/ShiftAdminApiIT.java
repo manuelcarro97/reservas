@@ -383,10 +383,13 @@ class ShiftAdminApiIT extends PostgresIT {
 
 	@Test
 	void closingADayWithActiveReservationReturns409() throws Exception {
-		givenReservation(plan, dinner, table, DATE, 2);
+		Reservation reservation = givenReservation(plan, dinner, table, DATE, 2);
+		// La reserva de otro día no aparece entre los códigos.
+		givenReservation(plan, dinner, givenTable(plan, "M2", 2), DATE.plusDays(1), 2);
 
 		addClosure(DATE.toString(), "Reforma").andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("CLOSURE_HAS_RESERVATIONS"));
+			.andExpect(jsonPath("$.code").value("CLOSURE_HAS_RESERVATIONS"))
+			.andExpect(jsonPath("$.reservations", contains(reservation.code())));
 	}
 
 	@Test
