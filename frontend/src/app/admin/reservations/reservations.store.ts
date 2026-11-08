@@ -220,6 +220,8 @@ export class ReservationsStore {
     this.dayRequests
       .pipe(
         switchMap((date) =>
+          // El `pending()` generado es la lista del día (`?date=`): springdoc nombra las dos variantes del endpoint
+          // `pending` y el snapshot se quedó con la de la fecha. Los pendientes de todos los días: PendingReservationsService.
           this.reservationsApi.pending({ slug: this.slug, date }).pipe(
             map((list) => ({ list, failed: false })),
             catchError(() => of({ list: null, failed: true })),
