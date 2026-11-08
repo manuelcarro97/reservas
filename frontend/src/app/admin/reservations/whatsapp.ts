@@ -1,19 +1,8 @@
-import { InjectionToken } from '@angular/core';
+import { formatDate } from '../../core/time';
 
 /** Cifras mínimas de un teléfono con el que se puede abrir WhatsApp (un móvil español sin prefijo). */
 const MIN_DIGITS = 9;
 const SPAIN_PREFIX = '34';
-
-/**
- * Cómo se abre un enlace en una pestaña nueva. Es un token para que los tests lo sustituyan: `window.open` no hace
- * nada en jsdom. `noopener` evita que la pestaña de WhatsApp pueda manejar la del panel.
- */
-export const OPEN_WINDOW = new InjectionToken<(url: string) => void>('OPEN_WINDOW', {
-  providedIn: 'root',
-  factory: () => (url) => {
-    window.open(url, '_blank', 'noopener');
-  },
-});
 
 /** Solo las cifras del teléfono, sin el `00` de las llamadas internacionales y con el 34 si son 9 cifras. */
 function internationalDigits(phone: string): string {
@@ -45,12 +34,6 @@ export interface MessageInfo {
   /** `HH:mm` o `HH:mm:ss`; las reservas anteriores a la hora de llegada no la tienen. */
   arrivalTime?: string;
   code: string;
-}
-
-/** `YYYY-MM-DD` como `dd/mm/aaaa`. */
-export function formatDate(isoDate: string): string {
-  const [year, month, day] = isoDate.split('-');
-  return `${day}/${month}/${year}`;
 }
 
 /** Texto en español que el dueño envía al cliente al confirmar, rechazar o cancelar su reserva. */

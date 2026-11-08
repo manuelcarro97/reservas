@@ -13,7 +13,7 @@ import { ApiConfiguration } from '../core/api/api-configuration';
 import { MeResponse } from '../core/api/models/me-response';
 import { PlanResponse } from '../core/api/models/plan-response';
 import { MeStore } from './me.store';
-import { OPEN_WINDOW } from './reservations/whatsapp';
+import { OPEN_WINDOW } from '../core/open-window';
 import { SettingsPage } from './settings.page';
 
 @Component({ selector: 'app-stub', template: '' })

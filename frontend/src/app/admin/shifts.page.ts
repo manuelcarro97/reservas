@@ -14,8 +14,7 @@ import { PlanResponse } from '../core/api/models/plan-response';
 import { ShiftResponse } from '../core/api/models/shift-response';
 import { AdminPlanControllerService } from '../core/api/services/admin-plan-controller.service';
 import { AdminShiftControllerService } from '../core/api/services/admin-shift-controller.service';
-import { NOW, todayIn } from '../public/booking.store';
-import { formatDate } from './reservations/whatsapp';
+import { NOW, addDays, formatDate, todayIn } from '../core/time';
 import { ActionFailureComponent } from './action-failure.component';
 import { ActionFailure, actionFailure } from './admin-errors';
 
@@ -67,14 +66,6 @@ function hourMinute(time: string | undefined): string {
 
 function byStart(a: ShiftResponse, b: ShiftResponse): number {
   return (a.start ?? '').localeCompare(b.start ?? '');
-}
-
-/** `YYYY-MM-DD` más `days` días, en UTC: sin horario de verano que desplace el día. */
-function addDays(isoDate: string, days: number): string {
-  const [year, month, day] = isoDate.split('-').map(Number);
-  const moved = new Date(Date.UTC(year, month - 1, day + days));
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${moved.getUTCFullYear()}-${pad(moved.getUTCMonth() + 1)}-${pad(moved.getUTCDate())}`;
 }
 
 /**

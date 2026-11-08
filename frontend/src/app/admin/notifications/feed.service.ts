@@ -14,7 +14,7 @@ import { Observable, Subject, Subscription } from 'rxjs';
 import { FeedEvent } from '../../core/api/models/feed-event';
 import { AdminFeedControllerService } from '../../core/api/services/admin-feed-controller.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { NOW } from '../../public/booking.store';
+import { NOW } from '../../core/time';
 import { Chime } from './chime.service';
 
 /** Cada cuánto se consulta `GET /admin/feed` (desde el fin de la respuesta anterior, no desde su inicio). */

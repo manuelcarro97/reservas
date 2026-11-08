@@ -1,5 +1,10 @@
 import { Point, Room, RoomShape, roomPolygon, roomProblems } from '../../plano/geometry';
-import { Handle, applyHandleDrag, handlesFor, moveHandleBy, moveHandleTo } from './room-handles';
+import { Handle, handlesFor, moveHandleBy, moveHandleTo } from './room-handles';
+
+/** Solo el local tras arrastrar el tirador: lo que miran la mayoría de estos tests. */
+function applyHandleDrag(of: Room, grabbed: Handle, dx: number, dy: number): Room {
+  return moveHandleBy(of, grabbed, dx, dy).room;
+}
 
 function room(
   shape: RoomShape,

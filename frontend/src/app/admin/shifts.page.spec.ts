@@ -9,7 +9,7 @@ import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ApiConfiguration } from '../core/api/api-configuration';
 import { PlanResponse } from '../core/api/models/plan-response';
-import { NOW } from '../public/booking.store';
+import { NOW } from '../core/time';
 import { ShiftsPage } from './shifts.page';
 
 const EVERY_DAY = [

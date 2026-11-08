@@ -441,8 +441,3 @@ export function moveHandleBy(room: Room, handle: Handle, dx: number, dy: number)
 export function moveHandleTo(room: Room, handle: Handle, value: number): WallMove {
   return grow(room, handle, value - room[handle.kind]);
 }
-
-/** Como `moveHandleBy`, pero solo el local. */
-export function applyHandleDrag(room: Room, handle: Handle, dx: number, dy: number): Room {
-  return moveHandleBy(room, handle, dx, dy).room;
-}

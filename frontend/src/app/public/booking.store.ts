@@ -1,17 +1,16 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { DestroyRef, Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY, Subject, Subscription, catchError, map, of, switchMap } from 'rxjs';
 import { PublicPlanResponse } from '../core/api/models/public-plan-response';
 import { ReservationDetails } from '../core/api/models/reservation-details';
-import { RoomDto } from '../core/api/models/room-dto';
 import { ShiftAvailability } from '../core/api/models/shift-availability';
-import { TableDto } from '../core/api/models/table-dto';
 import { PublicReservationControllerService } from '../core/api/services/public-reservation-controller.service';
-import { Room } from '../plano/geometry';
-import { PlanoTable, TableState } from '../plano/plano.component';
+import { toRoom, toTable } from '../plano/plan-mapping';
+import { TableState } from '../plano/plano.component';
 import { ThemeKey, knownTheme } from '../plano/themes';
 import { errorCode, rateLimitedMessage } from '../core/api-errors';
+import { NOW, addDays, todayIn } from '../core/time';
 
 /** Días de antelación máximos, inclusive (`BookingPolicy.BOOKING_WINDOW_DAYS` del backend). */
 export const BOOKING_WINDOW_DAYS = 90;
@@ -42,66 +41,6 @@ const ARRIVAL_ERROR_CODES = ['ARRIVAL_TIME_PAST', 'INVALID_ARRIVAL_TIME'];
 /** Las horas llegan como `HH:mm:ss` o `HH:mm`; el store trabaja y envía `HH:mm`. */
 function toHourMinute(time: string): string {
   return time.slice(0, 5);
-}
-
-/** Fecha de calendario de un `Date` creado con componentes locales, como `YYYY-MM-DD`. Solo para sumar días. */
-export function localIsoDate(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
-/** Reloj de la página; los tests lo sustituyen por uno fijo. */
-export const NOW = new InjectionToken<() => Date>('NOW', {
-  providedIn: 'root',
-  factory: () => () => new Date(),
-});
-
-/**
- * Día de calendario (`YYYY-MM-DD`) que es ahora en `timeZone` (id IANA del local). Sin zona, o si el navegador no la
- * conoce, usa la del navegador. Sin `toISOString()`: es UTC y daría otro día cerca de medianoche.
- */
-export function todayIn(timeZone: string | undefined, now: Date): string {
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(now);
-    const part = (type: string) => parts.find((candidate) => candidate.type === type)?.value ?? '';
-    return `${part('year')}-${part('month')}-${part('day')}`;
-  } catch {
-    return localIsoDate(now);
-  }
-}
-
-export function addDays(isoDate: string, days: number): string {
-  const [year, month, day] = isoDate.split('-').map(Number);
-  return localIsoDate(new Date(year, month - 1, day + days));
-}
-
-export function toRoom(dto: RoomDto | undefined): Room {
-  return {
-    shape: dto?.shape ?? 'RECTANGLE',
-    width: dto?.width ?? 0,
-    height: dto?.height ?? 0,
-    cutWidth: dto?.cutWidth ?? 0,
-    cutDepth: dto?.cutDepth ?? 0,
-    rotation: dto?.rotation ?? 0,
-  };
-}
-
-export function toTable(dto: TableDto): PlanoTable {
-  return {
-    id: dto.id ?? 0,
-    label: dto.label ?? '',
-    shape: dto.shape ?? 'SQUARE',
-    seats: dto.seats ?? 0,
-    rotation: dto.rotation ?? 0,
-    x: dto.x ?? 0,
-    y: dto.y ?? 0,
-  };
 }
 
 /**

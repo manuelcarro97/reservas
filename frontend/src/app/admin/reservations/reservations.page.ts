@@ -3,8 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { PlanoComponent } from '../../plano/plano.component';
+import { tableName } from '../../plano/table-name';
 import { FeedService } from '../notifications/feed.service';
-import { ReservationsStore, tableName } from './reservations.store';
+import { ReservationsStore } from './reservations.store';
 
 const STATUS_TEXT: Record<NonNullable<AdminReservation['status']>, string> = {
   PENDING: 'Pendiente',

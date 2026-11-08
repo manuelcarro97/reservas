@@ -14,7 +14,7 @@ import { ShiftAvailability } from '../core/api/models/shift-availability';
 import { THEMES } from '../plano/themes';
 import { ShellComponent } from '../shell/shell.component';
 import { BookingPage } from './booking.page';
-import { NOW, addDays, todayIn } from './booking.store';
+import { NOW, addDays } from '../core/time';
 
 const PLAN: PublicPlanResponse = {
   slug: 'kafe',
@@ -640,27 +640,5 @@ describe('BookingPage', () => {
     expect(request.request.params.get('date')).toBe(tomorrow);
     expect(page.querySelectorAll('g.t').length).toBe(0);
     expect(submitButton().disabled).toBe(true);
-  });
-});
-
-describe('booking dates', () => {
-  it('todayFollowsTheRestaurantZoneNotTheBrowser', () => {
-    const instant = new Date('2030-01-05T23:30:00Z');
-
-    expect(todayIn('Europe/Madrid', instant)).toBe('2030-01-06');
-    expect(todayIn('America/Los_Angeles', instant)).toBe('2030-01-05');
-    expect(todayIn('Asia/Tokyo', new Date('2030-01-05T15:30:00Z'))).toBe('2030-01-06');
-  });
-
-  it('unknownZoneFallsBackToBrowserDate', () => {
-    const instant = new Date(2030, 0, 5, 12, 0);
-
-    expect(todayIn('No/Existe', instant)).toBe('2030-01-05');
-    expect(todayIn(undefined, instant)).toBe('2030-01-05');
-  });
-
-  it('addsDaysAcrossMonths', () => {
-    expect(addDays('2030-01-31', 1)).toBe('2030-02-01');
-    expect(addDays('2030-12-31', 90)).toBe('2031-03-31');
   });
 });

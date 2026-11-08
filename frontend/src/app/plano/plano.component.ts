@@ -13,6 +13,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
 import { Point, Room, TableLike, isSupportedSeats, roomPolygon } from './geometry';
 import { Chair, ROUND_R, chairPositions, rectSize } from './table-drawing';
+import { tableName } from './table-name';
 import { STATE_COLORS, THEMES, ThemeKey } from './themes';
 
 /** `invalid`: mesa con un problema de plano (solape, fuera del local…); solo la usa el editor. */
@@ -225,8 +226,7 @@ export class PlanoComponent {
   }
 
   protected ariaLabel(table: PlanoTable): string {
-    const label = String(table.label ?? '').trim();
-    const name = /^mesa\b/i.test(label) ? label : `Mesa ${label}`;
+    const name = tableName(String(table.label ?? ''));
     return `${name}, ${table.seats} plazas, ${STATE_TEXT[this.stateOf(table.id)]}`;
   }
 

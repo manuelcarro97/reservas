@@ -16,11 +16,11 @@ import { FeedEvent } from '../../core/api/models/feed-event';
 import { PlanResponse } from '../../core/api/models/plan-response';
 import { TableOccupancy } from '../../core/api/models/table-occupancy';
 import { TableSuggestion } from '../../core/api/models/table-suggestion';
-import { NOW } from '../../public/booking.store';
+import { NOW } from '../../core/time';
 import { FeedService } from '../notifications/feed.service';
 import { ReservationsPage } from './reservations.page';
 import { isRealDate } from './reservations.store';
-import { OPEN_WINDOW } from './whatsapp';
+import { OPEN_WINDOW } from '../../core/open-window';
 
 @Component({ template: '<p>otra</p>' })
 class OtherStub {}

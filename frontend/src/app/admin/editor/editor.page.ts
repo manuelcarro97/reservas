@@ -23,6 +23,7 @@ import {
   planoFrame,
   planoViewBox,
 } from '../../plano/plano.component';
+import { tableName } from '../../plano/table-name';
 import { THEMES, THEME_KEYS, ThemeKey } from '../../plano/themes';
 import { EditorStore, EditorTable, ServerProblem } from './editor.store';
 import { ConfirmsLeaving } from './leave-editor.guard';
@@ -89,12 +90,6 @@ interface TableDrag {
 
 /** Pregunta abierta en la página (en vez de `window.confirm`). */
 type Dialog = { kind: 'leave'; resolve: (leave: boolean) => void } | { kind: 'delete'; id: number };
-
-/** Nombre de la mesa para frases: "Mesa 3", o el nombre tal cual si ya empieza por "mesa". */
-function tableName(label: string): string {
-  const text = label.trim();
-  return /^mesa\b/i.test(text) ? text : `Mesa ${text}`;
-}
 
 /**
  * `/panel/:slug/plano`: forma del local, mesas y tema. La forma se cambia con los botones, el giro y los tiradores del

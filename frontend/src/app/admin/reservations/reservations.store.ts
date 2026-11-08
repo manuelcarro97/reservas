@@ -11,19 +11,15 @@ import { AdminPlanControllerService } from '../../core/api/services/admin-plan-c
 import { AdminReservationControllerService } from '../../core/api/services/admin-reservation-controller.service';
 import { AdminRestaurantControllerService } from '../../core/api/services/admin-restaurant-controller.service';
 import { errorCode } from '../../core/api-errors';
+import { OPEN_WINDOW } from '../../core/open-window';
+import { NOW, formatDate, todayIn } from '../../core/time';
+import { toRoom, toTable } from '../../plano/plan-mapping';
 import { PlanoTable, TableState } from '../../plano/plano.component';
+import { tableName } from '../../plano/table-name';
 import { knownTheme } from '../../plano/themes';
-import { NOW, toRoom, toTable, todayIn } from '../../public/booking.store';
 import { RATE_LIMITED_ACTIONS_MESSAGE, adminErrorMessage } from '../admin-errors';
 import { PendingReservationsService } from './pending-reservations.service';
-import {
-  MessageKind,
-  OPEN_WINDOW,
-  canWhatsapp,
-  formatDate,
-  reservationMessage,
-  whatsappLink,
-} from './whatsapp';
+import { MessageKind, canWhatsapp, reservationMessage, whatsappLink } from './whatsapp';
 
 export type PageStatus = 'loading' | 'ready' | 'notFound' | 'error';
 export type Tab = 'day' | 'pending';
@@ -88,12 +84,6 @@ const STALE_RESERVATION_CODES = [
   'INVALID_TRANSITION',
   'CONCURRENT_UPDATE',
 ];
-
-/** Nombre de la mesa para frases: "Mesa 3", o el nombre tal cual si ya empieza por "mesa". */
-export function tableName(label: string): string {
-  const text = label.trim();
-  return /^mesa\b/i.test(text) ? text : `Mesa ${text}`;
-}
 
 /** Orden de la lista: por hora de llegada; las que no tienen hora (anteriores a V5) al final. */
 function byArrival(a: AdminReservation, b: AdminReservation): number {

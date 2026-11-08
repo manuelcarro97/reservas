@@ -25,7 +25,7 @@ import { ActionFailureComponent } from './action-failure.component';
 import { ActionFailure, actionFailure } from './admin-errors';
 import { embedSnippet } from './embed-snippet';
 import { MeStore } from './me.store';
-import { OPEN_WINDOW } from './reservations/whatsapp';
+import { OPEN_WINDOW } from '../core/open-window';
 
 export type PageStatus = 'loading' | 'ready' | 'notFound' | 'error';
 type BookingMode = NonNullable<PlanResponse['bookingMode']>;
