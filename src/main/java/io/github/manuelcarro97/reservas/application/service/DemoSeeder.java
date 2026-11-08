@@ -69,14 +69,18 @@ class DemoSeeder implements ResetDemoUseCase {
 	/**
 	 * Nombres y teléfonos de mentira. Ninguna usa la última mesa ("9"): la demo debe tener una libre, y un visitante
 	 * que la quite del plano no encuentra reservas que se lo impidan.
+	 * <p>
+	 * Los teléfonos son {@code 000 000 00N}: nueve cifras, como un móvil español, para que la página pública y el panel
+	 * los traten igual, pero ningún número real empieza por 0 y no se pueden marcar. Un {@code 600 000 00N} sí lo es:
+	 * un móvil de verdad al que el botón de WhatsApp del panel habría escrito.
 	 */
 	private static final List<SampleReservation> SAMPLES = List.of(
-			new SampleReservation("4", 2, "Ana Demo", "600 000 001", true),
-			new SampleReservation("1", 4, "Luis Ejemplo", "600 000 002", false),
-			new SampleReservation("5", 3, "Marta Prueba", "600 000 003", true),
-			new SampleReservation("6", 2, "Pedro Ficticio", "600 000 004", false),
-			new SampleReservation("8", 6, "Lucía Muestra", "600 000 005", true),
-			new SampleReservation("7", 4, "Jorge Simulado", "600 000 006", false));
+			new SampleReservation("4", 2, "Ana Demo", "000 000 001", true),
+			new SampleReservation("1", 4, "Luis Ejemplo", "000 000 002", false),
+			new SampleReservation("5", 3, "Marta Prueba", "000 000 003", true),
+			new SampleReservation("6", 2, "Pedro Ficticio", "000 000 004", false),
+			new SampleReservation("8", 6, "Lucía Muestra", "000 000 005", true),
+			new SampleReservation("7", 4, "Jorge Simulado", "000 000 006", false));
 
 	private record SampleReservation(String tableLabel, int partySize, String name, String phone,
 			boolean confirmed) {

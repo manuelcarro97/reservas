@@ -27,11 +27,17 @@ class ContactMaskTest {
 
 	@Test
 	void everySeededPhoneIsRecognizedAndNothingElseIs() {
-		assertThat(DemoSeeder.isSamplePhone("600 000 001")).isTrue();
-		assertThat(DemoSeeder.isSamplePhone("600 000 006")).isTrue();
-		assertThat(DemoSeeder.isSamplePhone("600 000 007")).isFalse();
-		assertThat(DemoSeeder.isSamplePhone("600000001")).isFalse();
+		assertThat(DemoSeeder.isSamplePhone("000 000 001")).isTrue();
+		assertThat(DemoSeeder.isSamplePhone("000 000 006")).isTrue();
+		assertThat(DemoSeeder.isSamplePhone("000 000 007")).isFalse();
+		assertThat(DemoSeeder.isSamplePhone("000000001")).isFalse();
 		assertThat(DemoSeeder.isSamplePhone(null)).isFalse();
+	}
+
+	@Test
+	void theOldDialableSamplePhonesAreNoLongerRecognizedSoTheDemoPanelMasksThem() {
+		assertThat(DemoSeeder.isSamplePhone("600 000 001")).isFalse();
+		assertThat(DemoSeeder.isSamplePhone("600 000 006")).isFalse();
 	}
 
 }

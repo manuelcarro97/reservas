@@ -110,7 +110,7 @@ class DemoPanelPrivacyIT extends PostgresIT {
 
 		assertThat(pending).filteredOn(reservation -> !reservation.customerName().equals("Visitante Real"))
 			.isNotEmpty()
-			.allSatisfy(seeded -> assertThat(seeded.customerPhone()).matches("600 000 00\\d"));
+			.allSatisfy(seeded -> assertThat(seeded.customerPhone()).matches("000 000 00\\d"));
 	}
 
 	@Test
