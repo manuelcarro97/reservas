@@ -17,6 +17,7 @@ import { PlanResponse } from '../../core/api/models/plan-response';
 import { TableOccupancy } from '../../core/api/models/table-occupancy';
 import { TableSuggestion } from '../../core/api/models/table-suggestion';
 import { NOW } from '../../core/time';
+import { MeStore } from '../me.store';
 import { FeedService } from '../notifications/feed.service';
 import { ReservationsPage } from './reservations.page';
 import { isRealDate } from './reservations.store';
@@ -132,10 +133,12 @@ describe('ReservationsPage', () => {
   let page: HTMLElement;
   let openWindow: Mock<(url: string) => void>;
   let feedEvents: Subject<FeedEvent>;
+  let demoAccount: boolean;
 
   beforeEach(() => {
     openWindow = vi.fn<(url: string) => void>();
     feedEvents = new Subject<FeedEvent>();
+    demoAccount = false;
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -148,6 +151,8 @@ describe('ReservationsPage', () => {
         { provide: OPEN_WINDOW, useValue: openWindow },
         // El marco del panel provee el servicio real; aquí solo importan los eventos que emite.
         { provide: FeedService, useValue: { events: feedEvents.asObservable() } },
+        // Idem el `MeStore`: aquí solo importa si la cuenta es la demo.
+        { provide: MeStore, useValue: { demo: () => demoAccount } },
       ],
     });
     TestBed.inject(ApiConfiguration).rootUrl = '';
@@ -642,6 +647,111 @@ describe('ReservationsPage', () => {
     expect(openWindow).not.toHaveBeenCalled();
     expect(page.querySelector('a.whatsapp')).toBeNull();
     expect(row('Luis').textContent).toContain('Cancelada');
+  });
+
+  describe('demoAccount', () => {
+    // Aunque el seeder ya no use números marcables, un teléfono con forma de móvil real no debe abrir WhatsApp en la
+    // demo: lo evita la marca de la cuenta, no el aspecto del número.
+    const ANA_DEMO: AdminReservation = {
+      ...ANA,
+      customerName: 'Ana Demo',
+      customerPhone: '600 000 001',
+    };
+
+    it('neverOpensWhatsappNorShowsTheLinkButTheActionStillRuns', async () => {
+      demoAccount = true;
+      await open({ day: [ANA_DEMO], pending: [ANA_DEMO] });
+
+      await click(row('Ana Demo'), 'Confirmar');
+      request('POST', '/api/v1/admin/reservations/1/confirm').flush(details(ANA_DEMO, 'CONFIRMED'));
+      await settle();
+      await flushScreen(TODAY, 11, { day: [{ ...ANA_DEMO, status: 'CONFIRMED' }], pending: [] });
+
+      expect(openWindow).not.toHaveBeenCalled();
+      expect(page.querySelector('a.whatsapp')).toBeNull();
+      expect(row('Ana Demo').textContent).toContain('Confirmada');
+      expect(page.textContent).toContain('Reserva de Ana Demo confirmada.');
+    });
+
+    it('anOrdinaryOwnerStillGetsWhatsappForTheSameNumber', async () => {
+      await open({ day: [ANA_DEMO], pending: [ANA_DEMO] });
+
+      await click(row('Ana Demo'), 'Confirmar');
+      request('POST', '/api/v1/admin/reservations/1/confirm').flush(details(ANA_DEMO, 'CONFIRMED'));
+      await settle();
+      await flushScreen(TODAY, 11, { day: [{ ...ANA_DEMO, status: 'CONFIRMED' }], pending: [] });
+
+      const link = openedLink();
+      expect(link.origin + link.pathname).toBe('https://wa.me/34600000001');
+      expect(page.querySelector('a.whatsapp')).not.toBeNull();
+    });
+  });
+
+  describe('actionInFlightWhenSwitchingPlan', () => {
+    /** Confirma a Ana en "kafe", deja el POST en vuelo y abre "otro" con sus lecturas ya respondidas. */
+    async function confirmAndSwitchPlan(): Promise<TestRequest> {
+      await open({ day: [ANA], pending: [ANA] });
+      await click(row('Ana'), 'Confirmar');
+      const confirmation = request('POST', '/api/v1/admin/reservations/1/confirm');
+
+      await harness.navigateByUrl('/panel/otro');
+      http
+        .expectOne((candidate) => candidate.url.endsWith('/api/v1/admin/restaurants/otro'))
+        .flush({ ...PLAN, slug: 'otro', name: 'Otro' });
+      await settle();
+      const forOther = (hasDate: boolean) =>
+        http.expectOne(
+          (candidate) =>
+            candidate.url.endsWith('/api/v1/admin/restaurants/otro/reservations') &&
+            candidate.params.has('date') === hasDate,
+        );
+      forOther(true).flush([]);
+      forOther(false).flush([]);
+      http
+        .expectOne((candidate) =>
+          candidate.url.endsWith('/api/v1/admin/restaurants/otro/occupancy'),
+        )
+        .flush(OCCUPANCY);
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+      return confirmation;
+    }
+
+    it('finishesAndStillOpensWhatsappForTheCustomer', async () => {
+      const confirmation = await confirmAndSwitchPlan();
+
+      // La petición ya salió: el servidor la va a confirmar, y el cliente tiene que enterarse.
+      expect(confirmation.cancelled).toBe(false);
+      confirmation.flush(details(ANA, 'CONFIRMED'));
+      await settle();
+
+      const link = openedLink();
+      expect(link.origin + link.pathname).toBe('https://wa.me/34612345678');
+      expect(link.searchParams.get('text')).toContain('Kafé del Puerto');
+    });
+
+    it('doesNotTouchTheViewOfTheNewPlan', async () => {
+      const confirmation = await confirmAndSwitchPlan();
+
+      confirmation.flush(details(ANA, 'CONFIRMED'));
+      await settle();
+
+      // Sin avisos, sin enlace de respaldo y sin releer nada del plano nuevo (`http.verify` lo exige).
+      expect(page.textContent).not.toContain('confirmada');
+      expect(page.querySelector('a.whatsapp')).toBeNull();
+      http.expectNone(() => true);
+    });
+
+    it('doesNotShowTheFailureOfThePreviousPlanInTheNewOne', async () => {
+      const confirmation = await confirmAndSwitchPlan();
+
+      confirmation.flush({ code: 'INVALID_TRANSITION' }, { status: 409, statusText: 'Conflict' });
+      await settle();
+
+      expect(alertText()).toBe('');
+      expect(openWindow).not.toHaveBeenCalled();
+      http.expectNone(() => true);
+    });
   });
 
   it('aConflictShowsTheMessageAndReloadsEverything', async () => {

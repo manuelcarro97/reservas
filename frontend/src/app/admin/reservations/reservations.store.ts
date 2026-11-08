@@ -18,6 +18,7 @@ import { PlanoTable, TableState } from '../../plano/plano.component';
 import { tableName } from '../../plano/table-name';
 import { knownTheme } from '../../plano/themes';
 import { RATE_LIMITED_ACTIONS_MESSAGE, adminErrorMessage } from '../admin-errors';
+import { MeStore } from '../me.store';
 import { PendingReservationsService } from './pending-reservations.service';
 import { MessageKind, canWhatsapp, reservationMessage, whatsappLink } from './whatsapp';
 
@@ -49,7 +50,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   TABLE_TAKEN: 'Esa mesa ya está ocupada en este turno. Se ha actualizado el plano.',
   TABLE_TOO_SMALL: 'Esa mesa tiene menos plazas que personas en la reserva.',
   TABLE_NOT_FOUND: 'Esa mesa ya no existe. Se ha actualizado el plano.',
-  TABLE_NOT_ALLOWED: 'En este plano las mesas las elige el cliente.',
   INVALID_TRANSITION: 'Esa reserva ya no admite esa acción. Se ha actualizado la lista.',
   CONCURRENT_UPDATE: 'La reserva acaba de cambiar. Se ha actualizado la lista.',
   RESERVATION_NOT_FOUND: 'Esa reserva ya no existe. Se ha actualizado la lista.',
@@ -128,10 +128,18 @@ export class ReservationsStore {
   private readonly pendingApi = inject(PendingReservationsService);
   private readonly openWindow = inject(OPEN_WINDOW);
   private readonly now = inject(NOW);
+  /** Sin el marco del panel no hay `MeStore`: entonces no se sabe si es la demo y se trata como un dueño normal. */
+  private readonly me = inject(MeStore, { optional: true });
 
   private slug = '';
   private loadRequest: Subscription | undefined;
-  private actionRequest: Subscription | undefined;
+  /**
+   * Acciones en vuelo. Cambiar de plano no las cancela: la petición ya salió, el servidor la va a aplicar y el dueño
+   * tiene que poder escribir al cliente. Solo se cancelan al cerrar la página.
+   */
+  private readonly actionRequests = new Subscription();
+  /** Cuenta los planos cargados: una acción solo toca la pantalla si sigue siendo la del plano que la lanzó. */
+  private view = 0;
   private planReload: Subscription | undefined;
   /** `null` cancela la petición en vuelo sin pedir otra (al cambiar de plano, la respuesta vieja no debe llegar). */
   private readonly dayRequests = new Subject<string | null>();
@@ -306,15 +314,15 @@ export class ReservationsStore {
 
     inject(DestroyRef).onDestroy(() => {
       this.loadRequest?.unsubscribe();
-      this.actionRequest?.unsubscribe();
+      this.actionRequests.unsubscribe();
       this.planReload?.unsubscribe();
     });
   }
 
   load(slug: string): void {
     this.slug = slug;
+    this.view++;
     this.loadRequest?.unsubscribe();
-    this.actionRequest?.unsubscribe();
     this.planReload?.unsubscribe();
     this.status.set('loading');
     this.plan.set(null);
@@ -505,10 +513,13 @@ export class ReservationsStore {
       return;
     }
     this.begin();
-    this.actionRequest = this.reservationsApi
-      .assignTable({ id: reservation.id, body: { tableId } })
-      .subscribe({
+    const view = this.view;
+    this.actionRequests.add(
+      this.reservationsApi.assignTable({ id: reservation.id, body: { tableId } }).subscribe({
         next: (details) => {
+          if (view !== this.view) {
+            return;
+          }
           this.busy.set(false);
           this.cancelAssign();
           this.notice.set(
@@ -516,8 +527,13 @@ export class ReservationsStore {
           );
           this.refresh();
         },
-        error: (error: HttpErrorResponse) => this.fail(error, reservation),
-      });
+        error: (error: HttpErrorResponse) => {
+          if (view === this.view) {
+            this.fail(error, reservation);
+          }
+        },
+      }),
+    );
   }
 
   private run(reservation: AdminReservation, kind: ActionKind): void {
@@ -532,42 +548,66 @@ export class ReservationsStore {
         : kind === 'noShow'
           ? this.reservationsApi.markNoShow({ id })
           : this.reservationsApi.cancel1({ id });
-    this.actionRequest = call.subscribe({
-      next: (details) => {
-        this.busy.set(false);
-        this.cancelAssignOf(reservation);
-        this.notice.set(DONE_MESSAGES[kind](reservation.customerName ?? ''));
-        this.refresh();
-        // Al no presentado no se le escribe.
-        if (kind !== 'noShow') {
-          this.openWhatsapp(kind, reservation, details);
-        }
-      },
-      error: (error: HttpErrorResponse) => this.fail(error, reservation),
-    });
+    const view = this.view;
+    // Si la respuesta llega con otro plano en pantalla, el texto del mensaje sigue siendo el del plano de la acción.
+    const fallback = {
+      restaurantName: this.planName(),
+      shiftName: this.shiftName(reservation.shiftId),
+    };
+    this.actionRequests.add(
+      call.subscribe({
+        next: (details) => {
+          const current = view === this.view;
+          if (current) {
+            this.busy.set(false);
+            this.cancelAssignOf(reservation);
+            this.notice.set(DONE_MESSAGES[kind](reservation.customerName ?? ''));
+            this.refresh();
+          }
+          // Al no presentado no se le escribe.
+          if (kind !== 'noShow') {
+            this.openWhatsapp(kind, reservation, details, fallback, current);
+          }
+        },
+        error: (error: HttpErrorResponse) => {
+          if (view === this.view) {
+            this.fail(error, reservation);
+          }
+        },
+      }),
+    );
   }
 
-  /** Abre WhatsApp con el mensaje al cliente; sin un teléfono real (cuenta demo) no hay enlace. */
+  /**
+   * Abre WhatsApp con el mensaje al cliente. No hay enlace sin un teléfono real: ni con la máscara que la demo pone a
+   * los de los visitantes, ni en la cuenta demo, cuyos teléfonos de muestra tienen forma de móvil real. `current`
+   * dice si la pantalla sigue siendo la del plano de la acción; si no, se abre la pestaña pero no se guarda el enlace
+   * de respaldo (sería el de un cliente de otro plano).
+   */
   private openWhatsapp(
     kind: MessageKind,
     reservation: AdminReservation,
     details: ReservationDetails,
+    fallback: { restaurantName: string; shiftName: string },
+    current: boolean,
   ): void {
     const phone = reservation.customerPhone ?? '';
-    if (!canWhatsapp(phone)) {
+    if (this.me?.demo() || !canWhatsapp(phone)) {
       return;
     }
     const date = details.date ?? reservation.date ?? '';
     const text = reservationMessage(kind, {
       customerName: reservation.customerName ?? '',
-      restaurantName: details.restaurantName ?? this.planName(),
+      restaurantName: details.restaurantName ?? fallback.restaurantName,
       date,
-      shiftName: details.shiftName ?? this.shiftName(reservation.shiftId),
+      shiftName: details.shiftName ?? fallback.shiftName,
       arrivalTime: details.arrivalTime ?? reservation.arrivalTime,
       code: details.code ?? reservation.code ?? '',
     });
     const url = whatsappLink(phone, text);
-    this.whatsappUrl.set(url);
+    if (current) {
+      this.whatsappUrl.set(url);
+    }
     this.openWindow(url);
   }
 
