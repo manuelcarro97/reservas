@@ -3,6 +3,7 @@ package io.github.manuelcarro97.reservas.adapter.in.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -300,7 +301,8 @@ class AdminReservationApiIT extends PostgresIT {
 			.andExpect(jsonPath("$[1].id").value(lunchToday.id()))
 			.andExpect(jsonPath("$[2].id").value(dinnerToday.id()))
 			.andExpect(jsonPath("$[3].id").value(laterDinner.id()))
-			.andExpect(jsonPath("$[0].status").value("PENDING"));
+			.andExpect(jsonPath("$[0].status").value("PENDING"))
+			.andExpect(jsonPath("$[0].arrivalTime").value(startsWith("20:00")));
 	}
 
 	@Test
@@ -323,6 +325,7 @@ class AdminReservationApiIT extends PostgresIT {
 			.andExpect(jsonPath("$[0].tableId").value(table.id()))
 			.andExpect(jsonPath("$[0].tableLabel").value("M4"))
 			.andExpect(jsonPath("$[0].createdAt", notNullValue()))
+			.andExpect(jsonPath("$[0].arrivalTime").value(startsWith("20:00")))
 			.andExpect(jsonPath("$[1].tableId").doesNotExist())
 			.andExpect(jsonPath("$[1].tableLabel").doesNotExist());
 	}

@@ -58,6 +58,37 @@ class AvailabilityServiceIT extends PostgresIT {
 	}
 
 	@Test
+	void freeShiftListsItsArrivalTimes() {
+		assertThat(availability.availability("demo", WEDNESDAY, 2)).extracting(ShiftAvailability::arrivalTimes)
+				.containsExactly(List.of(LocalTime.of(20, 0), LocalTime.of(20, 30), LocalTime.of(21, 0)));
+	}
+
+	@Test
+	void unavailableShiftListsNoArrivalTimes() {
+		reserve();
+
+		assertThat(availability.availability("demo", WEDNESDAY, 2)).extracting(ShiftAvailability::arrivalTimes)
+				.containsExactly(List.of());
+	}
+
+	@Test
+	void startedShiftListsNoArrivalTimes() {
+		LocalDate today = LocalDate.of(2026, 12, 1);
+		clock.set(today.atTime(20, 45).atZone(restaurant.zone()).toInstant());
+
+		assertThat(availability.availability("demo", today, 2)).extracting(ShiftAvailability::arrivalTimes)
+				.containsExactly(List.of());
+	}
+
+	@Test
+	void shiftLaterTodayListsAllItsArrivalTimes() {
+		LocalDate today = LocalDate.of(2026, 12, 1);
+		clock.set(today.atTime(12, 0).atZone(restaurant.zone()).toInstant());
+
+		assertThat(availability.availability("demo", today, 2).getFirst().arrivalTimes()).hasSize(3);
+	}
+
+	@Test
 	void closedDayReturnsEmptyList() {
 		restaurants.addClosure(restaurant.id(), WEDNESDAY, "Festivo");
 

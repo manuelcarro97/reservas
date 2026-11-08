@@ -3,6 +3,7 @@ package io.github.manuelcarro97.reservas.application.service;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +35,7 @@ import io.github.manuelcarro97.reservas.domain.model.RoomLayout;
 import io.github.manuelcarro97.reservas.domain.model.RoomShape;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
 import io.github.manuelcarro97.reservas.domain.model.TableShape;
+import io.github.manuelcarro97.reservas.domain.service.ArrivalPolicy;
 
 /**
  * Siembra la cuenta demo y su plano. El plano se crea por {@link PlanService#createUnrestricted}, que no es de
@@ -92,6 +94,7 @@ class DemoSeeder implements ResetDemoUseCase {
 	private record Slot(LocalDate date, Shift shift) {
 	}
 
+	private final ArrivalPolicy arrivalPolicy = new ArrivalPolicy();
 	private final PlanService plans;
 	private final CreateReservationUseCase createReservation;
 	private final ManageReservationUseCase manageReservations;
@@ -192,9 +195,12 @@ class DemoSeeder implements ResetDemoUseCase {
 		for (int i = 0; i < SAMPLES.size(); i++) {
 			SampleReservation sample = SAMPLES.get(i);
 			Slot slot = slots.get(Math.min(slots.size() - 1, i * step + i % 2));
+			// Una hora de la rejilla del turno, distinta según la reserva para que la agenda no sea toda a la misma hora.
+			List<LocalTime> arrivalSlots = arrivalPolicy.arrivalSlots(slot.shift());
+			LocalTime arrivalTime = arrivalSlots.get(i % arrivalSlots.size());
 			Reservation created = createReservation.create(DemoAccount.PLAN_SLUG,
 					new CreateReservationCommand(slot.date(), slot.shift().id(), sample.partySize(), sample.name(),
-							sample.phone(), null, tableIds.get(sample.tableLabel())));
+							sample.phone(), null, tableIds.get(sample.tableLabel()), arrivalTime));
 			if (sample.confirmed()) {
 				manageReservations.confirm(ownerUid, created.id());
 			}

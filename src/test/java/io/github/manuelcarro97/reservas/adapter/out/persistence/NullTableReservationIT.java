@@ -50,7 +50,7 @@ class NullTableReservationIT extends PostgresIT {
 	}
 
 	private Reservation pendingWithoutTable(String code) {
-		return Reservation.newPending(code, restaurant.id(), dinner.id(), null, tomorrow, 2, "Luis", "600000001",
+		return Reservation.newPending(code, restaurant.id(), dinner.id(), null, tomorrow, dinner.start(), 2, "Luis", "600000001",
 				null, Instant.parse("2026-12-01T10:00:00Z"));
 	}
 

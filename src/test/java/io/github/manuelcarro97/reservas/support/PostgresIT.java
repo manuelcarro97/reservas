@@ -132,7 +132,7 @@ public abstract class PostgresIT {
 		Long tableId = table == null ? null : table.id();
 		String code = ReservationCode.generate(restaurant.slug());
 		return reservations
-			.tryInsert(Reservation.newPending(code, restaurant.id(), shift.id(), tableId, date, party, "Ana",
+			.tryInsert(Reservation.newPending(code, restaurant.id(), shift.id(), tableId, date, shift.start(), party, "Ana",
 					"600000000", null, clock.instant()))
 			.orElseThrow();
 	}

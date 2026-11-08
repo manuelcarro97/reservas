@@ -43,7 +43,7 @@ class ReservationEvents {
 			Reservation reservation, Instant at) {
 		FeedEvent draft = new FeedEvent(kind, reservation.id(), reservation.code(), restaurant.slug(),
 				restaurant.name(), reservation.customerName(), reservation.partySize(), reservation.date(), shiftName,
-				tableLabel, at, null);
+				reservation.arrivalTime(), tableLabel, at, null);
 		return draft.withText(NotificationText.of(draft));
 	}
 

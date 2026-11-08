@@ -3,6 +3,10 @@
     "schemas": {
       "AdminReservation": {
         "properties": {
+          "arrivalTime": {
+            "format": "time-local",
+            "type": "string"
+          },
           "code": {
             "type": "string"
           },
@@ -107,6 +111,10 @@
       },
       "CreateReservationRequest": {
         "properties": {
+          "arrivalTime": {
+            "format": "time-local",
+            "type": "string"
+          },
           "customerEmail": {
             "format": "email",
             "maxLength": 254,
@@ -145,6 +153,7 @@
           }
         },
         "required": [
+          "arrivalTime",
           "customerName",
           "customerPhone",
           "date",
@@ -211,6 +220,10 @@
       },
       "FeedEvent": {
         "properties": {
+          "arrivalTime": {
+            "format": "time-local",
+            "type": "string"
+          },
           "at": {
             "format": "date-time",
             "type": "string"
@@ -486,6 +499,10 @@
       },
       "ReservationDetails": {
         "properties": {
+          "arrivalTime": {
+            "format": "time-local",
+            "type": "string"
+          },
           "code": {
             "type": "string"
           },
@@ -625,6 +642,13 @@
       },
       "ShiftAvailability": {
         "properties": {
+          "arrivalTimes": {
+            "items": {
+              "format": "time-local",
+              "type": "string"
+            },
+            "type": "array"
+          },
           "available": {
             "type": "boolean"
           },

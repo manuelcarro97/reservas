@@ -120,7 +120,7 @@ class TelegramLinkIT extends PostgresIT {
 
 	private void book() throws Exception {
 		mvc.perform(post("/api/v1/restaurants/demo/reservations").contentType(MediaType.APPLICATION_JSON).content("""
-				{"date":"%s","shiftId":%d,"partySize":2,"customerName":"Ana","customerPhone":"600000000",
+				{"date":"%s","shiftId":%d,"arrivalTime":"20:30","partySize":2,"customerName":"Ana","customerPhone":"600000000",
 				 "tableId":%d}
 				""".formatted(DATE, shift.id(), table.id()))).andExpect(status().isCreated());
 	}
@@ -376,7 +376,7 @@ class TelegramLinkIT extends PostgresIT {
 		Awaitility.await()
 			.atMost(Duration.ofMillis(WAIT_MS))
 			.untilAsserted(() -> assertThat(client.sent())
-				.containsExactly(new Sent(424242L, "[demo] Nueva reserva: Ana, 2 personas, cena del miércoles 2, mesa M2")));
+				.containsExactly(new Sent(424242L, "[demo] Nueva reserva: Ana, 2 personas, cena del miércoles 2 a las 20:30, mesa M2")));
 	}
 
 	@Test

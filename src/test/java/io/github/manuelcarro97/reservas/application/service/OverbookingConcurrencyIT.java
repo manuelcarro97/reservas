@@ -3,6 +3,7 @@ package io.github.manuelcarro97.reservas.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -46,7 +47,7 @@ class OverbookingConcurrencyIT extends PostgresIT {
 			start.await();
 			try {
 				return new Attempt(createReservation.create("demo",
-						new CreateReservationCommand(DATE, shiftId, partySize, "Ana", "600000000", null, tableId)),
+						new CreateReservationCommand(DATE, shiftId, partySize, "Ana", "600000000", null, tableId, LocalTime.of(20, 0))),
 						null);
 			}
 			catch (TableTakenException | NoTableAvailableException rejected) {
@@ -118,7 +119,7 @@ class OverbookingConcurrencyIT extends PostgresIT {
 
 		// Sin pasar por el servicio ni por el bloqueo: solo el índice parcial único impide el duplicado.
 		assertThat(reservations.tryInsert(Reservation.newPending("DEMO-DUPLICADA0001", restaurant.id(), shift.id(),
-				table.id(), DATE, 2, "Ana", "600000000", null, clock.instant()))).isEmpty();
+				table.id(), DATE, LocalTime.of(20, 0), 2, "Ana", "600000000", null, clock.instant()))).isEmpty();
 		assertThat(activeRows()).isEqualTo(1);
 	}
 

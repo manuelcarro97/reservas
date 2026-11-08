@@ -43,7 +43,7 @@ class ReservationPersistenceAdapterIT extends PostgresIT {
 	}
 
 	private Reservation reservation(String code) {
-		return Reservation.newPending(code, restaurant.id(), shift.id(), table.id(), DATE, 2, "Ana", "600000000", null,
+		return Reservation.newPending(code, restaurant.id(), shift.id(), table.id(), DATE, shift.start(), 2, "Ana", "600000000", null,
 				Instant.parse("2026-11-01T10:00:00Z"));
 	}
 

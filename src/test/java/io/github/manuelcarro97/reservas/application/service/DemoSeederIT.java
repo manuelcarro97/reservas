@@ -240,6 +240,19 @@ class DemoSeederIT extends PostgresIT {
 			.containsOnlyNulls();
 	}
 
+	@Test
+	void everySampleHasAnArrivalTimeOnItsShiftGrid() {
+		seeder.reset();
+
+		assertThat(jdbc.sql("""
+				SELECT count(*) FROM reservation r JOIN shift s ON s.id = r.shift_id
+				WHERE r.arrival_time BETWEEN s.start_time AND s.end_time - interval '60 minutes'
+				  AND extract(epoch FROM (r.arrival_time - s.start_time)) % 1800 = 0
+				""").query(Long.class).single()).isEqualTo(6);
+		assertThat(jdbc.sql("SELECT count(DISTINCT arrival_time) FROM reservation").query(Long.class).single())
+			.isGreaterThan(1);
+	}
+
 	/**
 	 * A cualquier hora (incluida la noche, con el horario de verano y con el día de la zona distinto del UTC) ninguna
 	 * reserva cae en un turno que ya empezó ni fuera de los próximos 7 días de Madrid.
@@ -477,7 +490,8 @@ class DemoSeederIT extends PostgresIT {
 		seeder.reset();
 		PlanView plan = demoPlan();
 		CreateReservationCommand command = new CreateReservationCommand(LocalDate.of(2026, 12, 8),
-				plan.shifts().getFirst().id(), 2, "Visitante", "600000099", null, plan.tables().getFirst().id());
+				plan.shifts().getFirst().id(), 2, "Visitante", "600000099", null, plan.tables().getFirst().id(),
+				plan.shifts().getFirst().start());
 
 		Throwable outcome = visitorWaitingBehindAReset(() -> createReservation.create("demo", command));
 
@@ -520,7 +534,8 @@ class DemoSeederIT extends PostgresIT {
 		for (int round = 0; round < 6; round++) {
 			PlanView plan = demoPlan();
 			CreateReservationCommand command = new CreateReservationCommand(LocalDate.of(2026, 12, 9),
-					plan.shifts().getLast().id(), 2, "Visitante", "600000099", null, plan.tables().getLast().id());
+					plan.shifts().getLast().id(), 2, "Visitante", "600000099", null, plan.tables().getLast().id(),
+					plan.shifts().getLast().start());
 			CountDownLatch start = new CountDownLatch(1);
 			try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
 				Future<String> reset = executor.submit(() -> {

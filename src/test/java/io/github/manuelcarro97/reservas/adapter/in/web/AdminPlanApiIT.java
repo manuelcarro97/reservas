@@ -220,7 +220,7 @@ class AdminPlanApiIT extends PostgresIT {
 			.andExpect(jsonPath("$.code").value("RESTAURANT_NOT_FOUND"));
 		mvc.perform(post("/api/v1/restaurants/mi-local/reservations").contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"date":"2026-12-02","shiftId":1,"partySize":2,"customerName":"Ana","customerPhone":"600000000"}
+					{"date":"2026-12-02","shiftId":1,"arrivalTime":"20:00","partySize":2,"customerName":"Ana","customerPhone":"600000000"}
 					"""))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.code").value("RESTAURANT_NOT_FOUND"));

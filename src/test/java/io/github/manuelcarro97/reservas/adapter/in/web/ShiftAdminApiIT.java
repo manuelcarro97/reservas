@@ -248,7 +248,7 @@ class ShiftAdminApiIT extends PostgresIT {
 
 		mvc.perform(post("/api/v1/restaurants/" + SLUG + "/reservations").contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"date":"%s","shiftId":%d,"partySize":2,"customerName":"Ana","customerPhone":"600000000"}
+					{"date":"%s","shiftId":%d,"arrivalTime":"20:00","partySize":2,"customerName":"Ana","customerPhone":"600000000"}
 					""".formatted(DATE, dinner.id())))
 			.andExpect(status().isNotFound())
 			.andExpect(jsonPath("$.code").value("SHIFT_NOT_FOUND"));

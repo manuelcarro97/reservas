@@ -90,7 +90,7 @@ class LayoutSaveConcurrencyIT extends PostgresIT {
 	private boolean book(Restaurant plan, Shift shift, DiningTable table) {
 		try {
 			createReservation.create(plan.slug(),
-					new CreateReservationCommand(DATE, shift.id(), 2, "Ana", "600000000", null, table.id()));
+					new CreateReservationCommand(DATE, shift.id(), 2, "Ana", "600000000", null, table.id(), shift.start()));
 			return true;
 		}
 		catch (TableNotFoundException saveWon) {

@@ -2,6 +2,7 @@ package io.github.manuelcarro97.reservas.application.service;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -23,6 +24,7 @@ import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
+import io.github.manuelcarro97.reservas.domain.service.ArrivalPolicy;
 import io.github.manuelcarro97.reservas.domain.service.BookingPolicy;
 import io.github.manuelcarro97.reservas.domain.service.SeatingCapacity;
 
@@ -36,6 +38,7 @@ class AvailabilityService implements GetAvailabilityUseCase, GetOccupancyUseCase
 	private final Clock clock;
 	private final BookingPolicy bookingPolicy = new BookingPolicy();
 	private final SeatingCapacity seatingCapacity = new SeatingCapacity();
+	private final ArrivalPolicy arrivalPolicy = new ArrivalPolicy();
 
 	AvailabilityService(RestaurantRepositoryPort restaurants, ShiftRepositoryPort shifts, TableRepositoryPort tables,
 			ReservationRepositoryPort reservations, Clock clock) {
@@ -55,9 +58,16 @@ class AvailabilityService implements GetAvailabilityUseCase, GetOccupancyUseCase
 		return shifts.findAll(restaurant.id())
 			.stream()
 			.filter(shift -> shift.opensOn(date))
-			.map(shift -> new ShiftAvailability(shift.id(), shift.name(), shift.start(),
-					isAvailable(restaurant, shift, date, partySize)))
+			.map(shift -> shiftAvailability(restaurant, shift, date, partySize))
 			.toList();
+	}
+
+	/** Un turno que no admite reservas tampoco ofrece horas de llegada. */
+	private ShiftAvailability shiftAvailability(Restaurant restaurant, Shift shift, LocalDate date, int partySize) {
+		boolean available = isAvailable(restaurant, shift, date, partySize);
+		List<LocalTime> arrivalTimes = available
+				? arrivalPolicy.availableSlots(shift, date, restaurant.zone(), clock.instant()) : List.of();
+		return new ShiftAvailability(shift.id(), shift.name(), shift.start(), available, arrivalTimes);
 	}
 
 	@Override

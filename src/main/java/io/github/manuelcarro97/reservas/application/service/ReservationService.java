@@ -47,6 +47,7 @@ import io.github.manuelcarro97.reservas.domain.model.ReservationCode;
 import io.github.manuelcarro97.reservas.domain.model.ReservationStatus;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
+import io.github.manuelcarro97.reservas.domain.service.ArrivalPolicy;
 import io.github.manuelcarro97.reservas.domain.service.BookingPolicy;
 import io.github.manuelcarro97.reservas.domain.service.SeatingCapacity;
 import io.github.manuelcarro97.reservas.domain.service.TableAssigner;
@@ -70,6 +71,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	private final BookingPolicy bookingPolicy = new BookingPolicy();
 	private final SeatingCapacity seatingCapacity = new SeatingCapacity();
 	private final TableAssigner tableAssigner = new TableAssigner();
+	private final ArrivalPolicy arrivalPolicy = new ArrivalPolicy();
 
 	ReservationService(RestaurantRepositoryPort restaurants, ShiftRepositoryPort shifts, TableRepositoryPort tables,
 			ReservationRepositoryPort reservations, Clock clock, ReservationEvents events,
@@ -106,6 +108,8 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 		bookingPolicy.requireWithinWindow(restaurant, command.date(), clock);
 		bookingPolicy.validate(restaurant, shift, command.date(), command.partySize(),
 				restaurants.maxCapacity(restaurant.id()), restaurants.isClosed(restaurant.id(), command.date()), clock);
+		// Después de validate: un turno ya empezado se rechaza allí, así que aquí solo llega una hora de un turno futuro.
+		arrivalPolicy.requireValid(shift, command.arrivalTime(), command.date(), restaurant.zone(), clock.instant());
 
 		List<DiningTable> free = tables.findFree(restaurant.id(), shift.id(), command.date());
 		List<Integer> unassignedParties = reservations.findActiveFor(restaurant.id(), shift.id(), command.date())
@@ -347,7 +351,7 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 		String phone = masked ? ContactMask.phone(reservation.customerPhone()) : reservation.customerPhone();
 		String email = demoPanel ? null : reservation.customerEmail();
 		return new AdminReservation(reservation.id(), reservation.code(), reservation.status(), reservation.date(),
-				reservation.shiftId(), reservation.partySize(), reservation.tableId(), tableLabel,
+				reservation.arrivalTime(), reservation.shiftId(), reservation.partySize(), reservation.tableId(), tableLabel,
 				reservation.customerName(), phone, email, reservation.createdAt());
 	}
 
@@ -374,14 +378,14 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 
 	private ReservationDetails details(Reservation reservation, Restaurant restaurant, Shift shift) {
 		return new ReservationDetails(reservation.code(), reservation.status(), reservation.date(),
-				reservation.shiftId(), reservation.partySize(), tableLabel(reservation), restaurant.name(),
-				restaurant.slug(), restaurant.theme(), shift.name(), shift.start(), shift.end());
+				reservation.arrivalTime(), reservation.shiftId(), reservation.partySize(), tableLabel(reservation),
+				restaurant.name(), restaurant.slug(), restaurant.theme(), shift.name(), shift.start(), shift.end());
 	}
 
 	private Reservation pendingReservation(Restaurant restaurant, Long tableId, CreateReservationCommand command) {
 		return Reservation.newPending(ReservationCode.generate(restaurant.slug()), restaurant.id(), command.shiftId(),
-				tableId, command.date(), command.partySize(), command.customerName(), command.customerPhone(),
-				command.customerEmail(), clock.instant());
+				tableId, command.date(), command.arrivalTime(), command.partySize(), command.customerName(),
+				command.customerPhone(), command.customerEmail(), clock.instant());
 	}
 
 }

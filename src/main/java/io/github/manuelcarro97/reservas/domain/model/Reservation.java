@@ -3,6 +3,7 @@ package io.github.manuelcarro97.reservas.domain.model;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import io.github.manuelcarro97.reservas.domain.exception.CancellationDeadlinePassedException;
 import io.github.manuelcarro97.reservas.domain.exception.InvalidTransitionException;
@@ -17,6 +18,8 @@ public class Reservation {
 	private final long shiftId;
 	private Long tableId;
 	private final LocalDate date;
+	/** Hora de llegada dentro del turno; nula en las reservas anteriores a que existiera. */
+	private final LocalTime arrivalTime;
 	private final int partySize;
 	private final String customerName;
 	private final String customerPhone;
@@ -27,14 +30,15 @@ public class Reservation {
 	private Instant cancelledByCustomerAt;
 
 	public Reservation(Long id, String code, long restaurantId, long shiftId, Long tableId, LocalDate date,
-			int partySize, String customerName, String customerPhone, String customerEmail, ReservationStatus status,
-			long version, Instant createdAt, Instant cancelledByCustomerAt) {
+			LocalTime arrivalTime, int partySize, String customerName, String customerPhone, String customerEmail,
+			ReservationStatus status, long version, Instant createdAt, Instant cancelledByCustomerAt) {
 		this.id = id;
 		this.code = code;
 		this.restaurantId = restaurantId;
 		this.shiftId = shiftId;
 		this.tableId = tableId;
 		this.date = date;
+		this.arrivalTime = arrivalTime;
 		this.partySize = partySize;
 		this.customerName = customerName;
 		this.customerPhone = customerPhone;
@@ -46,9 +50,10 @@ public class Reservation {
 	}
 
 	public static Reservation newPending(String code, long restaurantId, long shiftId, Long tableId, LocalDate date,
-			int partySize, String customerName, String customerPhone, String customerEmail, Instant createdAt) {
-		return new Reservation(null, code, restaurantId, shiftId, tableId, date, partySize, customerName,
-				customerPhone, customerEmail, ReservationStatus.PENDING, 0, createdAt, null);
+			LocalTime arrivalTime, int partySize, String customerName, String customerPhone, String customerEmail,
+			Instant createdAt) {
+		return new Reservation(null, code, restaurantId, shiftId, tableId, date, arrivalTime, partySize,
+				customerName, customerPhone, customerEmail, ReservationStatus.PENDING, 0, createdAt, null);
 	}
 
 	public void confirm(Instant now, Instant shiftStart) {
@@ -124,6 +129,10 @@ public class Reservation {
 
 	public LocalDate date() {
 		return date;
+	}
+
+	public LocalTime arrivalTime() {
+		return arrivalTime;
 	}
 
 	public int partySize() {

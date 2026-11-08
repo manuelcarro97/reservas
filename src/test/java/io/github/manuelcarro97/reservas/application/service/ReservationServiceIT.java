@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
+import io.github.manuelcarro97.reservas.domain.exception.InvalidArrivalTimeException;
 import io.github.manuelcarro97.reservas.domain.exception.NoTableAvailableException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftNotFoundException;
 import io.github.manuelcarro97.reservas.domain.exception.TableNotAllowedException;
@@ -48,7 +50,8 @@ class ReservationServiceIT extends PostgresIT {
 
 	private Reservation reserve(long shiftId, Long tableId, int partySize) {
 		return createReservation.create("demo",
-				new CreateReservationCommand(DATE, shiftId, partySize, "Ana", "600000000", null, tableId));
+				new CreateReservationCommand(DATE, shiftId, partySize, "Ana", "600000000", null, tableId,
+						shift.start()));
 	}
 
 	@Test
@@ -58,6 +61,38 @@ class ReservationServiceIT extends PostgresIT {
 		assertThat(reservation.status()).isEqualTo(ReservationStatus.PENDING);
 		assertThat(reservation.tableId()).isEqualTo(big.id());
 		assertThat(reservation.code()).matches("^DEMO-[2-9A-HJ-NP-Z]{16}$");
+	}
+
+	@Test
+	void createStoresTheArrivalTimeAndReadsItBack() {
+		Reservation created = createReservation.create("demo", new CreateReservationCommand(DATE, shift.id(), 2,
+				"Ana", "600000000", null, big.id(), LocalTime.of(21, 0)));
+
+		assertThat(created.arrivalTime()).isEqualTo(LocalTime.of(21, 0));
+		assertThat(reservations.findByCode(created.code())).get()
+			.extracting(Reservation::arrivalTime)
+			.isEqualTo(LocalTime.of(21, 0));
+	}
+
+	@Test
+	void arrivalTimeOutsideTheShiftGridIsRejectedWithoutInserting() {
+		assertThatThrownBy(() -> createReservation.create("demo", new CreateReservationCommand(DATE, shift.id(), 2,
+				"Ana", "600000000", null, big.id(), LocalTime.of(20, 15)))).isInstanceOf(InvalidArrivalTimeException.class);
+		assertThat(jdbc.sql("SELECT count(*) FROM reservation").query(Long.class).single()).isZero();
+	}
+
+	@Test
+	void missingArrivalTimeIsRejected() {
+		assertThatThrownBy(() -> createReservation.create("demo", new CreateReservationCommand(DATE, shift.id(), 2,
+				"Ana", "600000000", null, big.id(), null))).isInstanceOf(InvalidArrivalTimeException.class);
+	}
+
+	@Test
+	void anotherArrivalTimeOnTheSameTableAndShiftStillConflicts() {
+		reserve(shift.id(), big.id(), 2);
+
+		assertThatThrownBy(() -> createReservation.create("demo", new CreateReservationCommand(DATE, shift.id(), 2,
+				"Luis", "600000001", null, big.id(), LocalTime.of(21, 0)))).isInstanceOf(TableTakenException.class);
 	}
 
 	@Test

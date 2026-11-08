@@ -85,7 +85,7 @@ class FeedApiIT extends PostgresIT {
 	private ResultActions book(String slug, Shift onShift, DiningTable onTable) throws Exception {
 		return mvc.perform(post("/api/v1/restaurants/" + slug + "/reservations").contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"date":"%s","shiftId":%d,"partySize":2,"customerName":"Ana","customerPhone":"600000000",
+					{"date":"%s","shiftId":%d,"arrivalTime":"20:30","partySize":2,"customerName":"Ana","customerPhone":"600000000",
 					 "customerEmail":"ana@example.com"%s}
 					""".formatted(DATE, onShift.id(), onTable == null ? "" : ",\"tableId\":" + onTable.id())));
 	}
@@ -128,10 +128,11 @@ class FeedApiIT extends PostgresIT {
 			.andExpect(jsonPath("$.events[0].partySize").value(2))
 			.andExpect(jsonPath("$.events[0].date").value(DATE))
 			.andExpect(jsonPath("$.events[0].shiftName").value("Cena"))
+			.andExpect(jsonPath("$.events[0].arrivalTime").value(org.hamcrest.Matchers.startsWith("20:30")))
 			.andExpect(jsonPath("$.events[0].tableLabel").value("M2"))
 			.andExpect(jsonPath("$.events[0].at").value(MutableClock.START.toString()))
 			.andExpect(jsonPath("$.events[0].text")
-				.value("[demo] Nueva reserva: Ana, 2 personas, cena del miércoles 2, mesa M2"))
+				.value("[demo] Nueva reserva: Ana, 2 personas, cena del miércoles 2 a las 20:30, mesa M2"))
 			// Ni teléfono, ni email, ni dueño en la respuesta.
 			.andExpect(content().string(not(containsString("600000000"))))
 			.andExpect(content().string(not(containsString("ana@example.com"))))
@@ -146,7 +147,7 @@ class FeedApiIT extends PostgresIT {
 		feed("owner-a", BEFORE_START).andExpect(jsonPath("$.events", hasSize(1)))
 			.andExpect(jsonPath("$.events[0].tableLabel").doesNotExist())
 			.andExpect(jsonPath("$.events[0].text")
-				.value("[demo] Nueva reserva: Ana, 2 personas, cena del miércoles 2, sin mesa"));
+				.value("[demo] Nueva reserva: Ana, 2 personas, cena del miércoles 2 a las 20:30, sin mesa"));
 	}
 
 	@Test
@@ -162,7 +163,7 @@ class FeedApiIT extends PostgresIT {
 			.andExpect(jsonPath("$.events[1].code").value(code))
 			.andExpect(jsonPath("$.events[1].at").value(MutableClock.START.plusSeconds(120).toString()))
 			.andExpect(jsonPath("$.events[1].text")
-				.value("[demo] Reserva cancelada por el cliente: Ana, 2 personas, cena del miércoles 2"));
+				.value("[demo] Reserva cancelada por el cliente: Ana, 2 personas, cena del miércoles 2 a las 20:30"));
 	}
 
 	@Test
@@ -260,7 +261,7 @@ class FeedApiIT extends PostgresIT {
 
 		ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
 		verify(notifications, timeout(WAIT_MS).times(1)).notifyOwner(eq("owner-a"), text.capture());
-		assertThat(text.getValue()).isEqualTo("[demo] Nueva reserva: Ana, 2 personas, cena del miércoles 2, mesa M2");
+		assertThat(text.getValue()).isEqualTo("[demo] Nueva reserva: Ana, 2 personas, cena del miércoles 2 a las 20:30, mesa M2");
 	}
 
 	@Test
@@ -272,7 +273,7 @@ class FeedApiIT extends PostgresIT {
 		ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
 		verify(notifications, timeout(WAIT_MS).times(2)).notifyOwner(eq("owner-a"), text.capture());
 		assertThat(text.getAllValues().get(1))
-			.isEqualTo("[demo] Reserva cancelada por el cliente: Ana, 2 personas, cena del miércoles 2");
+			.isEqualTo("[demo] Reserva cancelada por el cliente: Ana, 2 personas, cena del miércoles 2 a las 20:30");
 	}
 
 	@Test
@@ -286,7 +287,7 @@ class FeedApiIT extends PostgresIT {
 		// Grupo mayor que la mesa: 422, sin aviso.
 		mvc.perform(post("/api/v1/restaurants/demo/reservations").contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"date":"%s","shiftId":%d,"partySize":3,"customerName":"Ana","customerPhone":"600000000",
+					{"date":"%s","shiftId":%d,"arrivalTime":"20:30","partySize":3,"customerName":"Ana","customerPhone":"600000000",
 					 "tableId":%d}
 					""".formatted(DATE, shift.id(), table.id()))).andExpect(status().is4xxClientError());
 

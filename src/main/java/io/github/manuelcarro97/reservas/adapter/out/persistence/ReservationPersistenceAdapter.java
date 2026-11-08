@@ -4,6 +4,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -27,9 +28,10 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 
 	// Va por JDBC porque JPA no expresa ON CONFLICT, y un conflicto no debe abortar la transacción.
 	private static final String INSERT_IF_SLOT_FREE = """
-			INSERT INTO reservation (code, restaurant_id, shift_id, table_id, reservation_date, party_size,
-			                         customer_name, customer_phone, customer_email, status, version, created_at)
-			VALUES (:code, :restaurantId, :shiftId, :tableId, :date, :partySize,
+			INSERT INTO reservation (code, restaurant_id, shift_id, table_id, reservation_date, arrival_time,
+			                         party_size, customer_name, customer_phone, customer_email, status, version,
+			                         created_at)
+			VALUES (:code, :restaurantId, :shiftId, :tableId, :date, :arrivalTime, :partySize,
 			        :customerName, :customerPhone, :customerEmail, :status, 0, :createdAt)
 			ON CONFLICT (table_id, reservation_date, shift_id) WHERE status IN ('PENDING', 'CONFIRMED') DO NOTHING
 			RETURNING id
@@ -77,6 +79,7 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 			.param("shiftId", reservation.shiftId())
 			.param("tableId", reservation.tableId(), Types.BIGINT)
 			.param("date", reservation.date())
+			.param("arrivalTime", reservation.arrivalTime(), Types.TIME)
 			.param("partySize", reservation.partySize())
 			.param("customerName", reservation.customerName())
 			.param("customerPhone", reservation.customerPhone())
@@ -86,9 +89,9 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 			.query(Long.class)
 			.optional()
 			.map(id -> new Reservation(id, reservation.code(), reservation.restaurantId(), reservation.shiftId(),
-					reservation.tableId(), reservation.date(), reservation.partySize(), reservation.customerName(),
-					reservation.customerPhone(), reservation.customerEmail(), reservation.status(), 0,
-					reservation.createdAt(), reservation.cancelledByCustomerAt()));
+					reservation.tableId(), reservation.date(), reservation.arrivalTime(), reservation.partySize(),
+					reservation.customerName(), reservation.customerPhone(), reservation.customerEmail(),
+					reservation.status(), 0, reservation.createdAt(), reservation.cancelledByCustomerAt()));
 	}
 
 	@Override

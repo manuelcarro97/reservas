@@ -55,7 +55,8 @@ class DemoPanelPrivacyIT extends PostgresIT {
 		PlanView plan = plans.get(DEMO_UID, "demo");
 		DiningTable freeTable = plan.tables().stream().filter(table -> table.label().equals("9")).findFirst().orElseThrow();
 		createReservation.create("demo", new CreateReservationCommand(VISITOR_DATE, plan.shifts().getLast().id(), 2,
-				"Visitante Real", "611 222 333", "visitante@example.com", freeTable.id()));
+				"Visitante Real", "611 222 333", "visitante@example.com", freeTable.id(),
+				plan.shifts().getLast().start()));
 	}
 
 	@Test
@@ -133,7 +134,8 @@ class DemoPanelPrivacyIT extends PostgresIT {
 		Shift shift = givenDinnerShift(plan);
 		DiningTable table = givenTable(plan, "1", 4);
 		createReservation.create("bar-de-luis", new CreateReservationCommand(LocalDate.of(2026, 12, 2), shift.id(), 2,
-				"Cliente", "611 222 333", "cliente@example.com", table.id()));
+				"Cliente", "611 222 333", "cliente@example.com", table.id(),
+				shift.start()));
 
 		AdminReservation reservation = manageReservations.list("owner-b", "bar-de-luis", LocalDate.of(2026, 12, 2))
 			.getFirst();

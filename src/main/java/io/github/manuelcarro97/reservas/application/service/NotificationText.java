@@ -1,5 +1,6 @@
 package io.github.manuelcarro97.reservas.application.service;
 
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.Locale;
 
@@ -9,6 +10,7 @@ import io.github.manuelcarro97.reservas.application.port.in.FeedEvent;
 final class NotificationText {
 
 	private static final Locale SPANISH = Locale.forLanguageTag("es");
+	private static final DateTimeFormatter ARRIVAL_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
 	private NotificationText() {
 	}
@@ -37,11 +39,15 @@ final class NotificationText {
 		return event.partySize() == 1 ? "1 persona" : event.partySize() + " personas";
 	}
 
-	/** "cena del viernes 4": turno en minúsculas, día de la semana y del mes. */
+	/**
+	 * "cena del viernes 4 a las 20:30": turno en minúsculas, día de la semana y del mes, y la hora de llegada si la
+	 * reserva la tiene (las anteriores a que existiera no).
+	 */
 	private static String when(FeedEvent event) {
 		String weekday = event.date().getDayOfWeek().getDisplayName(TextStyle.FULL, SPANISH);
-		return "%s del %s %d".formatted(event.shiftName().toLowerCase(SPANISH), weekday,
+		String day = "%s del %s %d".formatted(event.shiftName().toLowerCase(SPANISH), weekday,
 				event.date().getDayOfMonth());
+		return event.arrivalTime() == null ? day : day + " a las " + ARRIVAL_FORMAT.format(event.arrivalTime());
 	}
 
 }

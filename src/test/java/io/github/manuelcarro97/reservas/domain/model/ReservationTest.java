@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,12 +20,14 @@ class ReservationTest {
 	private static final int DEADLINE_HOURS = 2;
 
 	private static Reservation pending() {
-		return Reservation.newPending("ABCD", 1L, 2L, 3L, LocalDate.of(2026, 12, 1), 2, "Ana", "600000000", null,
+		return Reservation.newPending("ABCD", 1L, 2L, 3L, LocalDate.of(2026, 12, 1), LocalTime.of(20, 30), 2, "Ana",
+				"600000000", null,
 				Instant.parse("2026-11-01T10:00:00Z"));
 	}
 
 	private static Reservation pendingWithoutTable() {
-		return Reservation.newPending("ABCD", 1L, 2L, null, LocalDate.of(2026, 12, 1), 2, "Ana", "600000000", null,
+		return Reservation.newPending("ABCD", 1L, 2L, null, LocalDate.of(2026, 12, 1), LocalTime.of(20, 30), 2, "Ana",
+				"600000000", null,
 				Instant.parse("2026-11-01T10:00:00Z"));
 	}
 
@@ -38,6 +41,11 @@ class ReservationTest {
 		Reservation reservation = pending();
 		reservation.cancel();
 		return reservation;
+	}
+
+	@Test
+	void newPendingKeepsTheArrivalTime() {
+		assertThat(pending().arrivalTime()).isEqualTo(LocalTime.of(20, 30));
 	}
 
 	@Test
