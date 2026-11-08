@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { PlanoComponent } from '../../plano/plano.component';
+import { FeedService } from '../notifications/feed.service';
 import { ReservationsStore, tableName } from './reservations.store';
 
 const STATUS_TEXT: Record<NonNullable<AdminReservation['status']>, string> = {
@@ -37,6 +38,16 @@ export class ReservationsPage {
       .subscribe((params) => {
         this.slug = params.get('slug') ?? '';
         this.store.load(this.slug);
+      });
+
+    // Sin el marco del panel no hay servicio de avisos (opcional): la página sigue funcionando, sin recarga en vivo.
+    inject(FeedService, { optional: true })
+      ?.events.pipe(takeUntilDestroyed())
+      .subscribe((event) => {
+        // Mientras carga el plano no hay fecha ni turno que releer: la propia carga ya trae lo último.
+        if (event.restaurantSlug === this.slug && this.store.status() === 'ready') {
+          this.store.refresh();
+        }
       });
   }
 

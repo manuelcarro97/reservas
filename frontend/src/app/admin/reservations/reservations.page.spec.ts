@@ -4,19 +4,26 @@ import {
   TestRequest,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { Subject } from 'rxjs';
 import type { Mock } from 'vitest';
 import { ApiConfiguration } from '../../core/api/api-configuration';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
+import { FeedEvent } from '../../core/api/models/feed-event';
 import { PlanResponse } from '../../core/api/models/plan-response';
 import { TableOccupancy } from '../../core/api/models/table-occupancy';
 import { TableSuggestion } from '../../core/api/models/table-suggestion';
 import { NOW } from '../../public/booking.store';
+import { FeedService } from '../notifications/feed.service';
 import { ReservationsPage } from './reservations.page';
 import { isRealDate } from './reservations.store';
 import { OPEN_WINDOW } from './whatsapp';
+
+@Component({ template: '<p>otra</p>' })
+class OtherStub {}
 
 const EVERY_DAY = [
   'MONDAY',
@@ -124,16 +131,23 @@ describe('ReservationsPage', () => {
   let harness: RouterTestingHarness;
   let page: HTMLElement;
   let openWindow: Mock<(url: string) => void>;
+  let feedEvents: Subject<FeedEvent>;
 
   beforeEach(() => {
     openWindow = vi.fn<(url: string) => void>();
+    feedEvents = new Subject<FeedEvent>();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideRouter([{ path: 'panel/:slug', component: ReservationsPage }]),
+        provideRouter([
+          { path: 'panel/:slug', component: ReservationsPage },
+          { path: 'otra', component: OtherStub },
+        ]),
         { provide: NOW, useValue: () => CLOCK },
         { provide: OPEN_WINDOW, useValue: openWindow },
+        // El marco del panel provee el servicio real; aquí solo importan los eventos que emite.
+        { provide: FeedService, useValue: { events: feedEvents.asObservable() } },
       ],
     });
     TestBed.inject(ApiConfiguration).rootUrl = '';
@@ -845,6 +859,61 @@ describe('ReservationsPage', () => {
 
     expect(page.querySelector('li.reservation img')).toBeNull();
     expect(row('<img').textContent).toContain('<img src=x onerror=alert(1)>');
+  });
+
+  describe('liveUpdates', () => {
+    const NEW_EVENT = {
+      kind: 'NEW',
+      reservationId: 9,
+      restaurantSlug: 'kafe',
+      text: 'Nueva reserva',
+    };
+
+    it('reloadsTheListPendingAndOccupancyOnAnEventOfThisPlan', async () => {
+      await open({ day: [LUIS] });
+      expect(rows()).toHaveLength(1);
+
+      feedEvents.next(NEW_EVENT);
+      await flushScreen(TODAY, 11, { day: [LUIS, ANA], pending: [ANA] });
+
+      expect(rows().map((item) => item.querySelector('.name')?.textContent?.trim())).toEqual([
+        'Luis',
+        'Ana',
+      ]);
+    });
+
+    it('ignoresEventsOfAnotherPlan', async () => {
+      await open({ day: [LUIS] });
+
+      feedEvents.next({ ...NEW_EVENT, restaurantSlug: 'tapas' });
+      await settle();
+
+      // `http.verify()` del `afterEach` falla si la página ha pedido algo.
+      expect(rows()).toHaveLength(1);
+    });
+
+    it('ignoresEventsWhileThePlanIsStillLoading', async () => {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe');
+      const plan = request('GET', '/api/v1/admin/restaurants/kafe');
+
+      feedEvents.next(NEW_EVENT);
+      await settle();
+      plan.flush(PLAN);
+      await settle();
+
+      // Solo las lecturas de la carga normal: una por lista, no dos.
+      await flushScreen(TODAY, 11, {});
+    });
+
+    it('stopsListeningWhenThePageIsLeft', async () => {
+      await open({ day: [LUIS] });
+
+      await harness.navigateByUrl('/otra');
+      feedEvents.next(NEW_EVENT);
+
+      expect(feedEvents.observed).toBe(false);
+    });
   });
 });
 

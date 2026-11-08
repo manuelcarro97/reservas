@@ -1,7 +1,18 @@
 <header class="admin-header">
   <a class="brand" routerLink="/panel">Reservas · Panel</a>
+  @if (feed.pendingCount() > 0) {
+    <span class="badge"
+      ><span class="sr-only">Avisos sin ver: </span>{{ feed.pendingCount() }}</span
+    >
+  }
   <app-plan-switcher />
   <nav class="actions">
+    @if (feed.canAskPermission()) {
+      <button type="button" (click)="feed.askPermission()">Activar avisos del navegador</button>
+    }
+    <button type="button" (click)="feed.toggleMute()">
+      {{ feed.muted() ? 'Activar sonido' : 'Silenciar' }}
+    </button>
     <a routerLink="/panel/cuenta">Cuenta</a>
     <button type="button" (click)="signOut()">Salir</button>
   </nav>
@@ -12,3 +23,4 @@
 <main class="admin-main">
   <router-outlet />
 </main>
+<app-toast />

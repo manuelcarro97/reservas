@@ -1,0 +1,15 @@
+<div class="toasts" aria-live="polite">
+  @for (toast of feed.toasts(); track toast.id) {
+    <div class="toast">
+      <button type="button" class="toast-text" (click)="open(toast)">{{ toast.text }}</button>
+      <button
+        type="button"
+        class="toast-close"
+        aria-label="Cerrar aviso"
+        (click)="feed.dismiss(toast.id)"
+      >
+        ×
+      </button>
+    </div>
+  }
+</div>
