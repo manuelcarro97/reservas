@@ -20,7 +20,6 @@ export type PlanStatus = 'loading' | 'ready' | 'unavailable' | 'error';
 const DEFAULT_PARTY_SIZE = 2;
 
 const ERROR_MESSAGES: Record<string, string> = {
-  TABLE_REQUIRED: 'Elige una mesa en el plano para poder reservar.',
   DATE_IN_PAST: 'Ese turno ya ha empezado. Elige otro.',
   DATE_TOO_FAR: 'Solo se puede reservar con 90 días de antelación como máximo.',
   RESTAURANT_CLOSED: 'El local está cerrado ese día. Elige otra fecha.',
@@ -37,6 +36,10 @@ const GONE_MESSAGE = 'Ese turno o mesa ya no está disponible, elige otro';
 const ARRIVAL_UNAVAILABLE_MESSAGE = 'Esa hora ya no está disponible, elige otra';
 /** El backend rechaza la hora elegida (ya pasó o no es del turno): hay que volver a pedir las horas. */
 const ARRIVAL_ERROR_CODES = ['ARRIVAL_TIME_PAST', 'INVALID_ARRIVAL_TIME'];
+/** El local cambió el modo de reserva con la página abierta: o ya no se elige mesa o ahora hay que elegirla. */
+const MODE_CHANGED_CODES = ['TABLE_NOT_ALLOWED', 'TABLE_REQUIRED'];
+const MODE_CHANGED_MESSAGE =
+  'El local ha cambiado la forma de reservar; revisa tu reserva y vuelve a enviarla.';
 
 /** Las horas llegan como `HH:mm:ss` o `HH:mm`; el store trabaja y envía `HH:mm`. */
 function toHourMinute(time: string): string {
@@ -328,9 +331,38 @@ export class BookingStore {
       this.tableId.set(null);
       this.error.set(TABLE_TAKEN_MESSAGE);
       this.requestOccupancy();
+    } else if (code && MODE_CHANGED_CODES.includes(code)) {
+      // El local cambió entre elegir mesa y que el servidor decida: se vuelve a leer el plano, sin tocar lo escrito.
+      this.error.set(MODE_CHANGED_MESSAGE);
+      this.reloadPlan();
     } else {
       this.error.set((code && ERROR_MESSAGES[code]) || GENERIC_ERROR);
     }
+  }
+
+  /**
+   * Vuelve a leer el plano público sin vaciar el formulario: nombre, teléfono, fecha, personas, turno y hora se quedan.
+   * Solo cambia lo que depende del modo de reserva: la mesa elegida ya no vale y, si el cliente ahora elige mesa, se pide
+   * la ocupación del turno; si ya no la elige, se descarta.
+   */
+  private reloadPlan(): void {
+    this.planRequest?.unsubscribe();
+    this.planRequest = this.api.plan({ slug: this.slug }).subscribe({
+      next: (plan) => {
+        this.plan.set(plan);
+        this.tableId.set(null);
+        this.occupied.set(null);
+        this.occupancyFailed.set(false);
+        this.occupancyRequests.next(null);
+        this.requestOccupancy();
+      },
+      // Sin el plano nuevo se queda el que había: el aviso ya está puesto y el siguiente envío lo vuelve a intentar.
+      error: (error: HttpErrorResponse) => {
+        if (error.status === 404) {
+          this.status.set('unavailable');
+        }
+      },
+    });
   }
 
   private clearShifts(): void {

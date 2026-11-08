@@ -464,6 +464,88 @@ describe('BookingPage', () => {
     expect(submitButton().disabled).toBe(true);
   });
 
+  const MODE_CHANGED =
+    'El local ha cambiado la forma de reservar; revisa tu reserva y vuelve a enviarla.';
+
+  function inputValue(name: string): string {
+    return page.querySelector<HTMLInputElement>(`[name=${name}]`)?.value ?? '';
+  }
+
+  function chosen(selector: string): string[] {
+    return Array.from(page.querySelectorAll(`${selector}.chosen`)).map(
+      (button) => button.textContent?.trim() ?? '',
+    );
+  }
+
+  it('tableNotAllowedReloadsThePlanKeepsTheDataAndHidesThePlano', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await choosePartySize(4);
+    await flushShifts();
+    await chooseShift('Comida');
+    table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
+    await fillCustomer();
+    expect(page.querySelectorAll('g.t').length).toBe(3);
+
+    // El local pasó a asignar las mesas él mismo mientras la página estaba abierta.
+    const request = await submit();
+    request.flush(
+      { code: 'TABLE_NOT_ALLOWED' },
+      { status: 422, statusText: 'Unprocessable Entity' },
+    );
+    await settle();
+    expectApi('kafe').flush({ ...PLAN, bookingMode: 'ASSIGNED' });
+    await settle();
+
+    expect(page.querySelector('[role=alert]')?.textContent).toContain(MODE_CHANGED);
+    expect(page.querySelectorAll('g.t').length).toBe(0);
+    expect(inputValue('customerName')).toBe('Ana Pérez');
+    expect(inputValue('customerPhone')).toBe('600123123');
+    expect(inputValue('date')).toBe(TODAY);
+    expect(inputValue('partySize')).toBe('4');
+    expect(chosen('button.shift')).toEqual(['Comida · 13:00']);
+    expect(chosen('button.arrival')).toEqual(['13:30']);
+    expect(submitButton().disabled).toBe(false);
+
+    // Reenviar ya no lleva mesa (y `http.verify` exige que no se haya vuelto a pedir nada más).
+    const again = await submit();
+    expect(again.request.body.tableId).toBeUndefined();
+    again.flush(RESERVATION, { status: 201, statusText: 'Created' });
+    await settle();
+    expect(page.textContent).toContain('KAFE23456789ABCD');
+  });
+
+  it('tableRequiredReloadsThePlanKeepsTheDataAndShowsThePlano', async () => {
+    await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
+    await flushShifts();
+    await chooseShift('Comida', []);
+    await chooseArrival('13:30');
+    await fillCustomer();
+    expect(page.querySelectorAll('g.t').length).toBe(0);
+
+    // El local pasó a que el cliente elija mesa.
+    const request = await submit();
+    request.flush({ code: 'TABLE_REQUIRED' }, { status: 422, statusText: 'Unprocessable Entity' });
+    await settle();
+    expectApi('kafe').flush(PLAN);
+    await settle();
+    expectApi('kafe/occupancy').flush(FREE_OCCUPANCY);
+    await settle();
+
+    expect(page.querySelector('[role=alert]')?.textContent).toContain(MODE_CHANGED);
+    expect(page.querySelectorAll('g.t').length).toBe(3);
+    expect(inputValue('customerName')).toBe('Ana Pérez');
+    expect(inputValue('customerPhone')).toBe('600123123');
+    expect(chosen('button.shift')).toEqual(['Comida · 13:00']);
+    expect(chosen('button.arrival')).toEqual(['13:30']);
+    // Ahora falta elegir mesa antes de poder enviar.
+    expect(submitButton().disabled).toBe(true);
+    table('2').dispatchEvent(new Event('click'));
+    await settle();
+    expect(submitButton().disabled).toBe(false);
+  });
+
   it('rateLimitedShowsMessage', async () => {
     await open('/r/kafe');
     await flushShifts();
