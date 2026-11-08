@@ -35,6 +35,14 @@ const GENERIC_ERROR = 'No se pudo completar la reserva. Inténtalo de nuevo.';
 const TABLE_TAKEN_MESSAGE = 'Esa mesa se acaba de reservar, elige otra';
 const UNAVAILABLE_PLAN_MESSAGE = 'Este plano no está disponible';
 const GONE_MESSAGE = 'Ese turno o mesa ya no está disponible, elige otro';
+const ARRIVAL_UNAVAILABLE_MESSAGE = 'Esa hora ya no está disponible, elige otra';
+/** El backend rechaza la hora elegida (ya pasó o no es del turno): hay que volver a pedir las horas. */
+const ARRIVAL_ERROR_CODES = ['ARRIVAL_TIME_PAST', 'INVALID_ARRIVAL_TIME'];
+
+/** Las horas llegan como `HH:mm:ss` o `HH:mm`; el store trabaja y envía `HH:mm`. */
+function toHourMinute(time: string): string {
+  return time.slice(0, 5);
+}
 
 /** Fecha de calendario de un `Date` creado con componentes locales, como `YYYY-MM-DD`. Solo para sumar días. */
 export function localIsoDate(date: Date): string {
@@ -125,6 +133,8 @@ export class BookingStore {
   readonly shifts = signal<ShiftAvailability[] | null>(null);
   readonly shiftsFailed = signal(false);
   readonly shiftId = signal<number | null>(null);
+  /** Hora de llegada elegida (`HH:mm`) dentro del turno elegido. */
+  readonly arrivalTime = signal<string | null>(null);
   /** Mesas ocupadas en el turno elegido; `null` mientras se pide la ocupación. */
   readonly occupied = signal<ReadonlySet<number> | null>(null);
   readonly occupancyFailed = signal(false);
@@ -163,6 +173,12 @@ export class BookingStore {
     return states;
   });
 
+  /** Horas de llegada que ofrece el turno elegido (el backend ya descarta las pasadas). */
+  readonly arrivalTimes = computed(() => {
+    const shift = this.shifts()?.find((candidate) => candidate.shiftId === this.shiftId());
+    return (shift?.arrivalTimes ?? []).map(toHourMinute);
+  });
+
   readonly selectedTable = computed(
     () => this.tables().find((table) => table.id === this.tableId()) ?? null,
   );
@@ -172,6 +188,7 @@ export class BookingStore {
       this.status() === 'ready' &&
       !this.submitting() &&
       this.shiftId() !== null &&
+      this.arrivalTime() !== null &&
       (!this.freeChoice() || this.tableId() !== null) &&
       this.customerName().trim() !== '' &&
       this.customerPhone().trim() !== '',
@@ -287,10 +304,22 @@ export class BookingStore {
     ) {
       return;
     }
+    // Pulsar el mismo turno para reintentar la ocupación no borra la hora elegida; cambiar de turno sí.
+    if (this.shiftId() !== shiftId) {
+      this.arrivalTime.set(null);
+    }
     this.shiftId.set(shiftId);
     this.tableId.set(null);
     this.error.set(null);
     this.requestOccupancy();
+  }
+
+  selectArrivalTime(time: string): void {
+    if (this.submitting() || !this.arrivalTimes().includes(time)) {
+      return;
+    }
+    this.arrivalTime.set(time);
+    this.error.set(null);
   }
 
   selectTable(tableId: number): void {
@@ -309,7 +338,8 @@ export class BookingStore {
 
   submit(): void {
     const shiftId = this.shiftId();
-    if (!this.canSubmit() || shiftId === null) {
+    const arrivalTime = this.arrivalTime();
+    if (!this.canSubmit() || shiftId === null || arrivalTime === null) {
       return;
     }
     this.submitting.set(true);
@@ -321,6 +351,7 @@ export class BookingStore {
         body: {
           date: this.date(),
           shiftId,
+          arrivalTime,
           partySize: this.partySize(),
           customerName: this.customerName().trim(),
           customerPhone: this.customerPhone().trim(),
@@ -347,6 +378,10 @@ export class BookingStore {
       // Turno o mesa que ya no existen (SHIFT_NOT_FOUND, TABLE_NOT_FOUND): se recargan los turnos de la fecha.
       this.requestShifts();
       this.error.set(GONE_MESSAGE);
+    } else if (code && ARRIVAL_ERROR_CODES.includes(code)) {
+      // La hora ya pasó o dejó de ser del turno: se piden las horas de nuevo y se elige otra.
+      this.requestShifts();
+      this.error.set(ARRIVAL_UNAVAILABLE_MESSAGE);
     } else if (error.status === 429) {
       this.error.set(rateLimitedMessage(error));
     } else if (code === 'TABLE_TAKEN') {
@@ -363,6 +398,7 @@ export class BookingStore {
     this.shifts.set(null);
     this.shiftsFailed.set(false);
     this.shiftId.set(null);
+    this.arrivalTime.set(null);
     this.occupied.set(null);
     this.occupancyFailed.set(false);
     this.tableId.set(null);

@@ -70,14 +70,18 @@ export class ReservationPage {
   /** Tema del plano de la reserva; mientras no hay reserva (cargando, no encontrada), el de un plano nuevo. */
   protected readonly colors = computed(() => THEMES[knownTheme(this.reservation()?.theme)]);
 
-  /** `Cena · 20:00–22:00`; las horas llegan como `HH:mm:ss` o `HH:mm`. */
+  /**
+   * `Cena · llegada 20:30 (20:00–22:00)`; sin hora de llegada (reservas anteriores a que existiera), `Cena · 20:00–22:00`.
+   * Las horas llegan como `HH:mm:ss` o `HH:mm`.
+   */
   protected readonly shiftLabel = computed(() => {
     const reservation = this.reservation();
     const start = reservation?.shiftStart?.slice(0, 5);
     const end = reservation?.shiftEnd?.slice(0, 5);
-    return [reservation?.shiftName, start && end ? `${start}–${end}` : start]
-      .filter(Boolean)
-      .join(' · ');
+    const arrival = reservation?.arrivalTime?.slice(0, 5);
+    const range = start && end ? `${start}–${end}` : start;
+    const when = arrival ? [`llegada ${arrival}`, range && `(${range})`] : [range];
+    return [reservation?.shiftName, when.filter(Boolean).join(' ')].filter(Boolean).join(' · ');
   });
 
   protected readonly statusLabel = computed(() => {

@@ -79,6 +79,23 @@
             }
           </fieldset>
 
+          @if (store.shiftId() !== null) {
+            <fieldset class="shifts">
+              <legend>Hora de llegada</legend>
+              @for (time of store.arrivalTimes(); track time) {
+                <button
+                  type="button"
+                  class="arrival"
+                  [class.chosen]="time === store.arrivalTime()"
+                  [attr.aria-pressed]="time === store.arrivalTime()"
+                  (click)="store.selectArrivalTime(time)"
+                >
+                  {{ time }}
+                </button>
+              }
+            </fieldset>
+          }
+
           @if (store.freeChoice() && store.shiftId() !== null) {
             <section class="table-step">
               <h2>Elige tu mesa</h2>

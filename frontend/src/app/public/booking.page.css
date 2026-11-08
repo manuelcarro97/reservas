@@ -80,7 +80,8 @@ select {
   font-weight: 600;
 }
 
-.shift {
+.shift,
+.arrival {
   padding: 0.5rem 0.9rem;
   border: 1px solid var(--line-ui);
   border-radius: 999px;
@@ -90,13 +91,15 @@ select {
   cursor: pointer;
 }
 
-.shift.chosen {
+.shift.chosen,
+.arrival.chosen {
   border-color: var(--accent);
   background: var(--accent);
   color: #fff;
 }
 
-.shift:disabled {
+.shift:disabled,
+.arrival:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

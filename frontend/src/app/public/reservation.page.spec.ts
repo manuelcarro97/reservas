@@ -18,6 +18,7 @@ const CODE = 'KAFE23456789ABCD';
 const RESERVATION: ReservationDetails = {
   code: CODE,
   date: '2030-01-01',
+  arrivalTime: '20:30:00',
   partySize: 4,
   shiftId: 10,
   status: 'CONFIRMED',
@@ -104,8 +105,15 @@ describe('ReservationPage', () => {
     expect(text).toContain('Terraza 3');
     expect(text).toContain('Confirmada');
     expect(text).toContain('Kafé');
-    expect(text).toContain('Cena · 20:00–23:30');
+    expect(text).toContain('Cena · llegada 20:30 (20:00–23:30)');
     expect(button('Cancelar reserva')).toBeDefined();
+  });
+
+  it('showsTheShiftWithoutArrivalWhenTheReservationHasNone', async () => {
+    await open(`/reserva/${CODE}`, { ...RESERVATION, arrivalTime: undefined });
+
+    expect(page.textContent).toContain('Cena · 20:00–23:30');
+    expect(page.textContent).not.toContain('llegada');
   });
 
   it('appliesThePlanTheme', async () => {

@@ -37,8 +37,14 @@ const CLOCK = new Date('2030-01-05T23:30:00Z');
 const TODAY = '2030-01-06';
 
 const SHIFTS: ShiftAvailability[] = [
-  { shiftId: 10, name: 'Comida', start: '13:00', available: true },
-  { shiftId: 11, name: 'Cena', start: '20:00', available: false },
+  {
+    shiftId: 10,
+    name: 'Comida',
+    start: '13:00',
+    available: true,
+    arrivalTimes: ['13:00:00', '13:30:00', '14:00:00', '14:30:00', '15:00:00'],
+  },
+  { shiftId: 11, name: 'Cena', start: '20:00', available: false, arrivalTimes: [] },
 ];
 
 const FREE_OCCUPANCY: PublicOccupancyResponse[] = [
@@ -137,6 +143,17 @@ describe('BookingPage', () => {
     return Array.from(page.querySelectorAll<HTMLButtonElement>('button.shift'));
   }
 
+  function arrivalButtons(): HTMLButtonElement[] {
+    return Array.from(page.querySelectorAll<HTMLButtonElement>('button.arrival'));
+  }
+
+  async function chooseArrival(label: string): Promise<void> {
+    arrivalButtons()
+      .find((candidate) => candidate.textContent?.trim() === label)
+      ?.click();
+    await settle();
+  }
+
   function table(label: string): Element {
     return Array.from(page.querySelectorAll('g.t')).find((group) =>
       group.getAttribute('aria-label')?.startsWith(`Mesa ${label},`),
@@ -206,6 +223,7 @@ describe('BookingPage', () => {
     await open('/r/kafe');
     await flushShifts();
     await chooseShift('Comida');
+    await chooseArrival('13:30');
     await fillCustomer();
 
     expect(submitButton().disabled).toBe(true);
@@ -240,6 +258,7 @@ describe('BookingPage', () => {
     await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
     await flushShifts();
     await chooseShift('Comida', []);
+    await chooseArrival('13:30');
     await fillCustomer();
 
     expect(page.querySelectorAll('g.t').length).toBe(0);
@@ -255,12 +274,14 @@ describe('BookingPage', () => {
     await flushShifts();
     await chooseShift('Comida');
     table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
     await fillCustomer();
 
     const request = await submit();
     expect(request.request.body).toEqual({
       date: TODAY,
       shiftId: 10,
+      arrivalTime: '13:30',
       partySize: 2,
       customerName: 'Ana Pérez',
       customerPhone: '600123123',
@@ -274,6 +295,122 @@ describe('BookingPage', () => {
     expect(link).not.toBeNull();
     expect(page.querySelector('form')).toBeNull();
   });
+
+  it('arrivalTimesOfTheChosenShiftAppearAfterChoosingIt', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    expect(arrivalButtons().length).toBe(0);
+
+    await chooseShift('Comida');
+
+    expect(arrivalButtons().map((button) => button.textContent?.trim())).toEqual([
+      '13:00',
+      '13:30',
+      '14:00',
+      '14:30',
+      '15:00',
+    ]);
+    expect(
+      arrivalButtons().every((button) => button.getAttribute('aria-pressed') === 'false'),
+    ).toBe(true);
+  });
+
+  it('arrivalTimeIsRequiredBeforeSubmit', async () => {
+    await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
+    await flushShifts();
+    await chooseShift('Comida', []);
+    await fillCustomer();
+    expect(submitButton().disabled).toBe(true);
+
+    await chooseArrival('14:00');
+
+    expect(arrivalButtons()[2].getAttribute('aria-pressed')).toBe('true');
+    expect(submitButton().disabled).toBe(false);
+  });
+
+  it('arrivalTimeIsSentWithoutSeconds', async () => {
+    await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
+    await flushShifts();
+    await chooseShift('Comida', []);
+    await chooseArrival('14:30');
+    await fillCustomer();
+
+    const request = await submit();
+
+    expect(request.request.body.arrivalTime).toBe('14:30');
+    request.flush(RESERVATION, { status: 201, statusText: 'Created' });
+    await settle();
+  });
+
+  it('changingShiftClearsTheArrivalTime', async () => {
+    await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
+    await flushShifts([
+      SHIFTS[0],
+      { shiftId: 11, name: 'Cena', start: '20:00', available: true, arrivalTimes: ['20:00:00'] },
+    ]);
+    await chooseShift('Comida', []);
+    await chooseArrival('13:30');
+    await fillCustomer();
+    expect(submitButton().disabled).toBe(false);
+
+    await chooseShift('Cena', []);
+
+    expect(arrivalButtons().map((button) => button.textContent?.trim())).toEqual(['20:00']);
+    expect(arrivalButtons()[0].getAttribute('aria-pressed')).toBe('false');
+    expect(submitButton().disabled).toBe(true);
+  });
+
+  it('changingDateClearsTheArrivalTimes', async () => {
+    await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
+    await flushShifts();
+    await chooseShift('Comida', []);
+    await chooseArrival('13:30');
+
+    type('input[type=date]', addDays(TODAY, 1));
+    page.querySelector('input[type=date]')!.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+    await flushShifts();
+
+    expect(arrivalButtons().length).toBe(0);
+    await chooseShift('Comida', []);
+    expect(
+      arrivalButtons().every((button) => button.getAttribute('aria-pressed') === 'false'),
+    ).toBe(true);
+  });
+
+  for (const code of ['ARRIVAL_TIME_PAST', 'INVALID_ARRIVAL_TIME']) {
+    it(`${code}ReloadsAvailabilityAndAsksForAnotherTime`, async () => {
+      await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
+      await flushShifts();
+      await chooseShift('Comida', []);
+      await chooseArrival('13:30');
+      await fillCustomer();
+
+      const request = await submit();
+      request.flush({ code }, { status: 422, statusText: 'Unprocessable Content' });
+      await settle();
+
+      await flushShifts([
+        {
+          ...SHIFTS[0],
+          arrivalTimes: ['14:00:00', '14:30:00', '15:00:00'],
+        },
+      ]);
+      expect(page.querySelector('[role=alert]')?.textContent).toContain(
+        'Esa hora ya no está disponible, elige otra',
+      );
+      expect(submitButton().disabled).toBe(true);
+      await chooseShift('Comida', []);
+      expect(arrivalButtons().map((button) => button.textContent?.trim())).toEqual([
+        '14:00',
+        '14:30',
+        '15:00',
+      ]);
+      expect(
+        arrivalButtons().every((button) => button.getAttribute('aria-pressed') === 'false'),
+      ).toBe(true);
+    });
+  }
 
   it('failedOccupancyCanBeRetriedWithSameShift', async () => {
     await open('/r/kafe');
@@ -306,6 +443,7 @@ describe('BookingPage', () => {
     await flushShifts();
     await chooseShift('Comida');
     table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
     await fillCustomer();
 
     const request = await submit();
@@ -331,6 +469,7 @@ describe('BookingPage', () => {
     await flushShifts();
     await chooseShift('Comida');
     table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
     await fillCustomer();
 
     const request = await submit();
@@ -420,6 +559,7 @@ describe('BookingPage', () => {
     await flushShifts();
     await chooseShift('Comida');
     table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
     await fillCustomer();
     const request = await submit();
 
@@ -439,6 +579,7 @@ describe('BookingPage', () => {
     await flushShifts();
     await chooseShift('Comida');
     table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
     await fillCustomer();
 
     const request = await submit();
@@ -456,6 +597,7 @@ describe('BookingPage', () => {
     await flushShifts();
     await chooseShift('Comida');
     table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
     await fillCustomer();
 
     const request = await submit();
