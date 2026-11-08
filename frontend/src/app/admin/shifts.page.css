@@ -1,0 +1,162 @@
+/* Funcional y sobrio; el pulido visual llega en una tarea posterior. */
+h1 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+}
+
+h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.1rem;
+}
+
+.state,
+.hint {
+  color: #5b6877;
+}
+
+section {
+  margin-bottom: 1.5rem;
+}
+
+.shifts,
+.closures {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.shift,
+.closure,
+.shift-form,
+.closure-form {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e3e7ec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.shift {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.closure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+fieldset {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.hours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+label {
+  display: grid;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.day {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 400;
+}
+
+input[type='text'],
+input[type='time'],
+input[type='date'] {
+  padding: 0.5rem;
+  border: 1px solid #c4ccd6;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 400;
+}
+
+button {
+  padding: 0.5rem 1.2rem;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  justify-self: start;
+  border: 0;
+  background: #2457a6;
+  color: #fff;
+}
+
+.secondary {
+  border: 1px solid #c4ccd6;
+  background: #fff;
+  color: inherit;
+}
+
+.danger {
+  border: 0;
+  background: #b3261e;
+  color: #fff;
+}
+
+.link-danger {
+  padding: 0.5rem 0;
+  border: 0;
+  background: none;
+  color: #b3261e;
+  font-weight: 400;
+  text-decoration: underline;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.confirm {
+  flex-basis: 100%;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: #fdf3f2;
+}
+
+.confirm p {
+  margin: 0 0 0.6rem;
+}

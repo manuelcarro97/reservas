@@ -129,8 +129,39 @@ describe('routes', () => {
         await harness.fixture.whenStable();
         harness.detectChanges();
         expect(host.textContent).toContain('Forma del local');
+      } else if (href === '/panel/kafe/turnos') {
+        // Los turnos piden el plano y, con su zona horaria, los días cerrados.
+        await flushPromises();
+        backend
+          .expectOne((request) => request.url.endsWith('/api/v1/admin/restaurants/kafe'))
+          .flush({
+            slug: 'kafe',
+            name: 'Kafé',
+            status: 'DRAFT',
+            timeZone: 'Europe/Madrid',
+            shifts: [],
+          });
+        await harness.fixture.whenStable();
+        harness.detectChanges();
+        backend
+          .expectOne((request) => request.url.endsWith('/api/v1/admin/restaurants/kafe/closures'))
+          .flush([]);
+        await harness.fixture.whenStable();
+        harness.detectChanges();
+        expect(host.textContent).toContain('Turnos · Kafé');
+        expect(host.textContent).toContain('Días cerrados');
       } else {
-        expect(host.textContent).toContain('Esta sección llega pronto');
+        // Los ajustes piden el plano y vuelven a pedir los datos del dueño (la cabecera ya los pidió una vez).
+        await flushPromises();
+        backend
+          .expectOne((request) => request.url.endsWith('/api/v1/admin/restaurants/kafe'))
+          .flush({ slug: 'kafe', name: 'Kafé', status: 'DRAFT', timeZone: 'Europe/Madrid' });
+        backend
+          .expectOne((request) => request.url.endsWith('/api/v1/admin/me'))
+          .flush({ email: 'dueno@example.com', demo: false, maxPlans: 3, plans: [] });
+        await harness.fixture.whenStable();
+        harness.detectChanges();
+        expect(host.textContent).toContain('Ajustes · Kafé');
       }
     }
   });

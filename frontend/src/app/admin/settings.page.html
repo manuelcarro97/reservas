@@ -1,0 +1,213 @@
+@switch (status()) {
+  @case ('loading') {
+    <p class="state" role="status">Cargando los ajustes…</p>
+  }
+  @case ('notFound') {
+    <p class="state" role="alert">Este plano no existe.</p>
+    <p><a routerLink="/panel">Volver a tus planos</a></p>
+  }
+  @case ('error') {
+    <p class="state" role="alert">No se pudo cargar el plano.</p>
+    <button type="button" class="secondary" (click)="load()">Reintentar</button>
+  }
+  @case ('ready') {
+    <h1>Ajustes · {{ plan()?.name }}</h1>
+
+    <form class="settings-form" novalidate (submit)="save($event)">
+      <fieldset [disabled]="saving()">
+        <label>
+          Nombre del local
+          <input
+            type="text"
+            name="name"
+            autocomplete="off"
+            [attr.maxlength]="maxNameLength"
+            [value]="name()"
+            (input)="onName($event)"
+          />
+        </label>
+
+        <fieldset class="modes">
+          <legend>Modo de reserva</legend>
+          @for (option of modes; track option.value) {
+            <label class="mode">
+              <input
+                type="radio"
+                name="bookingMode"
+                [value]="option.value"
+                [checked]="mode() === option.value"
+                (change)="onMode(option.value)"
+              />
+              <span>
+                <strong>{{ option.label }}</strong>
+                {{ option.help }}
+              </span>
+            </label>
+          }
+          @if (modeChanged()) {
+            <p class="notice">Solo afecta a las reservas nuevas. Las que ya hay no cambian.</p>
+          }
+        </fieldset>
+
+        <label>
+          Plazo de cancelación (horas)
+          <input
+            type="number"
+            name="cancellationDeadlineHours"
+            min="0"
+            step="1"
+            [value]="hours()"
+            (input)="onHours($event)"
+          />
+          <span class="hint">
+            El cliente puede cancelar su reserva hasta estas horas antes de que empiece. Con 0,
+            hasta el momento de la reserva.
+          </span>
+        </label>
+
+        <app-action-failure [failure]="failure()" />
+        @if (saved()) {
+          <p class="notice" role="status">Ajustes guardados.</p>
+        }
+        <button type="submit" class="primary">Guardar ajustes</button>
+      </fieldset>
+    </form>
+
+    <section class="embed" aria-labelledby="embed-title">
+      <h2 id="embed-title">Incrustar en tu web</h2>
+      <p>Copia este código y pégalo en tu página para mostrar las reservas dentro de ella.</p>
+      <textarea #snippetField name="embed" readonly rows="4" [value]="snippet()"></textarea>
+      <div class="buttons">
+        <button type="button" class="secondary" (click)="copy()">Copiar</button>
+        @switch (copyStatus()) {
+          @case ('copied') {
+            <span class="copy-status" role="status">Copiado</span>
+          }
+          @case ('manual') {
+            <span class="copy-status" role="status">Copia el código a mano</span>
+          }
+        }
+      </div>
+    </section>
+
+    <section class="public" aria-labelledby="public-title">
+      <h2 id="public-title">Enlace público</h2>
+      @if (published()) {
+        <a class="public-link" [routerLink]="['/r', currentSlug()]" target="_blank" rel="noopener">
+          Abrir la página de reservas
+        </a>
+      } @else {
+        <p>
+          Publica el plano para tener enlace público.
+          <a class="editor-link" [routerLink]="['/panel', currentSlug(), 'plano']"
+            >Ir al editor del plano</a
+          >
+        </p>
+      }
+    </section>
+
+    @if (telegramVisible()) {
+      <section class="telegram" aria-labelledby="telegram-title">
+        <h2 id="telegram-title">Avisos por Telegram</h2>
+        @if (telegramFailed()) {
+          <p class="state" role="alert">
+            No se pudo leer el estado de Telegram.
+            <button type="button" class="secondary" (click)="retryTelegram()">Reintentar</button>
+          </p>
+        } @else if (telegram(); as telegramStatus) {
+          @if (telegramStatus.linked) {
+            <p>
+              Vinculado. Recibirás un aviso en Telegram por cada reserva nueva y cada cancelación.
+            </p>
+            @if (confirmingUnlink()) {
+              <div class="confirm">
+                <p>¿Desvincular Telegram? Dejarás de recibir los avisos.</p>
+                <div class="buttons">
+                  <button
+                    type="button"
+                    class="danger"
+                    [disabled]="telegramBusy()"
+                    (click)="unlinkTelegram()"
+                  >
+                    Sí, desvincular
+                  </button>
+                  <button
+                    type="button"
+                    class="secondary"
+                    [disabled]="telegramBusy()"
+                    (click)="keepTelegram()"
+                  >
+                    No desvincular
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <button type="button" class="secondary" (click)="askUnlink()">
+                Desvincular Telegram
+              </button>
+            }
+          } @else {
+            <p>
+              Sin vincular. Vincula tu Telegram para recibir un aviso por cada reserva nueva y cada
+              cancelación.
+            </p>
+            @if (telegramStatus.linkPending && !telegramUrl()) {
+              <p class="hint">Pulsa Start en el chat de Telegram para terminar de vincular.</p>
+            }
+            <div class="buttons">
+              <button
+                type="button"
+                class="primary"
+                [disabled]="telegramBusy()"
+                (click)="linkTelegram()"
+              >
+                Vincular Telegram
+              </button>
+              @if (telegramUrl(); as url) {
+                <a class="telegram-link" [href]="url" target="_blank" rel="noopener"
+                  >Abrir Telegram</a
+                >
+                <button type="button" class="secondary" (click)="retryTelegram()">
+                  Comprobar si ya está vinculado
+                </button>
+              }
+            </div>
+            @if (telegramUrl()) {
+              <p class="hint">Pulsa Start en el chat de Telegram para terminar de vincular.</p>
+            }
+          }
+        } @else {
+          <p class="state" role="status">Cargando…</p>
+        }
+        <app-action-failure [failure]="telegramFailure()" />
+      </section>
+    }
+
+    <section class="danger-zone" aria-labelledby="delete-title">
+      <h2 id="delete-title">Borrar el plano</h2>
+      <app-action-failure [failure]="deleteFailure()" />
+      @if (store.demo()) {
+        <p class="state">La cuenta de demostración es de solo lectura.</p>
+      } @else {
+        <p>
+          Su enlace público dejará de funcionar y las reservas que tenga se anonimizarán. No se
+          puede deshacer, y no se puede borrar mientras tenga reservas activas.
+        </p>
+        <form class="delete-form" novalidate (submit)="deletePlan($event)">
+          <label>
+            Para confirmar, escribe el enlace del plano: {{ currentSlug() }}
+            <input
+              type="text"
+              name="confirmSlug"
+              autocomplete="off"
+              spellcheck="false"
+              [value]="confirmSlug()"
+              (input)="onConfirmSlug($event)"
+            />
+          </label>
+          <button type="submit" class="danger" [disabled]="!canDelete()">Borrar el plano</button>
+        </form>
+      }
+    </section>
+  }
+}

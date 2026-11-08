@@ -1,0 +1,199 @@
+@switch (status()) {
+  @case ('loading') {
+    <p class="state" role="status">Cargando los turnos…</p>
+  }
+  @case ('notFound') {
+    <p class="state" role="alert">Este plano no existe.</p>
+    <p><a routerLink="/panel">Volver a tus planos</a></p>
+  }
+  @case ('error') {
+    <p class="state" role="alert">No se pudo cargar el plano.</p>
+    <button type="button" class="secondary" (click)="load()">Reintentar</button>
+  }
+  @case ('ready') {
+    <h1>Turnos · {{ plan()?.name }}</h1>
+
+    <app-action-failure [failure]="failure()" />
+
+    <section class="shifts-section" aria-labelledby="shifts-title">
+      <h2 id="shifts-title">Turnos</h2>
+      <ul class="shifts">
+        @for (shift of shifts(); track shift.id) {
+          <li class="shift">
+            <div class="summary">
+              <strong>{{ shift.name }}</strong>
+              <span>{{ hourMinute(shift.start) }}–{{ hourMinute(shift.end) }}</span>
+              <span>{{ daysText(shift) }}</span>
+            </div>
+            @if (confirmingDelete() === shift.id) {
+              <div class="confirm">
+                <p>
+                  ¿Borrar el turno «{{ shift.name }}»? No se puede borrar si tiene reservas activas.
+                </p>
+                <div class="buttons">
+                  <button
+                    type="button"
+                    class="danger"
+                    [disabled]="busy()"
+                    (click)="deleteShift(shift.id ?? 0)"
+                  >
+                    Sí, borrar el turno
+                  </button>
+                  <button type="button" class="secondary" [disabled]="busy()" (click)="keepShift()">
+                    No borrar
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div class="buttons">
+                <button
+                  type="button"
+                  class="secondary"
+                  [disabled]="busy()"
+                  (click)="startEdit(shift)"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  class="link-danger"
+                  [disabled]="busy()"
+                  (click)="askDelete(shift)"
+                >
+                  Borrar
+                </button>
+              </div>
+            }
+          </li>
+        } @empty {
+          <li class="state">Este plano no tiene turnos. Sin turnos nadie puede reservar.</li>
+        }
+      </ul>
+
+      <form class="shift-form" novalidate (submit)="submitShift($event)">
+        <h2>
+          @if (editingId() !== null) {
+            Editar turno «{{ editingName() }}»
+          } @else {
+            Nuevo turno
+          }
+        </h2>
+        <fieldset [disabled]="busy()">
+          <label>
+            Nombre
+            <input
+              type="text"
+              name="name"
+              autocomplete="off"
+              [attr.maxlength]="maxNameLength"
+              [value]="draft().name"
+              (input)="onName($event)"
+            />
+          </label>
+          <div class="hours">
+            <label>
+              Desde
+              <input type="time" name="start" [value]="draft().start" (input)="onStart($event)" />
+            </label>
+            <label>
+              Hasta
+              <input type="time" name="end" [value]="draft().end" (input)="onEnd($event)" />
+            </label>
+          </div>
+          <fieldset class="days">
+            <legend>Días</legend>
+            @for (day of days; track day.value) {
+              <label class="day">
+                <input
+                  type="checkbox"
+                  [name]="'day-' + day.value"
+                  [checked]="draft().days.includes(day.value)"
+                  (change)="onDay(day.value, $event)"
+                />
+                {{ day.label }}
+              </label>
+            }
+          </fieldset>
+          <div class="buttons">
+            <button type="submit" class="primary">
+              {{ editingId() !== null ? 'Guardar turno' : 'Añadir turno' }}
+            </button>
+            @if (editingId() !== null) {
+              <button type="button" class="secondary" (click)="stopEdit()">Cancelar</button>
+            }
+          </div>
+        </fieldset>
+        <p class="hint">
+          Cambiar el nombre se puede siempre. Cambiar las horas o los días, o borrar el turno, solo
+          si no tiene reservas activas.
+        </p>
+      </form>
+    </section>
+
+    <section class="closures-section" aria-labelledby="closures-title">
+      <h2 id="closures-title">Días cerrados</h2>
+      <p class="hint">
+        Ese día el local no admite reservas. Puedes cerrar desde hoy hasta dentro de 90 días.
+      </p>
+
+      @if (closuresFailed()) {
+        <p class="state" role="alert">
+          No se pudieron cargar los días cerrados.
+          <button type="button" class="secondary" (click)="loadClosures()">Reintentar</button>
+        </p>
+      } @else {
+        <ul class="closures">
+          @for (date of closures(); track date) {
+            <li class="closure">
+              @if (confirmingReopen() === date) {
+                <span>¿Volver a abrir el {{ formatDate(date) }}?</span>
+                <span class="buttons">
+                  <button type="button" class="danger" [disabled]="busy()" (click)="reopen(date)">
+                    Sí, quitar el cierre
+                  </button>
+                  <button
+                    type="button"
+                    class="secondary"
+                    [disabled]="busy()"
+                    (click)="keepClosure()"
+                  >
+                    No quitar
+                  </button>
+                </span>
+              } @else {
+                <span>{{ formatDate(date) }}</span>
+                <button
+                  type="button"
+                  class="link-danger"
+                  [disabled]="busy()"
+                  (click)="askReopen(date)"
+                >
+                  Quitar
+                </button>
+              }
+            </li>
+          } @empty {
+            <li class="state">No hay días cerrados.</li>
+          }
+        </ul>
+      }
+
+      <form class="closure-form" novalidate (submit)="addClosure($event)">
+        <fieldset [disabled]="busy()">
+          <label>
+            Cerrar el día
+            <input
+              type="date"
+              name="closure-date"
+              [min]="today()"
+              [max]="lastClosableDay()"
+              [value]="closureDate()"
+              (input)="onClosureDate($event)"
+            />
+          </label>
+          <button type="submit" class="primary">Cerrar el día</button>
+        </fieldset>
+      </form>
+    </section>
+  }
+}

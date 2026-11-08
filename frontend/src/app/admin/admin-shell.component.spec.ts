@@ -13,7 +13,6 @@ import { MeResponse } from '../core/api/models/me-response';
 import { FakeAuthSdk, flushPromises, provideFakeAuthSdk } from '../core/auth/testing/fake-auth-sdk';
 import { AccountPage } from './account.page';
 import { AdminShellComponent } from './admin-shell.component';
-import { PlaceholderPage } from './placeholder.page';
 import { PlansPage } from './plans.page';
 
 @Component({ template: '<p>entrar</p>' })
@@ -21,6 +20,9 @@ class LoginStub {}
 
 @Component({ template: '<p>reservas</p>' })
 class ReservationsStub {}
+
+@Component({ template: '<p>plano</p>' })
+class EditorStub {}
 
 const ME: MeResponse = {
   email: 'dueno@example.com',
@@ -55,7 +57,7 @@ describe('AdminShellComponent', () => {
               { path: '', component: PlansPage },
               { path: 'cuenta', component: AccountPage },
               { path: ':slug', component: ReservationsStub },
-              { path: ':slug/plano', component: PlaceholderPage },
+              { path: ':slug/plano', component: EditorStub },
             ],
           },
           { path: 'entrar', component: LoginStub },

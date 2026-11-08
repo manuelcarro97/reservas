@@ -4,15 +4,18 @@ import {
   TestRequest,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ApiConfiguration } from '../core/api/api-configuration';
 import { MeResponse } from '../core/api/models/me-response';
 import { PlanSummaryResponse } from '../core/api/models/plan-summary-response';
-import { PlaceholderPage } from './placeholder.page';
 import { MeStore } from './me.store';
 import { PlansPage } from './plans.page';
+
+@Component({ template: '<p>plano</p>' })
+class EditorStub {}
 
 const KAFE: PlanSummaryResponse = { slug: 'kafe', name: 'Kafé del Puerto', status: 'PUBLISHED' };
 const TAPAS: PlanSummaryResponse = { slug: 'tapas', name: 'Tapas <b>Sol</b>', status: 'DRAFT' };
@@ -48,7 +51,7 @@ describe('PlansPage', () => {
         MeStore,
         provideRouter([
           { path: 'panel', component: PlansPage },
-          { path: 'panel/:slug/plano', component: PlaceholderPage },
+          { path: 'panel/:slug/plano', component: EditorStub },
         ]),
       ],
     });

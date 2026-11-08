@@ -162,6 +162,8 @@ button:disabled {
 }
 
 .error ul {
+  max-height: 10rem;
+  overflow-y: auto;
   margin: 0.4rem 0 0;
   padding-left: 1.2rem;
   font-family: ui-monospace, monospace;

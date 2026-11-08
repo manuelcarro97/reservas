@@ -26,6 +26,8 @@ export class MeStore {
   readonly email = computed(() => this.me()?.email ?? '');
   readonly demo = computed(() => this.me()?.demo === true);
   readonly maxPlans = computed(() => this.me()?.maxPlans ?? DEFAULT_MAX_PLANS);
+  /** El servidor tiene configurado el bot de Telegram. */
+  readonly telegramAvailable = computed(() => this.me()?.telegramAvailable === true);
   /** La demo no crea planos (el backend respondería 403) y nadie pasa del tope. */
   readonly canCreatePlan = computed(() => !this.demo() && this.plans().length < this.maxPlans());
 

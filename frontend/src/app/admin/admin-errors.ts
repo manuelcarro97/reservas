@@ -20,7 +20,20 @@ const MESSAGES: Record<string, string> = {
   ALREADY_EXISTS: 'Ese enlace ya está en uso. Elige otro.',
   INVALID_REQUEST: 'El nombre o el enlace no son válidos. Revísalos.',
   PAYLOAD_TOO_LARGE: 'Los datos son demasiado largos. Revísalos.',
+  PLAN_HAS_RESERVATIONS:
+    'No se puede borrar el plano mientras tenga reservas activas. Cancela estas reservas antes:',
+  SHIFT_HAS_RESERVATIONS:
+    'Este turno tiene reservas activas. Cancela estas reservas antes de cambiar su horario o borrarlo:',
+  SHIFT_OVERLAP: 'Este turno se solapa con otro. Cambia las horas o los días.',
+  SHIFT_LIMIT: 'Has llegado al máximo de 10 turnos. Borra uno para poder añadir otro.',
+  SHIFT_NOT_FOUND: 'Ese turno ya no existe. Se ha actualizado la lista.',
+  CLOSURE_HAS_RESERVATIONS: 'Ese día tiene reservas activas. Cancélalas antes de cerrarlo:',
+  CLOSURE_DATE_OUT_OF_RANGE: 'Solo se pueden cerrar días desde hoy hasta dentro de 90 días.',
+  TELEGRAM_UNAVAILABLE: 'Telegram no está disponible en este servidor.',
 };
+
+/** Texto del 429 de las acciones del panel (reservas, turnos, días cerrados, ajustes). */
+export const RATE_LIMITED_ACTIONS_MESSAGE = 'Demasiadas acciones seguidas, espera un momento';
 
 /**
  * Mensaje en español de un error de la API del panel. Primero el `code` (hay dos 429 distintos: `RATE_LIMITED` y
@@ -39,11 +52,15 @@ const RESERVATION_CONFLICTS = new Set([
   'PLAN_HAS_RESERVATIONS',
   'ROOM_LOCKED',
   'TABLE_HAS_RESERVATIONS',
+  'SHIFT_HAS_RESERVATIONS',
+  'CLOSURE_HAS_RESERVATIONS',
 ]);
 
 /**
  * Códigos de las reservas que impiden un borrado (409 `PLAN_HAS_RESERVATIONS`), un cambio de la forma del local
- * (409 `ROOM_LOCKED`) o quitar o reducir mesas (409 `TABLE_HAS_RESERVATIONS`), en la propiedad `reservations`.
+ * (409 `ROOM_LOCKED`), quitar o reducir mesas (409 `TABLE_HAS_RESERVATIONS`), cambiar o borrar un turno (409
+ * `SHIFT_HAS_RESERVATIONS`) o cerrar un día (409 `CLOSURE_HAS_RESERVATIONS`), en la propiedad `reservations`.
+ * El backend aún no manda los códigos de un día cerrado: sin ellos la lista sale vacía.
  */
 export function blockingReservations(error: HttpErrorResponse): string[] {
   const code = errorCode(error);
@@ -54,6 +71,24 @@ export function blockingReservations(error: HttpErrorResponse): string[] {
   return Array.isArray(codes)
     ? codes.filter((item): item is string => typeof item === 'string')
     : [];
+}
+
+/** Qué sale mal en una acción del panel, con los códigos de las reservas que la impiden si es el caso. */
+export interface ActionFailure {
+  message: string;
+  reservations: string[];
+}
+
+/**
+ * Fallo de una acción del panel (turnos, días cerrados, ajustes): cualquier 429 pide esperar con el texto común de
+ * las acciones; el resto, el mensaje del `code` o `fallback`, y las reservas que lo causan.
+ */
+export function actionFailure(error: HttpErrorResponse, fallback: string): ActionFailure {
+  return {
+    message:
+      error.status === 429 ? RATE_LIMITED_ACTIONS_MESSAGE : adminErrorMessage(error, fallback),
+    reservations: blockingReservations(error),
+  };
 }
 
 /**

@@ -14,7 +14,7 @@ import { errorCode } from '../../core/api-errors';
 import { PlanoTable, TableState } from '../../plano/plano.component';
 import { knownTheme } from '../../plano/themes';
 import { NOW, toRoom, toTable, todayIn } from '../../public/booking.store';
-import { adminErrorMessage } from '../admin-errors';
+import { RATE_LIMITED_ACTIONS_MESSAGE, adminErrorMessage } from '../admin-errors';
 import { PendingReservationsService } from './pending-reservations.service';
 import {
   MessageKind,
@@ -44,7 +44,6 @@ const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDA
 const MIN_YEAR = 2000;
 const MAX_YEAR = 2100;
 
-const RATE_LIMITED_MESSAGE = 'Demasiadas acciones seguidas, espera un momento';
 const GENERIC_ERROR = 'No se pudo completar la acción. Inténtalo de nuevo.';
 const CONFIRM_NEEDS_TABLE = 'Asigna una mesa antes de confirmar.';
 
@@ -612,7 +611,7 @@ export class ReservationsStore {
     this.busy.set(false);
     const code = errorCode(error);
     if (error.status === 429) {
-      this.error.set(RATE_LIMITED_MESSAGE);
+      this.error.set(RATE_LIMITED_ACTIONS_MESSAGE);
       return;
     }
     if (code === 'TABLE_REQUIRED') {
