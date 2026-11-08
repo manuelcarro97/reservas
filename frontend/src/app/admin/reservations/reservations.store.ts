@@ -370,7 +370,7 @@ export class ReservationsStore {
     this.loadFailed.set(false);
     this.dayRequests.next(this.date());
     this.pendingRequests.next(true);
-    this.requestOccupancy();
+    this.requestOccupancy(true);
   }
 
   setTab(tab: Tab): void {
@@ -631,9 +631,15 @@ export class ReservationsStore {
     }
   }
 
-  private requestOccupancy(): void {
+  /**
+   * Pide la ocupación del turno elegido. Al cambiar de fecha o de turno se vacía la anterior (ya no es de esta vista);
+   * al releer lo mismo (`keepPrevious`) se conserva hasta que llegue la nueva, para que el plano no parpadee.
+   */
+  private requestOccupancy(keepPrevious = false): void {
     const shiftId = this.shiftId();
-    this.occupied.set(null);
+    if (!keepPrevious || shiftId === null) {
+      this.occupied.set(null);
+    }
     this.occupancyRequests.next(shiftId === null ? null : { date: this.date(), shiftId });
   }
 }

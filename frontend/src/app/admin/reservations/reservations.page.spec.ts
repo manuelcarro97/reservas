@@ -882,6 +882,45 @@ describe('ReservationsPage', () => {
       ]);
     });
 
+    it('keepsTheOldOccupancyOnThePlanoUntilTheNewOneArrives', async () => {
+      await open({ day: [ANA, LUIS] });
+      expect(tableState(3)).toContain('taken');
+
+      feedEvents.next(NEW_EVENT);
+      await settle();
+      // Mientras llega la ocupación nueva el plano no se vacía (no parpadea).
+      expect(tableState(2)).toContain('pending');
+      expect(tableState(3)).toContain('taken');
+
+      expectDay(TODAY).flush([ANA]);
+      expectPending().flush([ANA]);
+      expectOccupancy(TODAY, 11).flush([
+        { tableId: 2, label: '2', seats: 4, occupied: true },
+        { tableId: 3, label: '3', seats: 6, occupied: false },
+      ]);
+      await settle();
+      expect(tableState(3)).toContain('free');
+    });
+
+    it('clearsTheOccupancyWhenTheDateOrTheShiftChanges', async () => {
+      await open({ plan: TWO_SHIFTS, day: [PEPE, LUIS] });
+
+      await click(page, 'Cena · 20:00');
+      expect(tableState(3)).toContain('free');
+      expectOccupancy(TODAY, 11).flush(OCCUPANCY);
+      await settle();
+      expect(tableState(3)).toContain('taken');
+
+      const input = page.querySelector<HTMLInputElement>('input[type="date"]') as HTMLInputElement;
+      input.value = '2026-11-12';
+      input.dispatchEvent(new Event('change'));
+      await settle();
+      expect(tableState(3)).toContain('free');
+      expectDay('2026-11-12').flush([]);
+      expectOccupancy('2026-11-12', 11).flush(OCCUPANCY);
+      await settle();
+    });
+
     it('ignoresEventsOfAnotherPlan', async () => {
       await open({ day: [LUIS] });
 
