@@ -25,6 +25,7 @@ import {
 } from '../../plano/plano.component';
 import { tableName } from '../../plano/table-name';
 import { THEMES, THEME_KEYS, ThemeKey } from '../../plano/themes';
+import { embedSnippet } from '../embed-snippet';
 import { EditorStore, EditorTable, ServerProblem } from './editor.store';
 import { ConfirmsLeaving } from './leave-editor.guard';
 import { Handle, handlesFor } from './room-handles';
@@ -219,9 +220,8 @@ export class EditorPage implements ConfirmsLeaving {
   protected readonly publicLink = computed(
     () => `${this.document.location.origin}/r/${encodeURIComponent(this.store.slug())}`,
   );
-  protected readonly embedCode = computed(
-    () =>
-      `<iframe src="${this.publicLink()}?embed=1" title="Reservas" width="100%" height="720" style="border:0" loading="lazy"></iframe>`,
+  protected readonly embedCode = computed(() =>
+    embedSnippet(this.document.location.origin, this.store.slug(), this.store.name()),
   );
 
   constructor() {

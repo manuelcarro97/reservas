@@ -565,7 +565,20 @@ describe('EditorPage: mesas, tema y guardado', () => {
       ) as HTMLTextAreaElement;
       expect(embed.value).toContain(`${link.value}?embed=1`);
       expect(embed.value).toContain('<iframe');
-      expect(embed.value).not.toContain('Kafé');
+      // Es el mismo código que ofrecen los ajustes: el título lleva el nombre del plano.
+      expect(embed.value).toContain('title="Reservas · Kafé del Puerto"');
+    });
+
+    it('el código para incrustar escapa el nombre del plano', async () => {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/plano');
+      expectPlan('kafe').flush({ ...PLAN, name: '"><b>Kafé</b> & co', status: 'PUBLISHED' });
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+      const embed = page.querySelector('.published textarea') as HTMLTextAreaElement;
+      expect(embed.value).toContain(
+        'title="Reservas · &quot;&gt;&lt;b&gt;Kafé&lt;/b&gt; &amp; co"',
+      );
     });
 
     it('el enlace público y el iframe codifican el slug', async () => {

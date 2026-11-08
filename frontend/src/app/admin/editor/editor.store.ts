@@ -123,6 +123,9 @@ export class EditorStore {
   readonly published = this.publishedState.asReadonly();
   private readonly slugState = signal('');
   readonly slug = this.slugState.asReadonly();
+  private readonly nameState = signal('');
+  /** Nombre del plano tal como lo devolvió el servidor; el editor no lo cambia. */
+  readonly name = this.nameState.asReadonly();
 
   private readonly savingState = signal(false);
   private readonly publishingState = signal(false);
@@ -223,6 +226,7 @@ export class EditorStore {
     this.themeState.set(theme);
     this.publishedState.set(plan.status === 'PUBLISHED');
     this.slugState.set(plan.slug ?? this.slug());
+    this.nameState.set(plan.name ?? this.slug());
     this.savedState.set({ room, tables, theme });
     this.loadedPlan = plan;
     this.clearFeedback();
