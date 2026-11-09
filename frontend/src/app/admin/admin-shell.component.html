@@ -1,10 +1,25 @@
 <header class="admin-header">
-  <a class="brand" routerLink="/panel">reservas<i>.</i><small class="kicker">panel</small></a>
+  <!-- La marca lleva a la entrada del panel, que redirige al Inicio del plano actual. -->
+  <a class="brand" routerLink="/panel" [queryParams]="plansTabQuery()"
+    >reservas<i>.</i><small class="kicker">panel</small></a
+  >
   <span class="vr" aria-hidden="true"></span>
   <app-plan-switcher />
   <nav class="tabs" aria-label="Secciones del panel">
+    @if (planSlug(); as slug) {
+      <a
+        [routerLink]="['/panel', slug, 'inicio']"
+        routerLinkActive="on"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="tabMatch"
+        >Inicio</a
+      >
+    } @else {
+      <!-- Sin plano no hay adónde ir: se pinta como enlace desactivado, sin destino. -->
+      <a role="link" aria-disabled="true">Inicio</a>
+    }
     <a
-      routerLink="/panel"
+      routerLink="/panel/planos"
       [queryParams]="plansTabQuery()"
       routerLinkActive="on"
       ariaCurrentWhenActive="page"
@@ -34,7 +49,7 @@
         >Configuración</a
       >
     } @else {
-      <!-- Sin plano no hay adónde ir: se pintan como enlaces desactivados, sin destino. -->
+      <!-- Igual que Inicio: sin plano se pintan como enlaces desactivados. -->
       <a role="link" aria-disabled="true">Reservas</a>
       <a role="link" aria-disabled="true">Turnos</a>
       <a role="link" aria-disabled="true">Configuración</a>

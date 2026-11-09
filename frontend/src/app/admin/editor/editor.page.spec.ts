@@ -180,7 +180,7 @@ describe('EditorPage', () => {
     await settle();
     page = harness.routeNativeElement as HTMLElement;
     expect(page.textContent).toContain('Este plano no existe');
-    expect(page.querySelector('a')?.getAttribute('href')).toBe('/panel');
+    expect(page.querySelector('a')?.getAttribute('href')).toBe('/panel/planos');
     expect(page.querySelector('[role="slider"]')).toBeNull();
   });
 

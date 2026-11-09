@@ -1,0 +1,12 @@
+/* Disposición de Inicio. El aspecto común (hojas, cifras, botones, títulos) sale de styles/base.css. */
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.top {
+  flex: none;
+  margin-bottom: 18px;
+}

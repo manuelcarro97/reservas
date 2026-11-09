@@ -52,7 +52,7 @@ function seatsOf(plan: PlanResponse): number {
 }
 
 /**
- * `/panel`: mis planos (hasta 3). La tarjeta grande es el plano actual (`currentPlanSlug`: el primero, o el que pide
+ * `/panel/planos`: mis planos (hasta 3). La tarjeta grande es el plano actual (`currentPlanSlug`: el primero, o el que pide
  * `?plano=`) con su plano dibujado en solo lectura, su ficha y sus accesos; debajo, los demás con "Abrir", que los
  * sube a la tarjeta grande. A la derecha, el alta de un plano nuevo. Borrar un plano se hace en Configuración.
  *

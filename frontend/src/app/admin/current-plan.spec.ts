@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { PlanSummaryResponse } from '../core/api/models/plan-summary-response';
-import { currentPlanSlug } from './current-plan';
+import { currentPlanSlug, panelLocation } from './current-plan';
 
 const PLANS: PlanSummaryResponse[] = [
   { slug: 'kafe', name: 'Kafé', status: 'PUBLISHED' },
@@ -43,6 +43,12 @@ describe('currentPlanSlug', () => {
     expect(currentPlanSlug('/panel', router, [])).toBeNull();
     expect(currentPlanSlug('/panel?plano=kafe', router, [])).toBeNull();
     expect(currentPlanSlug('/panel/cuenta', router, [])).toBeNull();
+  });
+
+  it('planosIsNotASlug', () => {
+    expect(panelLocation('/panel/planos', router).slug).toBeNull();
+    expect(currentPlanSlug('/panel/planos', router, PLANS)).toBe('kafe');
+    expect(currentPlanSlug('/panel/planos?plano=terraza', router, PLANS)).toBe('terraza');
   });
 
   it('accountIsNotASlug', () => {
