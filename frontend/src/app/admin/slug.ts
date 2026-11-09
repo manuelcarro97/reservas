@@ -5,7 +5,7 @@ export const SLUG_MAX_LENGTH = 80;
  * Slugs que el backend rechaza con 409 `SLUG_RESERVED` (`AdminPlanController.RESERVED_SLUGS`), más `cuenta`: la ruta
  * `/panel/cuenta` (la cuenta) taparía a `/panel/:slug` (las reservas de un plano con ese slug).
  */
-const RESERVED_SLUGS = new Set(['demo', 'admin', 'api', 'r', 'panel', 'reserva', 'cuenta']);
+const RESERVED_SLUGS = new Set(['demo', 'admin', 'api', 'r', 'panel', 'reserva', 'cuenta', 'planos']);
 
 /**
  * Slug propuesto a partir del nombre: minúsculas, sin acentos, solo `a-z0-9-`, guiones colapsados y sin guiones en

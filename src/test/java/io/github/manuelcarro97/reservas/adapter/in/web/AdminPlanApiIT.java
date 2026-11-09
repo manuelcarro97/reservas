@@ -137,10 +137,13 @@ class AdminPlanApiIT extends PostgresIT {
 
 	@Test
 	void panelRouteSlugReturns409() throws Exception {
-		// /panel/cuenta es la página de la cuenta: un plano con ese slug quedaría tapado en /panel/:slug.
+		// /panel/cuenta y /panel/planos son páginas del panel: un plano con ese slug quedaría tapado en /panel/:slug.
 		createPlan("owner-a", "cuenta").andExpect(status().isConflict())
 			.andExpect(jsonPath("$.code").value("SLUG_RESERVED"));
 		assertThat(restaurants.findBySlug("cuenta")).isEmpty();
+		createPlan("owner-a", "planos").andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("SLUG_RESERVED"));
+		assertThat(restaurants.findBySlug("planos")).isEmpty();
 	}
 
 	@Test

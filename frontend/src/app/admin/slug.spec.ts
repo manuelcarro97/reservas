@@ -48,7 +48,7 @@ describe('slugProblem', () => {
   });
 
   it('rejectsReservedSlugs', () => {
-    for (const reserved of ['demo', 'admin', 'api', 'r', 'panel', 'reserva', 'cuenta']) {
+    for (const reserved of ['demo', 'admin', 'api', 'r', 'panel', 'reserva', 'cuenta', 'planos']) {
       expect(slugProblem(reserved)).not.toBeNull();
     }
   });
