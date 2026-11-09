@@ -3,8 +3,9 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
 /**
- * Todo color del panel sale de un token de `tokens.css`. Este test recorre los CSS y los estilos en línea de los
- * componentes y falla si encuentra un color fijo (`#hex`, `rgb()`, `rgba()`, `hsl()`, `hsla()`) fuera de él.
+ * Todo color del panel sale de un token de `tokens.css`. Este test recorre los CSS, las plantillas `.html` y los
+ * estilos en línea de los componentes y falla si encuentra un color fijo (`#hex`, `rgb()`, `hsl()`, `oklch()`, `hwb()`,
+ * `lab()`, en mayúsculas o minúsculas) fuera de él.
  *
  * Excepciones: `tokens.css` (ahí viven los valores) y `app/plano/` (el dibujo del plano y los datos de sus temas
  * llevan sus propios colores). Los `.spec.ts` no se miran.
@@ -15,7 +16,7 @@ const planoDir = resolve(srcDir, 'app', 'plano') + sep;
 
 // `#abc`, `#aabbcc` o `#aabbccdd` sin letra delante: así no casa con un campo privado de clase (`this.#add`).
 const hexColor = /(?<![\w$.])#[0-9a-fA-F]{3,8}\b/g;
-const colorFunction = /\b(?:rgba?|hsla?)\(/g;
+const colorFunction = /\b(?:rgba?|hsla?|oklch|hwb|lab)\(/gi;
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -25,6 +26,7 @@ function sourceFiles(dir: string): string[] {
     }
     const isStyle =
       entry.name.endsWith('.css') ||
+      entry.name.endsWith('.html') ||
       (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts'));
     return isStyle ? [path] : [];
   });
