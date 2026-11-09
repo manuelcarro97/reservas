@@ -1,14 +1,14 @@
 @switch (store.status()) {
   @case ('loading') {
-    <p class="state" role="status">Cargando…</p>
+    <h1 class="state" role="status">Cargando…</h1>
   }
   @case ('unavailable') {
-    <p class="state" role="alert">Este plano no está disponible</p>
+    <h1 class="state" role="alert">Este plano no está disponible</h1>
   }
   @case ('error') {
-    <p class="state" role="alert">
+    <h1 class="state" role="alert">
       No se pudo cargar el plano. Inténtalo de nuevo en unos minutos.
-    </p>
+    </h1>
   }
   @case ('ready') {
     @if (store.reservation(); as reservation) {

@@ -359,6 +359,8 @@ export class BookingStore {
       // Sin el plano nuevo se queda el que había: el aviso ya está puesto y el siguiente envío lo vuelve a intentar.
       error: (error: HttpErrorResponse) => {
         if (error.status === 404) {
+          // El local ya no está publicado: sin plano, la cabecera del marco público vuelve a la marca.
+          this.plan.set(null);
           this.status.set('unavailable');
         }
       },

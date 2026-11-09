@@ -787,6 +787,75 @@ describe('BookingPage', () => {
     expect(page.querySelector('header')?.textContent).not.toContain('Kafé');
   });
 
+  it('headerGoesBackToTheBrandWhenTheReloadedPlanIsNoLongerAvailable', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+    table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
+    await fillCustomer();
+    const request = await submit();
+    request.flush(
+      { code: 'TABLE_NOT_ALLOWED' },
+      { status: 422, statusText: 'Unprocessable Entity' },
+    );
+    await settle();
+
+    // Al recargar el plano por el cambio de modo, el local ya no está publicado.
+    expectApi('kafe').flush({}, { status: 404, statusText: 'Not Found' });
+    await settle();
+
+    expect(page.textContent).toContain('Este plano no está disponible');
+    expect(page.querySelector('header')?.textContent).toContain('reservas.');
+    expect(page.querySelector('header')?.textContent).not.toContain('Kafé');
+  });
+
+  it('navigatingToAnotherVenueNeverShowsTheOldNameWithTheNewPage', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    expect(page.querySelector('header')?.textContent).toContain('Kafé');
+
+    await harness.navigateByUrl('/r/bar');
+    harness.detectChanges();
+
+    // Mientras llega el plano nuevo: la marca, nunca el nombre viejo.
+    expect(page.querySelector('header')?.textContent).not.toContain('Kafé');
+    expect(page.querySelector('header')?.textContent).toContain('reservas.');
+
+    expectApi('bar').flush({ ...PLAN, slug: 'bar', name: 'Bar Pepe' });
+    await settle();
+    expectApi('bar/availability').flush(SHIFTS);
+    await settle();
+
+    expect(page.querySelector('header')?.textContent).toContain('Bar Pepe');
+    expect(page.querySelector('header')?.textContent).not.toContain('Kafé');
+  });
+
+  it('everyStateHasExactlyOneHeading', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/r/nada');
+    page = harness.routeNativeElement as HTMLElement;
+    expect(page.querySelectorAll('h1').length).toBe(1);
+
+    expectApi('nada').flush(
+      { code: 'RESTAURANT_NOT_FOUND' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    await settle();
+    expect(page.textContent).toContain('Este plano no está disponible');
+    expect(page.querySelectorAll('h1').length).toBe(1);
+  });
+
+  it('errorStateHasExactlyOneHeading', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/r/nada');
+    page = harness.routeNativeElement as HTMLElement;
+    expectApi('nada').flush(null, { status: 500, statusText: 'Server Error' });
+    await settle();
+
+    expect(page.querySelectorAll('h1').length).toBe(1);
+  });
+
   it('footerAppearsOnlyOnce', async () => {
     await open('/r/kafe');
     await flushShifts();
