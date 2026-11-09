@@ -60,6 +60,24 @@ export class ReservationsPage {
       : dayFigures(day, this.store.shiftId(), this.store.tables(), this.store.occupied());
   });
 
+  /**
+   * Reserva a la que se elige mesa cuando su fila no está en la lista visible (el día aún carga o falló): sin esto no
+   * habría dónde salir de la elección, que mantiene interactivo el plano.
+   */
+  protected readonly hiddenChoice = computed(() => {
+    const target = this.store.assigning();
+    if (!target) {
+      return null;
+    }
+    const listed =
+      this.store.tab() === 'pending'
+        ? this.store.pendingRows()
+        : this.store.day() === null
+          ? []
+          : this.store.dayRows();
+    return listed.some((reservation) => reservation.id === target.id) ? null : target;
+  });
+
   constructor() {
     // Cambiar de plano desde la cabecera reutiliza esta página: se recarga con cada slug, no solo con el primero.
     inject(ActivatedRoute)

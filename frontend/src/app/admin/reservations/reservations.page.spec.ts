@@ -231,6 +231,11 @@ describe('ReservationsPage', () => {
     return found;
   }
 
+  /** Texto con los espacios normalizados. */
+  function normalized(text: string | null | undefined): string {
+    return (text ?? '').replace(/\s+/g, ' ').trim();
+  }
+
   /** Hora de llegada que enseña la fila (o el guion si la reserva no tiene). */
   function timeOf(name: string): string {
     return row(name).querySelector('.time .hour')?.textContent?.trim() ?? '';
@@ -306,6 +311,8 @@ describe('ReservationsPage', () => {
     // Sin hora (reserva anterior a la hora de llegada) va la última, con un guion en lugar de la hora.
     expect(timeOf('Marta')).toBe('—');
     expect(row('Marta').textContent).not.toMatch(/\d{2}:\d{2}/);
+    // El turno ya no se repite en cada fila: lo dice la cabecera de la lista.
+    expect(normalized(page.querySelector('.list .head b')?.textContent)).toBe('Cena');
   });
 
   it('showsAnArrivalTimeOutsideTheCurrentGridAsIs', async () => {
@@ -456,6 +463,11 @@ describe('ReservationsPage', () => {
       'Zoe',
     ]);
     expect(row('Zoe').textContent).toContain('15/11/2026');
+    // En Pendientes la meta lleva la fecha y el turno; la cabecera de la lista dice que son las pendientes.
+    expect(normalized(row('Zoe').querySelector('.meta .when')?.textContent)).toBe(
+      '15/11/2026 · Cena',
+    );
+    expect(normalized(page.querySelector('.list .head b')?.textContent)).toBe('Pendientes');
     expect(page.querySelector('app-plano')).toBeNull();
   });
 
@@ -467,6 +479,14 @@ describe('ReservationsPage', () => {
         fig.querySelector('b')?.textContent?.trim() ?? '',
       ]),
     );
+  }
+
+  /** Cifra de "Pendientes" de la cabecera. */
+  function pendingFigure(): HTMLElement {
+    const fig = Array.from(page.querySelectorAll('.figures .fig')).find(
+      (candidate) => candidate.querySelector('.kicker')?.textContent?.trim() === 'Pendientes',
+    );
+    return fig?.querySelector('b') as HTMLElement;
   }
 
   function title(): string {
@@ -516,6 +536,11 @@ describe('ReservationsPage', () => {
       Pendientes: '0',
       'Mesas libres': '1',
     });
+    // Un 0 no se pinta como aviso, y la cifra aclara que cuenta solo el turno elegido.
+    expect(pendingFigure().classList).not.toContain('warn');
+    expect(normalized(pendingFigure().parentElement?.querySelector('.sub')?.textContent)).toBe(
+      'en este turno',
+    );
 
     await click(page, 'Cena · 20:00');
     // Mientras llega la ocupación del turno nuevo no se sabe cuántas mesas hay libres.
@@ -534,6 +559,7 @@ describe('ReservationsPage', () => {
       Pendientes: '1',
       'Mesas libres': '2',
     });
+    expect(pendingFigure().classList).toContain('warn');
   });
 
   it('pendingTabIsSingleColumn', async () => {
@@ -586,7 +612,7 @@ describe('ReservationsPage', () => {
     expect(row('Luis').classList).not.toContain('sel');
   });
 
-  it('theAssignmentShowsInsideItsRowInThePendingTabToo', async () => {
+  it('theQuestionShowsInsideItsRowInThePendingTab', async () => {
     const far: AdminReservation = { ...MARTA, id: 7, date: '2026-11-15', customerName: 'Zoe' };
     await open({ day: [], pending: [far] });
 
@@ -596,6 +622,54 @@ describe('ReservationsPage', () => {
     expect(row('Zoe').querySelector('.question')?.textContent).toContain(
       '¿Rechazar la reserva de Zoe?',
     );
+  });
+
+  it('anOpenQuestionIsDiscardedWhenSwitchingTab', async () => {
+    await open({ day: [LUIS], pending: [ANA] });
+
+    await click(row('Luis'), 'Cancelar');
+    expect(page.textContent).toContain('¿Cancelar la reserva de Luis?');
+
+    await click(page, 'Pendientes · 1');
+    await click(page, 'Del día');
+
+    // No queda una pregunta escondida que reaparezca al volver.
+    expect(page.querySelector('.question')).toBeNull();
+    expect(page.textContent).not.toContain('¿Cancelar la reserva');
+  });
+
+  it('aChoiceWhoseRowIsNotVisibleCanStillBeLeft', async () => {
+    const far: AdminReservation = { ...MARTA, id: 7, date: '2026-11-15', customerName: 'Zoe' };
+    await open({ day: [], pending: [far] });
+    expect(page.querySelector('.choosing')).toBeNull();
+
+    await click(page, 'Pendientes · 1');
+    await click(row('Zoe'), 'Asignar mesa');
+    // La carga del día de Zoe falla: su fila no se ve, pero la elección sigue abierta y el plano es interactivo.
+    expectDay('2026-11-15').flush(null, { status: 500, statusText: 'Server Error' });
+    expectOccupancy('2026-11-15', 11).flush(OCCUPANCY);
+    request('GET', '/api/v1/admin/reservations/7/suggestions').flush([]);
+    await settle();
+
+    expect(rows()).toEqual([]);
+    expect(normalized(page.querySelector('.choosing')?.textContent)).toContain(
+      'Eligiendo mesa para Zoe',
+    );
+
+    await click(page.querySelector('.choosing') as HTMLElement, 'Dejar de elegir mesa');
+
+    expect(page.querySelector('.choosing')).toBeNull();
+  });
+
+  it('noChoosingBoxWhileTheRowOfTheChoiceIsVisible', async () => {
+    await open({ day: [MARTA], pending: [MARTA] });
+
+    await click(row('Marta'), 'Asignar mesa');
+    request('GET', '/api/v1/admin/reservations/3/suggestions').flush([]);
+    await settle();
+
+    expect(row('Marta').querySelector('.assign')).not.toBeNull();
+    expect(page.querySelector('.choosing')).toBeNull();
   });
 
   it('showsTheStateOfEachReservationAsADotWithText', async () => {

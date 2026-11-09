@@ -12,7 +12,7 @@ import { AdminReservationControllerService } from '../../core/api/services/admin
 import { AdminRestaurantControllerService } from '../../core/api/services/admin-restaurant-controller.service';
 import { errorCode } from '../../core/api-errors';
 import { OPEN_WINDOW } from '../../core/open-window';
-import { NOW, formatDate, todayIn } from '../../core/time';
+import { NOW, todayIn } from '../../core/time';
 import { toRoom, toTable } from '../../plano/plan-mapping';
 import { PlanoTable, TableState } from '../../plano/plano.component';
 import { tableName } from '../../plano/table-name';
@@ -373,6 +373,8 @@ export class ReservationsStore {
 
   setTab(tab: Tab): void {
     this.resetMessages();
+    // La pregunta vive en la fila de su reserva: al cambiar de pestaña esa fila puede no estar y quedaría escondida.
+    this.question.set(null);
     this.tab.set(tab);
   }
 
@@ -613,16 +615,6 @@ export class ReservationsStore {
 
   shiftName(shiftId: number | undefined): string {
     return this.plan()?.shifts?.find((shift) => shift.id === shiftId)?.name ?? 'Turno';
-  }
-
-  /** "21:30 · Cena", o solo "Cena" si la reserva no tiene hora (anterior a V5). En Pendientes lleva delante la fecha. */
-  whenText(reservation: AdminReservation, withDate: boolean): string {
-    const parts = [
-      withDate && reservation.date ? formatDate(reservation.date) : null,
-      reservation.arrivalTime ? reservation.arrivalTime.slice(0, 5) : null,
-      this.shiftName(reservation.shiftId),
-    ];
-    return parts.filter((part) => part !== null).join(' · ');
   }
 
   private begin(): void {

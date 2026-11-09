@@ -33,7 +33,9 @@
           <span class="kicker">Comensales</span><b>{{ totals?.guests ?? '—' }}</b>
         </div>
         <div class="fig">
-          <span class="kicker">Pendientes</span><b class="warn">{{ totals?.pending ?? '—' }}</b>
+          <span class="kicker">Pendientes</span
+          ><b [class.warn]="(totals?.pending ?? 0) > 0">{{ totals?.pending ?? '—' }}</b>
+          <span class="sub">en este turno</span>
         </div>
         <div class="fig">
           <span class="kicker">Mesas libres</span><b>{{ totals?.freeTables ?? '—' }}</b>
@@ -84,6 +86,16 @@
       </div>
     </div>
 
+    @if (hiddenChoice(); as target) {
+      <div class="choosing" role="status">
+        <span class="truncate" [attr.title]="target.customerName"
+          >Eligiendo mesa para {{ target.customerName }}</span
+        >
+        <button type="button" class="btn quiet sm" (click)="store.cancelAssign()">
+          Dejar de elegir mesa
+        </button>
+      </div>
+    }
     @if (store.error(); as message) {
       <p class="error" role="alert">{{ message }}</p>
     }

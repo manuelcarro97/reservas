@@ -28,6 +28,10 @@
   color: var(--warn);
 }
 
+.fig .sub {
+  display: block;
+}
+
 .toolbar {
   display: flex;
   flex: none;
@@ -48,6 +52,23 @@
 
 .spacer {
   flex: 1;
+}
+
+/* Aviso de que hay una elección de mesa abierta cuya fila no se ve. */
+.choosing {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--blue);
+  background: var(--blue-tint);
+  color: var(--ink);
+  font-size: 13px;
 }
 
 .error,
