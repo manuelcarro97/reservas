@@ -9,7 +9,6 @@
 /* Es el h1 de la página en estos estados, pero se ve como texto corriente. */
 .state {
   margin: 48px auto;
-  color: var(--muted);
   font: inherit;
   text-align: center;
 }
@@ -89,11 +88,6 @@
 
 .row > * {
   min-width: 0;
-}
-
-.input.mono {
-  font-family: var(--mono);
-  font-size: 13px;
 }
 
 /* Grupos de botones (turnos y horas de llegada). */

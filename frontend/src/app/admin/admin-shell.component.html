@@ -47,7 +47,7 @@
       <app-icon name="bell" label="Avisos" />
       @if (feed.pendingCount() > 0) {
         <span class="badge"
-          ><span class="sr-only">Avisos sin ver: </span>{{ feed.pendingCount() }}</span
+          ><span class="visually-hidden">Avisos sin ver: </span>{{ feed.pendingCount() }}</span
         >
       }
     </span>

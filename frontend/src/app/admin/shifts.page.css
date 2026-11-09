@@ -7,7 +7,6 @@
   margin-bottom: 18px;
 }
 
-.state,
 .arrivals {
   color: var(--muted);
 }
@@ -55,22 +54,6 @@
 
 .row-actions {
   text-align: right;
-}
-
-.confirm {
-  padding: 10px 14px;
-  border-left: 2px solid var(--bad);
-  background: color-mix(in srgb, var(--bad) 5%, var(--paper));
-}
-
-.confirm p {
-  margin: 0 0 8px;
-}
-
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 /* Cuadritos de los días: en la tabla son la vista y en el formulario, el control. */
@@ -126,11 +109,6 @@
 
 .form-row .field {
   margin-top: 0;
-}
-
-.input.mono {
-  font-family: var(--mono);
-  font-size: 13px;
 }
 
 .day-picks {

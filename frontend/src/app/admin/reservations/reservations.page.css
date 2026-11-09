@@ -6,10 +6,6 @@
   min-height: 0;
 }
 
-.state {
-  color: var(--muted);
-}
-
 .top {
   display: flex;
   flex: none;

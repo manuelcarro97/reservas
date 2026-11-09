@@ -6,7 +6,7 @@ import { ActionFailure } from './admin-errors';
   selector: 'app-action-failure',
   template: `
     @if (failure(); as problem) {
-      <div class="error" role="alert">
+      <div class="callout bad" role="alert">
         <p>{{ problem.message }}</p>
         @if (problem.reservations.length > 0) {
           <ul>
@@ -19,14 +19,9 @@ import { ActionFailure } from './admin-errors';
     }
   `,
   styles: `
-    .error {
-      margin: 0 0 16px;
-      padding: 10px 14px;
-      border: 1px solid var(--rule);
-      border-left: 2px solid var(--bad);
-      background: color-mix(in srgb, var(--bad) 5%, var(--paper));
-      color: var(--ink-2);
-      font-size: 13px;
+    /* El aspecto del aviso sale de .callout.bad (styles/base.css); aquí solo el hueco de debajo. */
+    .callout {
+      margin-bottom: 16px;
     }
 
     p {

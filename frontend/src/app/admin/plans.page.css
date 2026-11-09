@@ -11,10 +11,6 @@
   margin-bottom: 18px;
 }
 
-.state {
-  color: var(--muted);
-}
-
 .grid {
   display: grid;
   flex: 1;

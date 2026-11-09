@@ -6,10 +6,6 @@
   min-height: 0;
 }
 
-.state {
-  color: var(--muted);
-}
-
 .top {
   display: flex;
   flex: none;
@@ -163,12 +159,6 @@
   margin: 0 0 4px;
   font-size: 15px;
   font-weight: 600;
-}
-
-.col .desc {
-  margin: 0 0 14px;
-  color: var(--muted);
-  font-size: 13px;
 }
 
 .col .hint {

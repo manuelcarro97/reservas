@@ -15,10 +15,6 @@
   min-width: 0;
 }
 
-.state {
-  color: var(--muted);
-}
-
 /* Tres columnas: General, Enlace y web, y Telegram con Borrar plano apiladas. */
 .grid {
   display: grid;
@@ -55,13 +51,9 @@ fieldset {
   border: 0;
 }
 
-.input.mono,
 .input.code {
   font-family: var(--mono);
   font-size: 13px;
-}
-
-.input.code {
   resize: vertical;
 }
 
@@ -166,22 +158,6 @@ fieldset {
 }
 
 /* Telegram y borrar el plano */
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.confirm {
-  padding: 10px 14px;
-  border-left: 2px solid var(--bad);
-  background: color-mix(in srgb, var(--bad) 5%, var(--paper));
-}
-
-.confirm p {
-  margin: 0 0 8px;
-}
-
 .delete-form code {
   color: var(--ink);
   font: 500 13px/1 var(--mono);

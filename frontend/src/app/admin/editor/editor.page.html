@@ -170,7 +170,7 @@
 
         <section class="sheet">
           <h3>Añadir mesa</h3>
-          <p class="desc">Haz clic en una forma para ponerla en el plano.</p>
+          <p class="sheet-desc">Haz clic en una forma para ponerla en el plano.</p>
           <app-table-palette
             [disabled]="store.tables().length >= maxTables || store.saving() || store.publishing()"
             (add)="addTable($event)"

@@ -9,10 +9,6 @@
   margin-bottom: 18px;
 }
 
-.state {
-  color: var(--muted);
-}
-
 .danger-zone {
   margin-top: 22px;
   border-color: var(--bad-soft);
@@ -27,12 +23,6 @@
 
 .danger-zone p {
   margin: 0 0 14px;
-}
-
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .error {

@@ -114,16 +114,16 @@
 
 .btn.ink {
   background: var(--ink);
-  color: #fff;
+  color: var(--paper);
 }
 
 .btn.ink:hover:not(:disabled, [aria-disabled='true']) {
-  background: #18304d;
+  background: var(--ink-hover);
 }
 
 .btn.blue {
   background: var(--blue);
-  color: #fff;
+  color: var(--paper);
 }
 
 .btn.blue:hover:not(:disabled, [aria-disabled='true']) {
@@ -157,7 +157,7 @@
 }
 
 .btn.danger:hover:not(:disabled, [aria-disabled='true']) {
-  background: #fff6f5;
+  background: var(--bad-wash);
   border-color: var(--bad);
 }
 
@@ -206,7 +206,7 @@
 .seg > [aria-pressed='true'],
 .seg > [aria-selected='true'] {
   background: var(--ink);
-  color: #fff;
+  color: var(--paper);
 }
 
 .seg > *:focus-visible {
@@ -259,6 +259,12 @@
   text-transform: none;
 }
 
+/* Valores en mono (hora, teléfono, código): un poco más pequeños que el texto. */
+.input.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
 .input::placeholder {
   color: var(--muted);
 }
@@ -267,7 +273,7 @@
 .input:focus-visible {
   outline: 2px solid transparent;
   box-shadow:
-    0 0 0 2px #fff,
+    0 0 0 2px var(--paper),
     0 0 0 4px var(--blue);
 }
 
@@ -315,6 +321,11 @@
   color: var(--bad);
 }
 
+/* Texto de "Cargando…" o de error en lugar del contenido. No es el .dot-state (punto de color más texto mono). */
+.state {
+  color: var(--muted);
+}
+
 /* ---------- Aviso en línea: caja con filete a la izquierda (error, confirmación, advertencia) ---------- */
 
 .callout {
@@ -340,6 +351,24 @@
 .callout.warn {
   border-left-color: var(--warn);
   background: color-mix(in srgb, var(--warn) 7%, var(--paper));
+}
+
+/* Pregunta de borrar o desvincular dentro de una fila o una hoja ("¿Borrar…?" y sus botones). */
+.confirm-box {
+  padding: 10px 14px;
+  border-left: 2px solid var(--bad);
+  background: color-mix(in srgb, var(--bad) 5%, var(--paper));
+}
+
+.confirm-box p {
+  margin: 0 0 8px;
+}
+
+/* Fila de botones que se parte en varias líneas si no caben. */
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* ---------- Textos ---------- */
@@ -512,12 +541,12 @@
   min-height: 0;
   min-width: 0;
   padding: 34px;
-  background-color: #fbfcff;
+  background-color: var(--canvas-bg);
   background-image:
-    linear-gradient(#e9eef8 1px, transparent 1px),
-    linear-gradient(90deg, #e9eef8 1px, transparent 1px),
-    linear-gradient(#f2f5fb 1px, transparent 1px),
-    linear-gradient(90deg, #f2f5fb 1px, transparent 1px);
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(var(--canvas-grid-fine) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid-fine) 1px, transparent 1px);
   background-size:
     96px 96px,
     96px 96px,

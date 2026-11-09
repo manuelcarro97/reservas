@@ -40,6 +40,16 @@
   --bad: #c8372d;
   /* Borde suave de lo peligroso (botón de borrar, zona de peligro). Solo adorno, nunca texto. */
   --bad-soft: #f0c4c0;
+  /* Fondo del botón de borrar al pasar el ratón. */
+  --bad-wash: #fff6f5;
+
+  /* Botón principal (.btn.ink) al pasar el ratón: un paso más claro que --ink. */
+  --ink-hover: #18304d;
+
+  /* Lienzo del editor: fondo y rejilla (líneas gruesas cada 96 px y finas cada 24 px). */
+  --canvas-bg: #fbfcff;
+  --canvas-grid: #e9eef8;
+  --canvas-grid-fine: #f2f5fb;
 
   /* Tipografía */
   --serif: 'Instrument Serif', Georgia, serif;

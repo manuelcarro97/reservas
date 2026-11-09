@@ -6,7 +6,10 @@ import { resolve } from 'node:path';
  * Lee `tokens.css` tal cual está en disco: los tokens son la fuente de verdad del sistema visual.
  * Se quitan los comentarios para que un valor citado en uno (p. ej. el de la maqueta) no cuente como declaración.
  */
-const tokensCss = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+const tokensCss = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+);
 
 function tokenHex(name: string): string {
   // Anclado al inicio de la declaración: `--bg` no casa con `--wash-bg` ni con un `var(--bg)`.
@@ -40,20 +43,28 @@ describe('design tokens', () => {
     const muted = tokenHex('--muted');
 
     for (const background of ['--paper', '--bg', '--wash']) {
-      expect(contrast(muted, tokenHex(background)), `--muted sobre ${background}`).toBeGreaterThanOrEqual(AA);
+      expect(
+        contrast(muted, tokenHex(background)),
+        `--muted sobre ${background}`,
+      ).toBeGreaterThanOrEqual(AA);
     }
   });
 
   it('stateColorsAreReadableOnWhite', () => {
     expect(contrast(tokenHex('--ok'), '#ffffff'), '--ok sobre blanco').toBeGreaterThanOrEqual(AA);
-    expect(contrast(tokenHex('--warn'), '#ffffff'), '--warn sobre blanco').toBeGreaterThanOrEqual(AA);
+    expect(contrast(tokenHex('--warn'), '#ffffff'), '--warn sobre blanco').toBeGreaterThanOrEqual(
+      AA,
+    );
   });
 
   it('textAndStateColorsAreReadableOnTheSelectedRow', () => {
     const selectedRow = tokenHex('--blue-tint');
 
     for (const token of ['--muted', '--ok', '--warn']) {
-      expect(contrast(tokenHex(token), selectedRow), `${token} sobre --blue-tint`).toBeGreaterThanOrEqual(AA);
+      expect(
+        contrast(tokenHex(token), selectedRow),
+        `${token} sobre --blue-tint`,
+      ).toBeGreaterThanOrEqual(AA);
     }
   });
 
