@@ -20,23 +20,31 @@ import { ActionFailure } from './admin-errors';
   `,
   styles: `
     .error {
-      margin: 0 0 1rem;
-      padding: 0.6rem 0.8rem;
-      border-radius: 6px;
-      background: #fde8e6;
-      color: #8e1d14;
+      margin: 0 0 16px;
+      padding: 10px 14px;
+      border: 1px solid var(--rule);
+      border-left: 2px solid var(--bad);
+      background: color-mix(in srgb, var(--bad) 5%, var(--paper));
+      color: var(--ink-2);
+      font-size: 13px;
     }
 
     p {
       margin: 0;
     }
 
+    /* Los códigos de las reservas que lo impiden, en mono y en línea; con tope de altura y scroll. */
     ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 14px;
       max-height: 10rem;
       overflow-y: auto;
-      margin: 0.4rem 0 0;
-      padding-left: 1.2rem;
-      font-family: ui-monospace, monospace;
+      margin: 6px 0 0;
+      padding: 0;
+      color: var(--ink);
+      font: 12px/18px var(--mono);
+      list-style: none;
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

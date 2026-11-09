@@ -1,162 +1,257 @@
-/* Funcional y sobrio; el pulido visual llega en una tarea posterior. */
-h1 {
-  margin: 0 0 1rem;
-  font-size: 1.5rem;
+/* Disposición de Turnos. El aspecto común (hojas, botones, campos, tabla) sale de styles/base.css. */
+:host {
+  display: block;
 }
 
-h2 {
-  margin: 0 0 0.6rem;
-  font-size: 1.1rem;
+.top {
+  margin-bottom: 18px;
 }
 
-.state,
-.hint {
-  color: #5b6877;
+.state {
+  color: var(--muted);
 }
 
-section {
-  margin-bottom: 1.5rem;
-}
-
-.shifts,
-.closures {
+.grid {
   display: grid;
-  gap: 0.6rem;
-  margin: 0 0 1rem;
-  padding: 0;
-  list-style: none;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 22px;
+  align-items: start;
 }
 
-.shift,
-.closure,
-.shift-form,
-.closure-form {
-  padding: 0.75rem 1rem;
-  border: 1px solid #e3e7ec;
-  border-radius: 10px;
-  background: #fff;
+/* Turnos */
+.table-wrap {
+  overflow-x: auto;
 }
 
-.shift {
+/* Columnas fijas: el nombre se lleva lo que sobra y se corta con puntos suspensivos si es largo. */
+.shift-table {
+  min-width: 700px;
+  table-layout: fixed;
+}
+
+.shift-table th:nth-child(2) {
+  width: 140px;
+}
+
+.shift-table th:nth-child(3) {
+  width: 210px;
+}
+
+.shift-table th:nth-child(4) {
+  width: 140px;
+}
+
+.shift-table th:nth-child(5) {
+  width: 150px;
+}
+
+.shift strong {
+  display: block;
+}
+
+.shift.editing td {
+  background: var(--blue-tint);
+}
+
+.arrivals {
+  color: var(--muted);
+}
+
+.row-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.confirm {
+  padding: 10px 14px;
+  border-left: 2px solid var(--bad);
+  background: color-mix(in srgb, var(--bad) 5%, var(--paper));
+}
+
+.confirm p {
+  margin: 0 0 8px;
+}
+
+.buttons {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
+  gap: 8px;
 }
 
-.closure {
+/* Cuadritos de los días: activo en tinta. En la tabla son la vista; en el formulario, el control. */
+.days {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
+  gap: 3px;
 }
 
-.summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
+.sq {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--muted);
+  font: 500 11px/22px var(--mono);
+  text-align: center;
 }
 
-fieldset {
-  display: grid;
-  gap: 1rem;
+.sq.on,
+.day-pick:has(input:checked) .sq {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Nuevo turno */
+.shift-form {
+  margin-top: 20px;
+}
+
+.shift-form fieldset,
+.closure-form fieldset {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.days {
+.shift-form .kicker {
+  margin: 0 0 10px;
+}
+
+.form-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1rem;
+  gap: 12px;
+  align-items: flex-end;
 }
 
-.hours {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+.form-row .field {
+  margin-top: 0;
 }
 
-label {
-  display: grid;
-  gap: 0.25rem;
-  font-weight: 600;
+.name-field {
+  flex: 2 1 160px;
 }
 
-.day {
-  display: flex;
+.hour-field {
+  flex: 1 1 96px;
+  max-width: 140px;
+}
+
+.input.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.days-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.day-picks {
   align-items: center;
-  gap: 0.35rem;
-  font-weight: 400;
+  min-height: 40px;
 }
 
-input[type='text'],
-input[type='time'],
-input[type='date'] {
-  padding: 0.5rem;
-  border: 1px solid #c4ccd6;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 400;
-}
-
-button {
-  padding: 0.5rem 1.2rem;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 600;
+.day-pick {
+  position: relative;
   cursor: pointer;
 }
 
-.primary {
-  justify-self: start;
-  border: 0;
-  background: #2457a6;
-  color: #fff;
+.day-picks .sq {
+  width: 28px;
+  height: 28px;
+  line-height: 26px;
 }
 
-.secondary {
-  border: 1px solid #c4ccd6;
-  background: #fff;
-  color: inherit;
+.day-pick:has(input:focus-visible) .sq {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 
-.danger {
-  border: 0;
-  background: #b3261e;
-  color: #fff;
-}
-
-.link-danger {
-  padding: 0.5rem 0;
-  border: 0;
-  background: none;
-  color: #b3261e;
-  font-weight: 400;
-  text-decoration: underline;
-}
-
-button:disabled {
-  opacity: 0.45;
+.day-pick:has(input:disabled) {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.buttons {
+.form-buttons {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 8px;
 }
 
-.confirm {
-  flex-basis: 100%;
-  padding: 0.75rem;
-  border-radius: 6px;
-  background: #fdf3f2;
+.shift-form .hint {
+  margin: 12px 0 0;
 }
 
-.confirm p {
-  margin: 0 0 0.6rem;
+/* Días cerrados */
+.closure-form fieldset {
+  display: flex;
+  gap: 8px;
+}
+
+.closure-form .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.closures {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.closure {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* Hoja de calendario: mes en banda de tinta y día en serif. */
+.cal {
+  overflow: hidden;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.cal small {
+  display: block;
+  background: var(--ink);
+  color: var(--paper);
+  font: 500 9.5px/16px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cal b {
+  display: block;
+  font: 400 22px/28px var(--serif);
+}
+
+.when .hint {
+  display: block;
+  margin: 0;
+  font-family: var(--mono);
+}
+
+.reopen {
+  display: grid;
+  grid-column: 2 / -1;
+  gap: 8px;
+}
+
+.closed > .state {
+  margin: 14px 0 0;
+}
+
+/* Por debajo de 1280 px la tabla no cabe junto a los días cerrados: una columna y la página hace scroll. */
+@media (max-width: 1279px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }

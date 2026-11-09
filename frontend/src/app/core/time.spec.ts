@@ -1,4 +1,4 @@
-import { addDays, formatDate, longDateParts, todayIn } from './time';
+import { addDays, calendarLeaf, formatDate, longDateParts, todayIn } from './time';
 
 describe('time', () => {
   it('todayFollowsTheRestaurantZoneNotTheBrowser', () => {
@@ -29,6 +29,12 @@ describe('time', () => {
   it('longDateKeepsTheCalendarDayWhateverTheBrowserZoneIs', () => {
     expect(longDateParts('2026-11-09')).toEqual({ weekday: 'Lunes', day: '9 de noviembre' });
     expect(longDateParts('2026-03-01')).toEqual({ weekday: 'Domingo', day: '1 de marzo' });
+  });
+
+  it('calendarLeafGivesTheShortMonthAndTheDayWithoutLeadingZero', () => {
+    expect(calendarLeaf('2026-12-24')).toEqual({ month: 'dic', day: '24' });
+    expect(calendarLeaf('2027-01-01')).toEqual({ month: 'ene', day: '1' });
+    expect(calendarLeaf('2026-03-09')).toEqual({ month: 'mar', day: '9' });
   });
 
   it('formatsDateAsDayMonthYear', () => {

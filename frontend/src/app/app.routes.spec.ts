@@ -185,7 +185,7 @@ describe('routes', () => {
           .flush([]);
         await harness.fixture.whenStable();
         harness.detectChanges();
-        expect(host.textContent).toContain('Turnos · Kafé');
+        expect(host.textContent).toContain('Kafé / Turnos');
         expect(host.textContent).toContain('Días cerrados');
       } else {
         // Los ajustes piden el plano y vuelven a pedir los datos del dueño (la cabecera ya los pidió una vez).
@@ -198,7 +198,7 @@ describe('routes', () => {
           .flush({ email: 'dueno@example.com', demo: false, maxPlans: 3, plans: [] });
         await harness.fixture.whenStable();
         harness.detectChanges();
-        expect(host.textContent).toContain('Ajustes · Kafé');
+        expect(host.textContent).toContain('Kafé / Configuración');
       }
     }
   });

@@ -26,6 +26,7 @@ import { ActionFailure, actionFailure } from './admin-errors';
 import { embedSnippet } from './embed-snippet';
 import { MeStore } from './me.store';
 import { OPEN_WINDOW } from '../core/open-window';
+import { IconComponent } from '../shared/icon.component';
 
 export type PageStatus = 'loading' | 'ready' | 'notFound' | 'error';
 type BookingMode = NonNullable<PlanResponse['bookingMode']>;
@@ -69,10 +70,11 @@ type CopyStatus = 'idle' | 'copied' | 'manual';
  */
 @Component({
   selector: 'app-settings-page',
-  imports: [ActionFailureComponent, RouterLink],
+  imports: [ActionFailureComponent, IconComponent, RouterLink],
   templateUrl: './settings.page.html',
   styleUrl: './settings.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'rise-stagger' },
 })
 export class SettingsPage {
   protected readonly store = inject(MeStore);
@@ -82,6 +84,8 @@ export class SettingsPage {
   private readonly router = inject(Router);
   private readonly openWindow = inject(OPEN_WINDOW);
   private readonly origin = inject(DOCUMENT).location.origin;
+  /** Servidor sin esquema, para enseñar el enlace público: `localhost:4200/r/kafe`. */
+  protected readonly publicHost = inject(DOCUMENT).location.host;
 
   /** Plano de la URL. Es una señal porque lo leen los `computed` (código para incrustar, botón de borrar). */
   protected readonly currentSlug = signal('');

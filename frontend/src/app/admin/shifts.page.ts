@@ -14,7 +14,8 @@ import { PlanResponse } from '../core/api/models/plan-response';
 import { ShiftResponse } from '../core/api/models/shift-response';
 import { AdminPlanControllerService } from '../core/api/services/admin-plan-controller.service';
 import { AdminShiftControllerService } from '../core/api/services/admin-shift-controller.service';
-import { NOW, addDays, formatDate, todayIn } from '../core/time';
+import { arrivalRange } from '../core/arrival-times';
+import { NOW, addDays, calendarLeaf, formatDate, longDateParts, todayIn } from '../core/time';
 import { ActionFailureComponent } from './action-failure.component';
 import { ActionFailure, actionFailure } from './admin-errors';
 
@@ -22,19 +23,21 @@ export type PageStatus = 'loading' | 'ready' | 'notFound' | 'error';
 
 type Day = NonNullable<ShiftResponse['days']>[number];
 
-/** Días de la semana en el orden de la interfaz (lunes primero), con su texto corto. */
-const DAYS: readonly { value: Day; label: string }[] = [
-  { value: 'MONDAY', label: 'Lun' },
-  { value: 'TUESDAY', label: 'Mar' },
-  { value: 'WEDNESDAY', label: 'Mié' },
-  { value: 'THURSDAY', label: 'Jue' },
-  { value: 'FRIDAY', label: 'Vie' },
-  { value: 'SATURDAY', label: 'Sáb' },
-  { value: 'SUNDAY', label: 'Dom' },
+/** Días de la semana en el orden de la interfaz (lunes primero), con su texto corto y la letra del cuadrito. */
+const DAYS: readonly { value: Day; label: string; letter: string }[] = [
+  { value: 'MONDAY', label: 'Lun', letter: 'L' },
+  { value: 'TUESDAY', label: 'Mar', letter: 'M' },
+  { value: 'WEDNESDAY', label: 'Mié', letter: 'X' },
+  { value: 'THURSDAY', label: 'Jue', letter: 'J' },
+  { value: 'FRIDAY', label: 'Vie', letter: 'V' },
+  { value: 'SATURDAY', label: 'Sáb', letter: 'S' },
+  { value: 'SUNDAY', label: 'Dom', letter: 'D' },
 ];
 
 /** Hasta cuántos días por delante se puede cerrar (`ShiftAdminService.MAX_CLOSURE_DAYS_AHEAD` del backend). */
 const MAX_CLOSURE_DAYS_AHEAD = 90;
+/** Turnos que admite un plano (`ShiftAdminService.MAX_SHIFTS` del backend); solo para el contador de la tabla. */
+const MAX_SHIFTS = 10;
 const MAX_NAME_LENGTH = 60;
 
 const SHIFT_FAILED = 'No se pudo guardar el turno. Inténtalo de nuevo.';
@@ -79,6 +82,7 @@ function byStart(a: ShiftResponse, b: ShiftResponse): number {
   templateUrl: './shifts.page.html',
   styleUrl: './shifts.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'rise-stagger' },
 })
 export class ShiftsPage {
   private readonly plansApi = inject(AdminPlanControllerService);
@@ -92,7 +96,9 @@ export class ShiftsPage {
 
   protected readonly days = DAYS;
   protected readonly maxNameLength = MAX_NAME_LENGTH;
+  protected readonly maxShifts = MAX_SHIFTS;
   protected readonly formatDate = formatDate;
+  protected readonly calendarLeaf = calendarLeaf;
   protected readonly hourMinute = hourMinute;
 
   protected readonly status = signal<PageStatus>('loading');
@@ -184,6 +190,16 @@ export class ShiftsPage {
         next: (dates) => this.closures.set([...dates].sort()),
         error: () => this.closuresFailed.set(true),
       });
+  }
+
+  /** "13:00 … 15:00", o solo "13:00" si el turno es tan corto que no hay más horas de llegada. */
+  protected arrivalsText(shift: ShiftResponse): string {
+    const { first, last } = arrivalRange(shift.start ?? '', shift.end ?? '');
+    return first === last ? first : `${first} … ${last}`;
+  }
+
+  protected weekdayOf(isoDate: string): string {
+    return longDateParts(isoDate).weekday;
   }
 
   protected daysText(shift: ShiftResponse): string {

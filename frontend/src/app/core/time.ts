@@ -60,6 +60,16 @@ export function longDateParts(isoDate: string): { weekday: string; day: string }
   };
 }
 
+/** Hoja de calendario de un `YYYY-MM-DD`: mes corto ("dic") y día sin cero a la izquierda. */
+export function calendarLeaf(isoDate: string): { month: string; day: string } {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return {
+    month: new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: 'UTC' }).format(date),
+    day: String(day),
+  };
+}
+
 /** `YYYY-MM-DD` como `dd/mm/aaaa`. */
 export function formatDate(isoDate: string): string {
   const [year, month, day] = isoDate.split('-');

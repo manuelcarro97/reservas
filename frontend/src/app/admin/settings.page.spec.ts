@@ -146,6 +146,17 @@ describe('SettingsPage', () => {
     return page.querySelector('[role="alert"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
   }
 
+  function eyebrowText(): string | undefined {
+    return page.querySelector('.eyebrow')?.textContent?.replace(/\s+/g, ' ').trim();
+  }
+
+  /** Títulos de las zonas, con su número, en el orden en que salen en la página. */
+  function sectionTitles(): string[] {
+    return Array.from(page.querySelectorAll('h2.sheet-title')).map(
+      (title) => title.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+    );
+  }
+
   function snippetField(): HTMLTextAreaElement {
     return page.querySelector<HTMLTextAreaElement>('textarea[name="embed"]')!;
   }
@@ -158,7 +169,7 @@ describe('SettingsPage', () => {
     it('showsTheCurrentSettings', async () => {
       await open();
 
-      expect(page.querySelector('h1')?.textContent).toContain('Kafé del Puerto');
+      expect(eyebrowText()).toBe('Kafé del Puerto / Configuración');
       expect(field('name').value).toBe('Kafé del Puerto');
       expect(field('cancellationDeadlineHours').value).toBe('2');
       expect(field('cancellationDeadlineHours').min).toBe('0');
@@ -189,7 +200,81 @@ describe('SettingsPage', () => {
       await settle();
 
       expect(page.querySelector('[role="status"]')?.textContent).toContain('Ajustes guardados');
-      expect(page.querySelector('h1')?.textContent).toContain('Kafé Nuevo');
+      expect(eyebrowText()).toContain('Kafé Nuevo');
+    });
+
+    it('headerSaveButtonSubmitsTheSettingsForm', async () => {
+      await open();
+
+      // El botón está arriba a la derecha, fuera del <form>: se asocia con el atributo `form`.
+      const save = page.querySelector<HTMLButtonElement>('.top button[type="submit"]')!;
+      expect(save.form).toBe(page.querySelector('form.settings-form'));
+      type('name', 'Kafé Nuevo');
+      save.click();
+      await settle();
+
+      const patch = expectApi('PATCH', 'restaurants/kafe');
+      expect(patch.request.body).toMatchObject({ name: 'Kafé Nuevo' });
+      patch.flush({ ...PLAN, name: 'Kafé Nuevo' });
+      await settle();
+      expectApi('GET', 'me').flush(meWith());
+      await settle();
+      expect(page.querySelector('[role="status"]')?.textContent).toContain('Ajustes guardados');
+    });
+
+    it('titleIsConfiguracion', async () => {
+      await open();
+
+      expect(page.querySelector('h1')?.textContent).toContain('Configuración');
+    });
+
+    it('eyebrowFollowsTheSavedNameNotTheDraft', async () => {
+      await open();
+
+      type('name', 'Sin guardar');
+
+      expect(eyebrowText()).toBe('Kafé del Puerto / Configuración');
+    });
+
+    it('modesAreSelectableCardsAroundNativeRadios', async () => {
+      await open();
+
+      const cards = Array.from(page.querySelectorAll<HTMLLabelElement>('.modes label.mode'));
+      expect(cards).toHaveLength(2);
+      for (const card of cards) {
+        // Los radios nativos siguen ahí (teclado, lector de pantalla), dentro de la tarjeta.
+        expect(card.querySelector('input[type="radio"][name="bookingMode"]')).not.toBeNull();
+      }
+
+      // Pulsar el texto de la tarjeta elige el modo.
+      page.querySelector<HTMLElement>('input[value="ASSIGNED"] ~ .mode-name')!.click();
+      harness.detectChanges();
+
+      expect(
+        page.querySelector<HTMLInputElement>('input[name="bookingMode"][value="ASSIGNED"]')!
+          .checked,
+      ).toBe(true);
+      expect(page.textContent).toContain('Solo afecta a las reservas nuevas');
+    });
+
+    it('settingsSectionsAreNumbered', async () => {
+      await open({
+        me: meWith({ telegramAvailable: true }),
+        telegram: { available: true, linked: true, linkPending: false },
+      });
+
+      expect(sectionTitles()).toEqual([
+        '01 General',
+        '02 Enlace y web',
+        '03 Avisos por Telegram',
+        '04 Borrar el plano',
+      ]);
+    });
+
+    it('sectionNumbersStayConsecutiveWithoutTelegram', async () => {
+      await open();
+
+      expect(sectionTitles()).toEqual(['01 General', '02 Enlace y web', '03 Borrar el plano']);
     });
 
     it('modeChangeShowsNotice', async () => {

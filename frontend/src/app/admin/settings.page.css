@@ -1,141 +1,230 @@
-/* Funcional y sobrio; el pulido visual llega en una tarea posterior. */
-h1 {
-  margin: 0 0 1rem;
-  font-size: 1.5rem;
+/* Disposición de Configuración. El aspecto común (hojas, botones, campos, estado) sale de styles/base.css. */
+:host {
+  display: block;
 }
 
-h2 {
-  margin: 0 0 0.6rem;
-  font-size: 1.1rem;
+.top {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 18px;
 }
 
-.state,
-.hint {
-  color: #5b6877;
+.heading {
+  min-width: 0;
 }
 
-.notice {
-  color: #1f6f4a;
+.state {
+  color: var(--muted);
 }
 
-.settings-form,
-section {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  border: 1px solid #e3e7ec;
-  border-radius: 10px;
-  background: #fff;
+/* Tres columnas: General, Enlace y web, y Telegram con Borrar plano apiladas. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  align-items: start;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sec-num {
+  margin-right: 8px;
+  color: var(--blue);
+  font: 400 15px/1 var(--serif);
 }
 
 .danger-zone {
-  border-color: #e8b9b5;
+  border-color: var(--bad-soft);
+}
+
+.danger-zone .sec-num {
+  color: var(--bad);
 }
 
 fieldset {
-  display: grid;
-  gap: 1rem;
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-label {
+.input.mono,
+.input.code {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.input.code {
+  resize: vertical;
+}
+
+/* Modo de reserva: dos tarjetas seleccionables. El radio nativo está oculto a la vista y la tarjeta es su etiqueta. */
+.modes {
+  margin-top: 16px;
+}
+
+.mode-cards {
   display: grid;
-  gap: 0.25rem;
-  font-weight: 600;
+  gap: 8px;
 }
 
 .mode {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  font-weight: 400;
-}
-
-.modes legend {
-  font-weight: 600;
-}
-
-input[type='text'],
-input[type='number'] {
-  padding: 0.5rem;
-  border: 1px solid #c4ccd6;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 400;
-}
-
-.hint {
-  font-size: 0.9rem;
-  font-weight: 400;
-}
-
-textarea {
-  box-sizing: border-box;
-  width: 100%;
-  margin-bottom: 0.6rem;
-  padding: 0.5rem;
-  border: 1px solid #c4ccd6;
-  border-radius: 6px;
-  font-family: ui-monospace, monospace;
-  font-size: 0.9rem;
-}
-
-button {
-  padding: 0.5rem 1.2rem;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 600;
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 11px 14px 11px 42px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--paper);
   cursor: pointer;
 }
 
-.primary {
-  justify-self: start;
-  border: 0;
-  background: #2457a6;
-  color: #fff;
+.mode::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
 }
 
-.secondary {
-  border: 1px solid #c4ccd6;
-  background: #fff;
-  color: inherit;
+.mode:has(input:checked) {
+  border-color: var(--ink);
+  background: var(--wash);
+  box-shadow: inset 0 0 0 1px var(--ink);
 }
 
-.danger {
-  justify-self: start;
-  border: 0;
-  background: #b3261e;
-  color: #fff;
+.mode:has(input:checked)::before {
+  border-color: var(--ink);
+  background: radial-gradient(circle, var(--ink) 0 4px, transparent 4.5px);
 }
 
-button:disabled {
-  opacity: 0.45;
+.mode:has(input:focus-visible) {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.mode:has(input:disabled) {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
+.mode-name {
+  font-weight: 600;
+}
+
+.mode-help {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.fields > .hint {
+  margin-top: 7px;
+}
+
+/* Enlace y web */
+.public {
+  margin-bottom: 4px;
+}
+
+.url {
+  display: flex;
+  margin-bottom: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--wash);
+  color: var(--ink);
+  font: 13px/20px var(--mono);
+}
+
+.draft-note {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.copy-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.copy-status {
+  color: var(--ink-2);
+  font: 500 11px/1 var(--mono);
+  text-transform: uppercase;
+}
+
+/* Telegram y borrar el plano */
 .buttons {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
+  gap: 8px;
 }
 
 .confirm {
-  padding: 0.75rem;
-  border-radius: 6px;
-  background: #fdf3f2;
+  padding: 10px 14px;
+  border-left: 2px solid var(--bad);
+  background: color-mix(in srgb, var(--bad) 5%, var(--paper));
 }
 
 .confirm p {
-  margin: 0 0 0.6rem;
+  margin: 0 0 8px;
 }
 
-.delete-form {
-  display: grid;
-  gap: 0.75rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.delete-form code {
+  color: var(--ink);
+  font: 500 13px/1 var(--mono);
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.btn.wide {
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* Menos de 1280 px: las tres columnas no caben cómodas. General y Enlace van juntos y las otras dos debajo. */
+@media (max-width: 1279px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .col {
+    flex-direction: row;
+    grid-column: 1 / -1;
+    align-items: flex-start;
+  }
+
+  .col > * {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* Estrecha: una sola columna y la página hace scroll. */
+@media (max-width: 1023px) {
+  .top {
+    flex-wrap: wrap;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .col {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

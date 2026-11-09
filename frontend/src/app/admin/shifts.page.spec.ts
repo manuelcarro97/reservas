@@ -104,11 +104,16 @@ describe('ShiftsPage', () => {
   }
 
   function shiftItems(): HTMLElement[] {
-    return Array.from(page.querySelectorAll<HTMLElement>('li.shift'));
+    return Array.from(page.querySelectorAll<HTMLElement>('tbody.shift'));
   }
 
   function shiftItem(name: string): HTMLElement {
     return shiftItems().find((item) => item.querySelector('strong')?.textContent === name)!;
+  }
+
+  /** Texto de la columna "Llegadas" de un turno. */
+  function arrivals(name: string): string | undefined {
+    return shiftItem(name).querySelector('.arrivals')?.textContent?.trim();
   }
 
   function closureItems(): HTMLElement[] {
@@ -177,6 +182,45 @@ describe('ShiftsPage', () => {
       expect(shiftItem('Cena').textContent).toContain('Sáb');
       expect(shiftItem('Cena').textContent).not.toContain('Lun');
       expect(page.textContent).toContain('Kafé del Puerto');
+    });
+
+    it('titleAndEyebrowNameThePlanAndTheSection', async () => {
+      await open();
+
+      expect(page.querySelector('h1')?.textContent).toContain('Turnos y días cerrados');
+      expect(page.querySelector('.eyebrow')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+        'Kafé del Puerto / Turnos',
+      );
+    });
+
+    it('arrivalRangeShownPerShift', async () => {
+      await open();
+
+      expect(arrivals('Comida')).toBe('13:00 … 15:00');
+      expect(arrivals('Cena')).toBe('20:00 … 22:30');
+    });
+
+    it('shortShiftOnlyArrivesAtItsStart', async () => {
+      await open({ ...PLAN, shifts: [{ ...COMIDA, end: '13:30:00' }] });
+
+      expect(arrivals('Comida')).toBe('13:00');
+    });
+
+    it('lastArrivalIsOnTheGrid', async () => {
+      await open({ ...PLAN, shifts: [{ ...COMIDA, end: '15:45:00' }] });
+
+      expect(arrivals('Comida')).toBe('13:00 … 14:30');
+    });
+
+    it('daysAreSquaresAndTheTextIsStillReadable', async () => {
+      await open();
+
+      const squares = (name: string) => shiftItem(name).querySelectorAll('.days span');
+      expect(squares('Comida')).toHaveLength(7);
+      expect(shiftItem('Comida').querySelectorAll('.days span.on')).toHaveLength(7);
+      expect(shiftItem('Cena').querySelectorAll('.days span.on')).toHaveLength(2);
+      // Las letras no son nombres: los lectores de pantalla oyen "Vie, Sáb" y no "L M X J V S D".
+      expect(shiftItem('Cena').querySelector('.days')?.getAttribute('aria-hidden')).toBe('true');
     });
 
     it('showsNamesAsTextOnly', async () => {
@@ -452,6 +496,20 @@ describe('ShiftsPage', () => {
         expect.stringContaining('12/11/2026'),
         expect.stringContaining('24/12/2026'),
       ]);
+    });
+
+    it('eachClosedDayShowsACalendarLeafAndItsWeekday', async () => {
+      await open(PLAN, ['2026-11-12', '2026-12-24']);
+
+      const leaf = (index: number) => closureItems()[index].querySelector('.cal');
+      expect(leaf(0)?.querySelector('small')?.textContent).toBe('nov');
+      expect(leaf(0)?.querySelector('b')?.textContent).toBe('12');
+      expect(leaf(1)?.querySelector('small')?.textContent).toBe('dic');
+      expect(leaf(1)?.querySelector('b')?.textContent).toBe('24');
+      // La hoja es decorativa: el día completo sigue en el texto.
+      expect(leaf(0)?.getAttribute('aria-hidden')).toBe('true');
+      expect(closureItems()[0].textContent).toContain('Jueves');
+      expect(closureItems()[1].textContent).toContain('Jueves');
     });
 
     it('addAndRemoveClosure', async () => {
