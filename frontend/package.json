@@ -8,6 +8,7 @@
     "api": "ng-openapi-gen",
     "prebuild": "npm run api",
     "build": "ng build",
+    "postbuild": "node scripts/check-csp-hashes.mjs",
     "prewatch": "npm run api",
     "watch": "ng build --watch --configuration development",
     "pretest": "npm run api",
