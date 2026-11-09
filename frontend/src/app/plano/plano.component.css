@@ -108,6 +108,7 @@
 }
 
 /* Foco de teclado propio: contorno claro sobre el tablero (el del navegador sobre un <g> dibuja su caja). */
+.t:focus,
 .t:focus-visible {
   outline: none;
 }
