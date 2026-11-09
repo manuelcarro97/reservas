@@ -34,24 +34,25 @@
         @if (showsPlano()) {
           <section class="sheet table-step">
             <h2 class="sheet-title">Elige tu mesa</h2>
-            @if (store.occupied() !== null) {
-              <div class="drawing">
-                <app-plano
-                  [room]="store.room()"
-                  [tables]="store.tables()"
-                  [theme]="store.theme()"
-                  [states]="store.tableStates()"
-                  [interactive]="!store.submitting()"
-                  (tableSelected)="store.selectTable($event)"
-                />
-              </div>
+            @if (store.shiftId() === null) {
+              <p class="hint" role="status">Elige un turno para ver las mesas libres.</p>
             } @else if (store.occupancyFailed()) {
               <p class="hint" role="alert">
                 No se pudo cargar el plano de mesas. Elige el turno otra vez.
               </p>
-            } @else {
+            } @else if (store.occupied() === null) {
               <p class="hint" role="status">Cargando mesas…</p>
             }
+            <div class="drawing">
+              <app-plano
+                [room]="store.room()"
+                [tables]="store.tables()"
+                [theme]="store.theme()"
+                [states]="store.tableStates()"
+                [interactive]="store.occupied() !== null && !store.submitting()"
+                (tableSelected)="store.selectTable($event)"
+              />
+            </div>
           </section>
         }
 
@@ -120,7 +121,7 @@
               }
             </fieldset>
 
-            @if (store.shiftId() !== null) {
+            @if (store.shiftId() !== null && store.shifts() !== null) {
               <fieldset class="group times">
                 <legend class="field-label">Hora de llegada</legend>
                 @for (time of store.arrivalTimes(); track time) {
@@ -150,6 +151,10 @@
                   </p>
                 }
               </div>
+            }
+
+            @if (store.choiceNotice(); as notice) {
+              <p class="callout warn" role="status">{{ notice }}</p>
             }
 
             <div class="row">
@@ -190,9 +195,17 @@
             @if (store.error(); as message) {
               <p class="callout bad" role="alert">{{ message }}</p>
             }
-            <button type="submit" class="btn blue block" [disabled]="!store.canSubmit()">
+            <button
+              type="submit"
+              class="btn blue block"
+              [disabled]="!store.canSubmit()"
+              [attr.aria-describedby]="missingHint() ? 'missing-hint' : null"
+            >
               Reservar
             </button>
+            @if (missingHint(); as hint) {
+              <p class="hint" id="missing-hint">{{ hint }}</p>
+            }
             <p class="hint privacy">
               Usamos tu nombre y tu teléfono solo para gestionar esta reserva y contactar contigo si
               hace falta. El local los ve en su panel y se anonimizan 30 días después de la fecha de

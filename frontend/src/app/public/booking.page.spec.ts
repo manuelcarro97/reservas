@@ -195,7 +195,8 @@ describe('BookingPage', () => {
     const host = page.querySelector<HTMLElement>('app-booking-page')!;
     expect(host.style.getPropertyValue('--accent')).toBe(THEMES.NOCHE.cushA);
     expect(page.textContent).toContain('Kafé');
-    expect(page.querySelectorAll('g.t').length).toBe(0);
+    // En elección libre el plano está desde que carga la página, aunque aún no haya turno.
+    expect(page.querySelectorAll('g.t').length).toBe(3);
     const availability = await flushShifts();
     expect(availability.request.params.get('partySize')).toBe('2');
     expect(availability.request.params.get('date')).toBe(TODAY);
@@ -367,7 +368,7 @@ describe('BookingPage', () => {
     expect(submitButton().disabled).toBe(true);
   });
 
-  it('changingDateClearsTheArrivalTimes', async () => {
+  it('changingDateDropsTheArrivalTimeNotOfferedThatDay', async () => {
     await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
     await flushShifts();
     await chooseShift('Comida', []);
@@ -376,10 +377,12 @@ describe('BookingPage', () => {
     type('input[type=date]', addDays(TODAY, 1));
     page.querySelector('input[type=date]')!.dispatchEvent(new Event('change', { bubbles: true }));
     await settle();
-    await flushShifts();
+    await flushShifts([{ ...SHIFTS[0], arrivalTimes: ['14:00:00', '14:30:00'] }, SHIFTS[1]]);
 
-    expect(arrivalButtons().length).toBe(0);
-    await chooseShift('Comida', []);
+    expect(arrivalButtons().map((button) => button.textContent?.trim())).toEqual([
+      '14:00',
+      '14:30',
+    ]);
     expect(
       arrivalButtons().every((button) => button.getAttribute('aria-pressed') === 'false'),
     ).toBe(true);
@@ -711,29 +714,304 @@ describe('BookingPage', () => {
 
     expect(occupancy.cancelled).toBe(true);
     await flushShifts();
+    // El turno se mantiene: se pide la ocupación de la fecha nueva.
+    const again = expectApi('kafe/occupancy');
+    expect(again.request.params.get('date')).toBe(addDays(TODAY, 1));
+    again.flush(FREE_OCCUPANCY);
+    await settle();
   });
 
-  it('changingDateReloadsShiftsAndClearsSelection', async () => {
+  async function changeDate(date: string): Promise<void> {
+    type('input[type=date]', date);
+    page.querySelector('input[type=date]')!.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+  }
+
+  it('changingDateKeepsTheShiftIfOfferedThatDay', async () => {
     await open('/r/kafe');
     await flushShifts();
     await chooseShift('Comida');
     table('2').dispatchEvent(new Event('click'));
-    await settle();
+    await chooseArrival('13:30');
+    await fillCustomer();
 
     const tomorrow = addDays(TODAY, 1);
-    type('input[type=date]', tomorrow);
-    page.querySelector('input[type=date]')!.dispatchEvent(new Event('change', { bubbles: true }));
-    await settle();
+    await changeDate(tomorrow);
 
     const request = await flushShifts();
     expect(request.request.params.get('date')).toBe(tomorrow);
-    expect(page.querySelectorAll('g.t').length).toBe(0);
-    expect(submitButton().disabled).toBe(true);
+    const occupancy = expectApi('kafe/occupancy');
+    expect(occupancy.request.params.get('date')).toBe(tomorrow);
+    expect(occupancy.request.params.get('shiftId')).toBe('10');
+    occupancy.flush(FREE_OCCUPANCY);
+    await settle();
+
+    expect(chosen('button.shift')).toEqual(['Comida · 13:00']);
+    expect(chosen('button.arrival')).toEqual(['13:30']);
+    expect(table('2').classList.contains('selected')).toBe(true);
+    expect(page.querySelectorAll('g.t').length).toBe(3);
+    expect(submitButton().disabled).toBe(false);
+  });
+
+  it('changingDateDropsTheShiftNotOfferedThatDayAndSaysWhy', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+    table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
+
+    await changeDate(addDays(TODAY, 1));
+    await flushShifts([{ ...SHIFTS[0], available: false }, SHIFTS[1]]);
+
+    expect(chosen('button.shift')).toEqual([]);
+    expect(arrivalButtons().length).toBe(0);
+    expect(table('2').classList.contains('selected')).toBe(false);
+    expect(page.textContent).toContain('Ese turno ya no está disponible para esa fecha.');
+    expect(page.textContent).toContain('Elige un turno para ver las mesas libres');
+    expect(page.querySelectorAll('g.t').length).toBe(3);
   });
 
   function columns(): string | null | undefined {
     return page.querySelector('form')?.getAttribute('data-columns');
   }
+
+  it('planoShowsFromTheStartInFreeChoice', async () => {
+    await open('/r/kafe');
+    expect(columns()).toBe('2');
+
+    await flushShifts();
+
+    expect(columns()).toBe('2');
+    expect(page.querySelectorAll('.table-step app-plano g.t').length).toBe(3);
+    // Sin turno no hay ocupación: el plano se pinta sin estados y no se puede pulsar.
+    expect(page.querySelector('app-plano [data-interactive]')).toBeNull();
+    expect(page.querySelector('app-plano g.t[tabindex]')).toBeNull();
+    expect(page.querySelector('.table-step')?.textContent).toContain(
+      'Elige un turno para ver las mesas libres',
+    );
+    table('1').dispatchEvent(new Event('click'));
+    await settle();
+    expect(table('1').classList.contains('selected')).toBe(false);
+
+    await chooseShift('Comida');
+
+    expect(page.querySelector('app-plano [data-interactive]')).not.toBeNull();
+    expect(page.textContent).not.toContain('Elige un turno para ver las mesas libres');
+  });
+
+  it('assignedModeHasNoPlano', async () => {
+    await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
+    await flushShifts();
+
+    expect(columns()).toBe('1');
+    expect(page.querySelector('.table-step')).toBeNull();
+    expect(page.querySelectorAll('g.t').length).toBe(0);
+    expect(page.textContent).not.toContain('Elige un turno para ver las mesas libres');
+  });
+
+  async function reserveTable(label: string): Promise<void> {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+    table(label).dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
+    await fillCustomer();
+  }
+
+  it('changingPartySizeKeepsShiftArrivalAndTableWhenStillValid', async () => {
+    await reserveTable('2');
+
+    await choosePartySize(3);
+    // Mientras llegan los turnos el plano sigue y lo elegido no se pierde.
+    expect(columns()).toBe('2');
+    expect(page.querySelectorAll('g.t').length).toBe(3);
+    const availability = await flushShifts();
+    expect(availability.request.params.get('partySize')).toBe('3');
+    const occupancy = expectApi('kafe/occupancy');
+    expect(occupancy.request.params.get('shiftId')).toBe('10');
+    occupancy.flush(FREE_OCCUPANCY);
+    await settle();
+
+    expect(chosen('button.shift')).toEqual(['Comida · 13:00']);
+    expect(chosen('button.arrival')).toEqual(['13:30']);
+    expect(table('2').classList.contains('selected')).toBe(true);
+    expect(page.textContent).toContain('Mesa 2 · 4 plazas');
+    expect(page.textContent).not.toContain('Elige otra');
+    expect(submitButton().disabled).toBe(false);
+  });
+
+  it('changingPartySizeDropsATableThatIsTooSmallAndSaysWhy', async () => {
+    await reserveTable('1');
+
+    await choosePartySize(4);
+    await flushShifts();
+    expectApi('kafe/occupancy').flush(FREE_OCCUPANCY);
+    await settle();
+
+    expect(chosen('button.shift')).toEqual(['Comida · 13:00']);
+    expect(chosen('button.arrival')).toEqual(['13:30']);
+    expect(table('1').classList.contains('selected')).toBe(false);
+    expect(page.querySelector('.table-pick')?.textContent).not.toContain('Mesa 1 · 2 plazas');
+    expect(page.textContent).toContain('La Mesa 1 es pequeña para 4 personas. Elige otra.');
+    expect(page.textContent).toContain('Falta: mesa');
+    expect(submitButton().disabled).toBe(true);
+
+    // Elegir otra mesa borra el aviso.
+    table('2').dispatchEvent(new Event('click'));
+    await settle();
+    expect(page.textContent).not.toContain('Elige otra.');
+    expect(submitButton().disabled).toBe(false);
+  });
+
+  it('changingPartySizeDropsATableThatIsNoLongerFreeAndSaysWhy', async () => {
+    await reserveTable('2');
+
+    await choosePartySize(3);
+    await flushShifts();
+    expectApi('kafe/occupancy').flush([
+      { tableId: 1, occupied: false },
+      { tableId: 2, occupied: true },
+      { tableId: 3, occupied: true },
+    ]);
+    await settle();
+
+    expect(table('2').classList.contains('selected')).toBe(false);
+    expect(page.textContent).toContain('La Mesa 2 ya no está libre. Elige otra.');
+    expect(submitButton().disabled).toBe(true);
+  });
+
+  it('changingPartySizeDropsAShiftThatIsNoLongerAvailableAndSaysWhy', async () => {
+    await reserveTable('2');
+
+    await choosePartySize(3);
+    await flushShifts([{ ...SHIFTS[0], available: false }, SHIFTS[1]]);
+
+    // No se pide la ocupación (`http.verify`): ya no hay turno elegido.
+    expect(chosen('button.shift')).toEqual([]);
+    expect(arrivalButtons().length).toBe(0);
+    expect(table('2').classList.contains('selected')).toBe(false);
+    expect(page.textContent).toContain('Ese turno ya no está disponible para 3 personas.');
+    expect(page.textContent).toContain('Elige un turno para ver las mesas libres');
+    expect(submitButton().disabled).toBe(true);
+    expect(page.textContent).toContain('Falta: turno, hora de llegada y mesa');
+  });
+
+  it('changingPartySizeDropsTheArrivalTimeThatIsNoLongerOffered', async () => {
+    await reserveTable('2');
+
+    await choosePartySize(3);
+    await flushShifts([{ ...SHIFTS[0], arrivalTimes: ['14:00:00', '14:30:00'] }, SHIFTS[1]]);
+    expectApi('kafe/occupancy').flush(FREE_OCCUPANCY);
+    await settle();
+
+    expect(chosen('button.shift')).toEqual(['Comida · 13:00']);
+    expect(chosen('button.arrival')).toEqual([]);
+    expect(table('2').classList.contains('selected')).toBe(true);
+    expect(page.textContent).toContain('Falta: hora de llegada');
+  });
+
+  it('twoQuickPartySizeChangesOnlyApplyTheLast', async () => {
+    await reserveTable('2');
+
+    await choosePartySize(3);
+    await choosePartySize(4);
+    const [first, last] = http.match((candidate) =>
+      candidate.url.endsWith('/api/v1/restaurants/kafe/availability'),
+    );
+    expect(first.cancelled).toBe(true);
+    expect(first.request.params.get('partySize')).toBe('3');
+    expect(last.request.params.get('partySize')).toBe('4');
+    last.flush(SHIFTS);
+    await settle();
+    expectApi('kafe/occupancy').flush(FREE_OCCUPANCY);
+    await settle();
+
+    expect(page.querySelector<HTMLSelectElement>('select[name=partySize]')!.value).toBe('4');
+    expect(table('2').classList.contains('selected')).toBe(true);
+    expect(page.textContent).not.toContain('Elige otra');
+  });
+
+  it('failedAvailabilityAfterChangingPartySizeClearsTheChoices', async () => {
+    await reserveTable('2');
+
+    await choosePartySize(3);
+    expectApi('kafe/availability').flush(null, { status: 500, statusText: 'Server Error' });
+    await settle();
+
+    expect(page.textContent).toContain('No se pudieron cargar los turnos');
+    expect(chosen('button.arrival')).toEqual([]);
+    expect(arrivalButtons().length).toBe(0);
+    expect(table('2').classList.contains('selected')).toBe(false);
+    expect(submitButton().disabled).toBe(true);
+  });
+
+  it('cannotSubmitWhileTheNewAvailabilityIsLoading', async () => {
+    await reserveTable('2');
+    expect(submitButton().disabled).toBe(false);
+
+    await choosePartySize(3);
+    expect(submitButton().disabled).toBe(true);
+    await flushShifts();
+    // Falta la ocupación del turno para dar la mesa por buena.
+    expect(submitButton().disabled).toBe(true);
+    expectApi('kafe/occupancy').flush(FREE_OCCUPANCY);
+    await settle();
+    expect(submitButton().disabled).toBe(false);
+  });
+
+  it('submitButtonSaysWhatIsMissing', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    const hint = () => page.querySelector('#missing-hint')?.textContent?.trim();
+    expect(hint()).toBe('Falta: turno, hora de llegada, mesa, nombre y teléfono');
+
+    await chooseShift('Comida');
+    expect(hint()).toBe('Falta: hora de llegada, mesa, nombre y teléfono');
+
+    await chooseArrival('13:30');
+    expect(hint()).toBe('Falta: mesa, nombre y teléfono');
+
+    table('2').dispatchEvent(new Event('click'));
+    await settle();
+    expect(hint()).toBe('Falta: nombre y teléfono');
+
+    type('input[name=customerName]', 'Ana Pérez');
+    await settle();
+    expect(hint()).toBe('Falta: teléfono');
+
+    type('input[name=customerPhone]', '600123123');
+    await settle();
+    expect(hint()).toBeUndefined();
+    expect(submitButton().disabled).toBe(false);
+    expect(submitButton().hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('submitButtonDoesNotAskForATableInAssignedMode', async () => {
+    await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
+    await flushShifts();
+    expect(page.querySelector('#missing-hint')?.textContent?.trim()).toBe(
+      'Falta: turno, hora de llegada, nombre y teléfono',
+    );
+  });
+
+  it('missingHintIsHiddenWhileSubmitting', async () => {
+    await reserveTable('2');
+    const request = await submit();
+
+    expect(page.querySelector('#missing-hint')).toBeNull();
+    expect(submitButton().hasAttribute('aria-describedby')).toBe(false);
+    request.flush(RESERVATION, { status: 201, statusText: 'Created' });
+    await settle();
+  });
+
+  it('missingHintIsLinkedToTheButton', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+
+    const hint = page.querySelector('#missing-hint');
+    expect(hint).not.toBeNull();
+    expect(submitButton().getAttribute('aria-describedby')).toBe(hint?.id);
+  });
 
   it('assignedModeIsSingleColumn', async () => {
     await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
@@ -747,11 +1025,11 @@ describe('BookingPage', () => {
     expect(page.querySelector('.table-step')).toBeNull();
   });
 
-  it('freeChoiceIsSingleColumnUntilAShiftIsChosenAndThenShowsThePlanoBesideTheForm', async () => {
+  it('freeChoiceShowsThePlanoBesideTheFormFromTheStartAndKeepsItAfterChoosingAShift', async () => {
     await open('/r/kafe');
     await flushShifts();
-    expect(columns()).toBe('1');
-    expect(page.querySelector('.table-step')).toBeNull();
+    expect(columns()).toBe('2');
+    expect(page.querySelector('.table-step app-plano')).not.toBeNull();
 
     await chooseShift('Comida');
 

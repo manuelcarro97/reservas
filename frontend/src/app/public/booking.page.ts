@@ -36,10 +36,21 @@ export class BookingPage {
   protected readonly partySizes = computed(() =>
     Array.from({ length: this.store.maxPartySize() }, (_, index) => index + 1),
   );
-  /** El plano de mesas solo se pinta al elegir mesa (elección libre) y ya con turno: si no, una sola columna. */
-  protected readonly showsPlano = computed(
-    () => this.store.freeChoice() && this.store.shiftId() !== null,
-  );
+  /**
+   * El plano de mesas está siempre que el cliente elige mesa (elección libre), desde que carga la página y aunque aún
+   * no haya turno: sin ocupación se pinta sin estados y no se puede pulsar. En modo asignado no hay plano: una columna.
+   */
+  protected readonly showsPlano = computed(() => this.store.freeChoice());
+  /** "Falta: hora de llegada, nombre y teléfono" bajo el botón; `null` si no falta nada o se está enviando. */
+  protected readonly missingHint = computed(() => {
+    const missing = this.store.missing();
+    if (missing.length === 0 || this.store.submitting()) {
+      return null;
+    }
+    const last = missing[missing.length - 1];
+    const list = missing.length === 1 ? last : `${missing.slice(0, -1).join(', ')} y ${last}`;
+    return `Falta: ${list}`;
+  });
 
   constructor() {
     inject(ActivatedRoute)

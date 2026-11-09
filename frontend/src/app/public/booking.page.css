@@ -18,7 +18,7 @@
   border-top: 3px solid var(--accent);
 }
 
-/* Sin plano que pintar (modo asignado o aún sin turno): una sola columna centrada. */
+/* Sin plano que pintar (modo asignado): una sola columna centrada. */
 .booking-form {
   display: grid;
   flex: 1;
@@ -50,6 +50,11 @@
 
 .table-step .sheet-title {
   margin-bottom: 12px;
+}
+
+/* Nota sobre el plano ("Elige un turno…", "Cargando mesas…"): va entre el título y el dibujo. */
+.table-step .hint {
+  margin: 0 0 10px;
 }
 
 .table-step .drawing {

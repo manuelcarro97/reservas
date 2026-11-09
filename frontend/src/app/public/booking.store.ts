@@ -8,6 +8,7 @@ import { ShiftAvailability } from '../core/api/models/shift-availability';
 import { PublicReservationControllerService } from '../core/api/services/public-reservation-controller.service';
 import { toRoom, toTable } from '../plano/plan-mapping';
 import { TableState } from '../plano/plano.component';
+import { tableName } from '../plano/table-name';
 import { ThemeKey, knownTheme } from '../plano/themes';
 import { errorCode, rateLimitedMessage } from '../core/api-errors';
 import { NOW, addDays, todayIn } from '../core/time';
@@ -46,9 +47,19 @@ function toHourMinute(time: string): string {
   return time.slice(0, 5);
 }
 
+function peopleText(partySize: number): string {
+  return partySize === 1 ? '1 persona' : `${partySize} personas`;
+}
+
+/** Qué cambió al pedir los turnos de nuevo: decide el aviso si el turno elegido ya no vale. */
+type AvailabilityChange = 'date' | 'partySize';
+
 /**
  * Estado de la página pública de reserva. Fecha y personas piden los turnos; el turno pide la ocupación del plano
  * (solo en elección libre). Cada petición nueva cancela la anterior (`switchMap`).
+ *
+ * Al cambiar fecha o personas se conserva lo elegido (turno, hora y mesa) mientras siga valiendo con los datos nuevos;
+ * lo que deja de valer se quita y `choiceNotice` dice por qué.
  */
 @Injectable()
 export class BookingStore {
@@ -56,6 +67,8 @@ export class BookingStore {
   private readonly now = inject(NOW);
 
   private slug = '';
+  /** Lo último que cambió el cliente (fecha o personas): da el texto del aviso si el turno elegido ya no está. */
+  private lastChange: AvailabilityChange = 'partySize';
   private planRequest: Subscription | undefined;
   private submitRequest: Subscription | undefined;
   private readonly availabilityRequests = new Subject<{ date: string; partySize: number }>();
@@ -81,6 +94,8 @@ export class BookingStore {
   readonly occupied = signal<ReadonlySet<number> | null>(null);
   readonly occupancyFailed = signal(false);
   readonly tableId = signal<number | null>(null);
+  /** Por qué se quitó lo elegido al cambiar fecha o personas (turno, mesa); `null` si no se quitó nada. */
+  readonly choiceNotice = signal<string | null>(null);
 
   readonly customerName = signal('');
   readonly customerPhone = signal('');
@@ -97,12 +112,18 @@ export class BookingStore {
   /** Mesa más grande del plano: es el tope de personas que acepta el backend (`PARTY_TOO_LARGE`). */
   readonly maxPartySize = computed(() => Math.max(1, ...this.tables().map((table) => table.seats)));
 
-  /** Lo que el cliente no puede elegir (ocupada o pequeña para el grupo) va como `blocked`. `taken` no se usa. */
+  /**
+   * Lo que el cliente no puede elegir (ocupada o pequeña para el grupo) va como `blocked`. `taken` no se usa.
+   * Sin ocupación (sin turno o cargándola) no hay estados; solo se marca la mesa ya elegida, para que no parpadee.
+   */
   readonly tableStates = computed<Record<number, TableState>>(() => {
     const occupied = this.occupied();
     const selected = this.tableId();
     const states: Record<number, TableState> = {};
     if (occupied === null) {
+      if (selected !== null) {
+        states[selected] = 'selected';
+      }
       return states;
     }
     for (const table of this.tables()) {
@@ -125,15 +146,38 @@ export class BookingStore {
     () => this.tables().find((table) => table.id === this.tableId()) ?? null,
   );
 
+  /** Lo que falta para poder reservar, en el orden del formulario. Vacío si no falta nada que elegir o escribir. */
+  readonly missing = computed(() => {
+    const missing: string[] = [];
+    if (this.shiftId() === null) {
+      missing.push('turno');
+    }
+    if (this.arrivalTime() === null) {
+      missing.push('hora de llegada');
+    }
+    if (this.freeChoice() && this.tableId() === null) {
+      missing.push('mesa');
+    }
+    if (this.customerName().trim() === '') {
+      missing.push('nombre');
+    }
+    if (this.customerPhone().trim() === '') {
+      missing.push('teléfono');
+    }
+    return missing;
+  });
+
+  /**
+   * Además de no faltar nada, los turnos y la ocupación tienen que estar cargados: si se acaba de cambiar fecha o
+   * personas, lo elegido aún no está confirmado con los datos nuevos.
+   */
   readonly canSubmit = computed(
     () =>
       this.status() === 'ready' &&
       !this.submitting() &&
-      this.shiftId() !== null &&
-      this.arrivalTime() !== null &&
-      (!this.freeChoice() || this.tableId() !== null) &&
-      this.customerName().trim() !== '' &&
-      this.customerPhone().trim() !== '',
+      this.shifts() !== null &&
+      (!this.freeChoice() || this.occupied() !== null) &&
+      this.missing().length === 0,
   );
 
   constructor() {
@@ -147,10 +191,7 @@ export class BookingStore {
         ),
         takeUntilDestroyed(),
       )
-      .subscribe(({ shifts, failed }) => {
-        this.shifts.set(shifts);
-        this.shiftsFailed.set(failed);
-      });
+      .subscribe(({ shifts, failed }) => this.applyAvailability(shifts, failed));
 
     this.occupancyRequests
       .pipe(
@@ -172,6 +213,12 @@ export class BookingStore {
       .subscribe(({ occupied, failed }) => {
         this.occupied.set(occupied);
         this.occupancyFailed.set(failed);
+        if (occupied === null) {
+          // Sin ocupación no se puede dar por buena la mesa elegida: se vuelve a elegir al reintentar.
+          this.tableId.set(null);
+        } else {
+          this.checkChosenTable(occupied);
+        }
       });
 
     inject(DestroyRef).onDestroy(() => {
@@ -220,7 +267,7 @@ export class BookingStore {
       return;
     }
     this.date.set(date);
-    this.requestShifts();
+    this.refreshShifts('date');
   }
 
   setPartySize(partySize: number): void {
@@ -233,7 +280,7 @@ export class BookingStore {
       return;
     }
     this.partySize.set(partySize);
-    this.requestShifts();
+    this.refreshShifts('partySize');
   }
 
   selectShift(shiftId: number): void {
@@ -253,6 +300,7 @@ export class BookingStore {
     this.shiftId.set(shiftId);
     this.tableId.set(null);
     this.error.set(null);
+    this.choiceNotice.set(null);
     this.requestOccupancy();
   }
 
@@ -276,6 +324,7 @@ export class BookingStore {
     }
     this.tableId.set(tableId);
     this.error.set(null);
+    this.choiceNotice.set(null);
   }
 
   submit(): void {
@@ -370,19 +419,90 @@ export class BookingStore {
   private clearShifts(): void {
     this.shifts.set(null);
     this.shiftsFailed.set(false);
+    this.clearChoices();
+  }
+
+  /** Quita turno, hora, mesa y ocupación, y cancela la ocupación en vuelo. */
+  private clearChoices(): void {
     this.shiftId.set(null);
     this.arrivalTime.set(null);
     this.occupied.set(null);
     this.occupancyFailed.set(false);
     this.tableId.set(null);
+    this.choiceNotice.set(null);
     this.occupancyRequests.next(null);
   }
 
-  /** Fecha o personas cambiadas: los turnos, la ocupación y la mesa elegida ya no valen. */
+  /** Vuelve a pedir los turnos de la fecha y las personas actuales y descarta todo lo elegido (flujos de error). */
   private requestShifts(): void {
     this.clearShifts();
     this.error.set(null);
     this.availabilityRequests.next({ date: this.date(), partySize: this.partySize() });
+  }
+
+  /**
+   * Fecha o personas cambiadas por el cliente: se vuelven a pedir los turnos, pero lo elegido se conserva hasta que
+   * lleguen (`applyAvailability` y `checkChosenTable` quitan lo que ya no vale). La ocupación en vuelo era de la fecha o
+   * el grupo anteriores: se cancela y se pide de nuevo con el turno que se mantenga.
+   */
+  private refreshShifts(change: AvailabilityChange): void {
+    this.lastChange = change;
+    this.shifts.set(null);
+    this.shiftsFailed.set(false);
+    this.occupied.set(null);
+    this.occupancyFailed.set(false);
+    this.occupancyRequests.next(null);
+    this.choiceNotice.set(null);
+    this.error.set(null);
+    this.availabilityRequests.next({ date: this.date(), partySize: this.partySize() });
+  }
+
+  /** Llegan los turnos: si el elegido sigue ofreciéndose se conserva (y su hora, si sigue), si no se quita y se avisa. */
+  private applyAvailability(shifts: ShiftAvailability[], failed: boolean): void {
+    this.shifts.set(shifts);
+    this.shiftsFailed.set(failed);
+    const chosenId = this.shiftId();
+    if (chosenId === null) {
+      return;
+    }
+    const shift = shifts.find((candidate) => candidate.shiftId === chosenId);
+    if (failed || !shift?.available) {
+      this.clearChoices();
+      if (!failed) {
+        this.choiceNotice.set(
+          this.lastChange === 'date'
+            ? 'Ese turno ya no está disponible para esa fecha.'
+            : `Ese turno ya no está disponible para ${peopleText(this.partySize())}.`,
+        );
+      }
+      return;
+    }
+    const arrivalTimes = (shift.arrivalTimes ?? []).map(toHourMinute);
+    const arrivalTime = this.arrivalTime();
+    if (arrivalTime !== null && !arrivalTimes.includes(arrivalTime)) {
+      this.arrivalTime.set(null);
+    }
+    this.requestOccupancy();
+  }
+
+  /** Llega la ocupación: la mesa elegida se conserva si sigue libre y le caben los comensales, si no se quita y se avisa. */
+  private checkChosenTable(occupied: ReadonlySet<number>): void {
+    const tableId = this.tableId();
+    if (tableId === null) {
+      return;
+    }
+    const table = this.selectedTable();
+    const name = table ? tableName(table.label) : 'Mesa';
+    if (table && table.seats < this.partySize()) {
+      this.choiceNotice.set(
+        `La ${name} es pequeña para ${peopleText(this.partySize())}. Elige otra.`,
+      );
+    } else if (!table || occupied.has(tableId)) {
+      this.choiceNotice.set(`La ${name} ya no está libre. Elige otra.`);
+    } else {
+      return;
+    }
+    this.tableId.set(null);
   }
 
   private requestOccupancy(): void {
