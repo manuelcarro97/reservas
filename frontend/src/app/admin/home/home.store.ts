@@ -1,19 +1,19 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, Subscription } from 'rxjs';
+import { Observable, Subscription, forkJoin, map } from 'rxjs';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { PlanResponse } from '../../core/api/models/plan-response';
 import { AdminPlanControllerService } from '../../core/api/services/admin-plan-controller.service';
 import { AdminReservationControllerService } from '../../core/api/services/admin-reservation-controller.service';
 import { AdminShiftControllerService } from '../../core/api/services/admin-shift-controller.service';
-import { NOW, timeIn, todayIn } from '../../core/time';
+import { NOW, addDays, timeIn, todayIn } from '../../core/time';
 import { adminErrorMessage } from '../admin-errors';
 import { MeStore } from '../me.store';
 import { PendingReservationsService } from '../reservations/pending-reservations.service';
 import { ActionHost, ReservationActions } from '../reservations/reservation-actions';
 import { byDateThenArrival } from '../reservations/reservation-order';
-import { NextShift, nextShift, weekStart } from './home-figures';
+import { DayTile, NextShift, dayTile, nextShift, weekStart } from './home-figures';
 
 export type HomeStatus = 'loading' | 'ready' | 'notFound' | 'error';
 
@@ -25,8 +25,11 @@ type FailureKey = HomePart | 'next';
 
 const PUBLISH_FAILED = 'No se pudo publicar el plano. Inténtalo de nuevo.';
 
+/** Días de la semana: de lunes a domingo. */
+const WEEK_DAYS = 7;
+
 /**
- * Estado de `/panel/:slug/inicio`: el plano, las reservas de hoy, las pendientes y los cierres. Cada lectura es
+ * Estado de `/panel/:slug/inicio`: el plano, las reservas de hoy, las pendientes, los cierres y la semana. Cada lectura es
  * independiente: si una falla, solo su tarjeta lo dice. `load` cancela todo lo del plano anterior. Confirmar y
  * rechazar las hace `ReservationActions`, que lo usa como su `ActionHost`.
  */
@@ -66,6 +69,8 @@ export class HomeStore implements ActionHost {
   readonly todayRows = signal<AdminReservation[] | null>(null);
   /** Reservas del día del próximo turno si no es hoy; `null` mientras se piden o si el próximo turno es de hoy. */
   readonly nextRows = signal<AdminReservation[] | null>(null);
+  /** Reservas de los días de la semana que no son hoy (hoy sale de `todayRows`), por fecha; `null` hasta que llegan. */
+  private readonly weekRows = signal<ReadonlyMap<string, AdminReservation[]> | null>(null);
   /** Pendientes de todos los días. */
   readonly pending = signal<AdminReservation[]>([]);
   readonly closures = signal<ReadonlySet<string>>(new Set());
@@ -104,6 +109,38 @@ export class HomeStore implements ActionHost {
     nextShift(this.plan()?.shifts ?? [], this.upcomingClosures(), this.today(), this.nowTime()),
   );
 
+  /** Las fechas de la semana de hoy, de lunes a domingo. */
+  readonly weekDates = computed(() => {
+    const monday = weekStart(this.today());
+    return Array.from({ length: WEEK_DAYS }, (_, offset) => addDays(monday, offset));
+  });
+
+  /**
+   * Una tarjeta por día de la semana; `null` mientras falte algo para pintarla: las reservas de hoy y de los demás
+   * días o los cierres (sin ellos no se sabe qué días abren). Es una señal calculada: cuando la semana llegue de una
+   * sola petición solo cambia `readWeek`, que es quien rellena `weekRows`.
+   */
+  readonly week = computed<DayTile[] | null>(() => {
+    const plan = this.plan();
+    const todayRows = this.todayRows();
+    const otherRows = this.weekRows();
+    const closuresKnown = !this.partLoading().has('closures') && !this.partFailed().has('closures');
+    if (!plan || todayRows === null || otherRows === null || !closuresKnown) {
+      return null;
+    }
+    const today = this.today();
+    return this.weekDates().map((date) =>
+      dayTile(
+        date,
+        today,
+        plan.shifts ?? [],
+        this.closures(),
+        date === today ? todayRows : (otherRows.get(date) ?? []),
+        this.tableCount(),
+      ),
+    );
+  });
+
   constructor() {
     this.actions.attach(this);
     inject(DestroyRef).onDestroy(() => {
@@ -133,10 +170,11 @@ export class HomeStore implements ActionHost {
     this.plan.set(null);
     this.todayRows.set(null);
     this.nextRows.set(null);
+    this.weekRows.set(null);
     this.pending.set([]);
     this.closures.set(new Set());
     this.partFailed.set(new Set());
-    this.partLoading.set(new Set<HomePart>(['today', 'pending', 'closures']));
+    this.partLoading.set(new Set<HomePart>(['today', 'pending', 'closures', 'week']));
 
     this.planRequest = this.plans.get({ slug }).subscribe({
       next: (plan) => {
@@ -168,6 +206,7 @@ export class HomeStore implements ActionHost {
       // Qué turno es el próximo depende de los cierres: hasta entonces no se sabe de qué día pedir las reservas.
       () => this.readNextRows(),
     );
+    this.readWeek();
   }
 
   /** Publica el plano (borrador → publicado). Un fallo deja su motivo en `publishError`. */
@@ -284,13 +323,68 @@ export class HomeStore implements ActionHost {
       this.nextRows.set(null);
     }
     this.nextRowsDate = next.date;
-    this.nextRequest = this.reservationsApi
-      .pending({ slug: this.slug, date: next.date })
-      .subscribe({
-        next: (rows) => this.nextRows.set(rows),
-        error: () => this.markFailed('next', true),
-      });
+    if (this.weekDates().includes(next.date)) {
+      // Sus reservas llegan con las de la semana: no se piden dos veces.
+      this.feedNextRowsFromWeek();
+      return;
+    }
+    this.requestNextRows(next.date);
+  }
+
+  /** Pide las reservas de un día para la cifra de mesas libres del próximo turno. Un fallo es de la cifra de hoy. */
+  private requestNextRows(date: string): void {
+    this.nextRequest?.unsubscribe();
+    this.nextRequest = this.reservationsApi.pending({ slug: this.slug, date }).subscribe({
+      next: (rows) => this.nextRows.set(rows),
+      error: () => this.markFailed('next', true),
+    });
     this.reads.add(this.nextRequest);
+  }
+
+  /**
+   * Lee las reservas de los días de la semana que no son hoy (hoy ya se lee aparte), una petición por día. Es lo único
+   * de Inicio que hace tantas lecturas: el endpoint de resumen de la semana la sustituye por una sola, y entonces
+   * este método y `feedNextRowsFromWeek` son lo único que cambia.
+   */
+  private readWeek(): void {
+    const slug = this.slug;
+    const today = this.today();
+    const days = this.weekDates()
+      .filter((date) => date !== today)
+      .map((date) =>
+        this.reservationsApi.pending({ slug, date }).pipe(map((rows) => [date, rows] as const)),
+      );
+    this.read(
+      'week',
+      forkJoin(days),
+      (entries) => this.weekRows.set(new Map(entries)),
+      () => this.feedNextRowsFromWeek(),
+    );
+  }
+
+  /**
+   * Si el próximo turno es de un día de la semana (que no sea hoy), sus reservas son las que trajo la semana: se
+   * copian a `nextRows`. Si la semana falló se piden aparte: las cifras de hoy no dependen de la tarjeta de la semana.
+   */
+  private feedNextRowsFromWeek(): void {
+    const next = this.next();
+    // Mientras no llegan los cierres no se sabe cuál es el próximo turno.
+    if (
+      this.partLoading().has('closures') ||
+      !next ||
+      next.date === this.today() ||
+      !this.weekDates().includes(next.date)
+    ) {
+      return;
+    }
+    if (this.failures.has('week')) {
+      this.requestNextRows(next.date);
+      return;
+    }
+    const rows = this.weekRows();
+    if (rows) {
+      this.nextRows.set(rows.get(next.date) ?? null);
+    }
   }
 
   private answered(part: HomePart): void {

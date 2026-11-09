@@ -17,6 +17,7 @@ import { ReservationActions } from '../reservations/reservation-actions';
 import { HomePendingComponent } from './home-pending.component';
 import { HomePlanCardComponent } from './home-plan-card.component';
 import { HomeSettingsComponent } from './home-settings.component';
+import { HomeWeekComponent } from './home-week.component';
 import { shiftLoad, todayFigures } from './home-figures';
 import { HomeStore } from './home.store';
 
@@ -32,17 +33,24 @@ function durationText(minutes: number): string {
 
 /**
  * `/panel/:slug/inicio`: la entrada por defecto del panel, un resumen del día del plano actual: las cifras de hoy,
- * la tarjeta del plano, las pendientes con sus acciones y la configuración. Cada parte se lee por su lado y, si
- * falla, solo ella lo dice.
+ * la tarjeta del plano, las pendientes con sus acciones, la configuración y la semana. Cada parte se lee por su lado
+ * y, si falla, solo ella lo dice.
  */
 @Component({
   selector: 'app-home-page',
-  imports: [HomePendingComponent, HomePlanCardComponent, HomeSettingsComponent, RouterLink],
+  imports: [
+    HomePendingComponent,
+    HomePlanCardComponent,
+    HomeSettingsComponent,
+    HomeWeekComponent,
+    RouterLink,
+  ],
   providers: [HomeStore, ReservationActions],
   templateUrl: './home.page.html',
   styleUrl: './home.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'rise-stagger' },
+  // `fit`: en un escritorio normal Inicio cabe en la ventana sin scroll de página (ver el CSS).
+  host: { class: 'rise-stagger fit' },
 })
 export class HomePage {
   protected readonly store = inject(HomeStore);

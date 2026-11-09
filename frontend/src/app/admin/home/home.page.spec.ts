@@ -12,10 +12,11 @@ import { FeedEvent } from '../../core/api/models/feed-event';
 import { PlanResponse } from '../../core/api/models/plan-response';
 import { ShiftResponse } from '../../core/api/models/shift-response';
 import { OPEN_WINDOW } from '../../core/open-window';
-import { NOW } from '../../core/time';
+import { NOW, addDays } from '../../core/time';
 import { embedSnippet } from '../embed-snippet';
 import { MeStore } from '../me.store';
 import { FeedService } from '../notifications/feed.service';
+import { weekStart } from './home-figures';
 import { HomePage } from './home.page';
 
 @Component({ template: '<p>otra</p>' })
@@ -142,6 +143,14 @@ interface Screen {
   today?: AdminReservation[];
   pending?: AdminReservation[];
   closures?: string[];
+  /** Reservas de los demás días de la semana, por fecha; los días que no estén aquí vienen vacíos. */
+  week?: Record<string, AdminReservation[]>;
+}
+
+/** Los siete días (lunes a domingo) de la semana de `today`. */
+function weekOf(today: string): string[] {
+  const monday = weekStart(today);
+  return Array.from({ length: 7 }, (_, offset) => addDays(monday, offset));
 }
 
 describe('HomePage', () => {
@@ -234,11 +243,22 @@ describe('HomePage', () => {
     return request('GET', `${base(slug)}/closures`, { from });
   }
 
-  /** Las tres lecturas que salen cuando llega el plano; no responde a la del próximo turno si no es hoy. */
-  async function flushReads(screen: Screen, slug = 'kafe'): Promise<void> {
-    expectDay(TODAY, slug).flush(screen.today ?? TODAY_ROWS);
+  /** Las lecturas de los demás días de la semana (hoy sale de la de hoy): una por fecha. */
+  function flushWeek(screen: Screen, slug = 'kafe', today = TODAY): void {
+    for (const date of weekOf(today).filter((day) => day !== today)) {
+      expectDay(date, slug).flush(screen.week?.[date] ?? []);
+    }
+  }
+
+  /**
+   * Las lecturas que salen cuando llega el plano: hoy, pendientes, cierres y los otros seis días de la semana. Si el
+   * próximo turno cae dentro de la semana sale de esas mismas lecturas: no hay una petición aparte.
+   */
+  async function flushReads(screen: Screen, slug = 'kafe', today = TODAY): Promise<void> {
+    expectDay(today, slug).flush(screen.today ?? TODAY_ROWS);
     expectPending(slug).flush(screen.pending ?? PENDING_ROWS);
-    expectClosures(TODAY, slug).flush(screen.closures ?? []);
+    expectClosures(weekStart(today), slug).flush(screen.closures ?? []);
+    flushWeek(screen, slug, today);
     await settle();
   }
 
@@ -357,13 +377,13 @@ describe('HomePage', () => {
     await harness.navigateByUrl('/panel/kafe/inicio');
     expectPlan().flush(PLAN);
     await settle();
-    await flushReads({});
-
-    // Las reservas de mañana se piden aparte, y de ellas sale la cifra de mesas libres.
-    expectDay('2026-11-10').flush([
-      reservation({ id: 20, date: '2026-11-10', shiftId: COMIDA.id, tableId: 1 }),
-    ]);
-    await settle();
+    // Mañana cae dentro de la semana: sus reservas llegan con las de la semana (una sola petición) y de ellas sale la
+    // cifra de mesas libres.
+    await flushReads({
+      week: {
+        '2026-11-10': [reservation({ id: 20, date: '2026-11-10', shiftId: COMIDA.id, tableId: 1 })],
+      },
+    });
     page = harness.routeNativeElement as HTMLElement;
 
     expect(figures()[3]).toEqual({
@@ -384,10 +404,8 @@ describe('HomePage', () => {
     await harness.navigateByUrl('/panel/kafe/inicio');
     expectPlan().flush(PLAN);
     await settle();
+    // El miércoles también está en la semana: sin petición aparte.
     await flushReads({ closures: ['2026-11-10'] });
-
-    expectDay('2026-11-11').flush([]);
-    await settle();
     page = harness.routeNativeElement as HTMLElement;
 
     expect(figures()[3].value).toBe('Miércoles · Comida 13:00');
@@ -508,6 +526,7 @@ describe('HomePage', () => {
     expectDay(TODAY).flush(TODAY_ROWS);
     expectPending().flush(null, { status: 500, statusText: 'Server Error' });
     expectClosures(TODAY).flush([]);
+    flushWeek({});
     await settle();
     page = harness.routeNativeElement as HTMLElement;
 
@@ -529,6 +548,7 @@ describe('HomePage', () => {
     expectDay(TODAY).flush(null, { status: 500, statusText: 'Server Error' });
     expectPending().flush(PENDING_ROWS);
     expectClosures(TODAY).flush([]);
+    flushWeek({});
     await settle();
     page = harness.routeNativeElement as HTMLElement;
 
@@ -549,13 +569,21 @@ describe('HomePage', () => {
     await harness.navigateByUrl('/panel/kafe/inicio');
     expectPlan().flush(PLAN);
     await settle();
-    // Las tres lecturas de "kafe" quedan en vuelo.
-    const inFlight = [expectDay(TODAY), expectPending(), expectClosures(TODAY)];
+    // Las lecturas de "kafe" quedan en vuelo: hoy, pendientes, cierres y los otros seis días de la semana.
+    const inFlight = [
+      expectDay(TODAY),
+      expectPending(),
+      expectClosures(TODAY),
+      ...weekOf(TODAY)
+        .filter((date) => date !== TODAY)
+        .map((date) => expectDay(date)),
+    ];
 
     await harness.navigateByUrl('/panel/otro/inicio');
 
     // Si respondieran después, pisarían la pantalla de "otro": tienen que haberse cancelado.
-    expect(inFlight.map((pending) => pending.cancelled)).toEqual([true, true, true]);
+    expect(inFlight.length).toBe(9);
+    expect(inFlight.every((pending) => pending.cancelled)).toBe(true);
     expectPlan('otro').flush({ ...PLAN, slug: 'otro', name: 'Otro' });
     await settle();
     await flushReads({}, 'otro');
@@ -583,6 +611,7 @@ describe('HomePage', () => {
     expectDay(TODAY, 'otro').flush([ANA]);
     expectPending('otro').flush([]);
     expectClosures(TODAY, 'otro').flush([]);
+    flushWeek({}, 'otro');
     await settle();
 
     expect(figures()[0]).toEqual({ kicker: 'Reservas hoy', value: '1', sub: 'todas confirmadas' });
@@ -1017,6 +1046,352 @@ describe('HomePage', () => {
       const field = page.querySelector('app-home-settings textarea') as HTMLTextAreaElement;
       expect(field.value).toBe(embedSnippet(location.origin, 'kafe', 'Kafé del Puerto'));
       expect(text('app-home-settings [role="status"]')).toBe('Copia el código a mano');
+    });
+  });
+
+  describe('semana', () => {
+    function days(): HTMLElement[] {
+      return Array.from(page.querySelectorAll<HTMLElement>('app-home-week .day'));
+    }
+
+    /** La tarjeta de un día, por su cabecera (`Lun 9`). */
+    function day(label: string): HTMLElement {
+      const found = days().find(
+        (item) => normalized(item.querySelector('.dhead b')?.textContent) === label,
+      );
+      if (!found) {
+        throw new Error(`No hay tarjeta de ${label}`);
+      }
+      return found;
+    }
+
+    function tags(item: HTMLElement): string[] {
+      return Array.from(item.querySelectorAll('.tag')).map((tag) => normalized(tag.textContent));
+    }
+
+    /** Cada fila de turno como `Comida 2/9` (más `1 sin mesa` si lo hay): nombre, cifra y nota. */
+    function shiftRows(item: HTMLElement): string[] {
+      return Array.from(item.querySelectorAll('.srow')).map((row) =>
+        Array.from(row.children)
+          .map((part) => normalized(part.textContent))
+          .filter((part) => part !== '')
+          .join(' '),
+      );
+    }
+
+    function foot(item: HTMLElement): string {
+      return normalized(item.querySelector('.dfoot')?.textContent);
+    }
+
+    /** Un día con una reserva en cada mesa de la cena (9 mesas): turno lleno. */
+    function fullDinner(date: string): AdminReservation[] {
+      return SEATS.map((_, index) =>
+        reservation({ id: 100 + index, date, shiftId: CENA.id, tableId: index + 1 }),
+      );
+    }
+
+    it('weekRunsMondayToSunday', async () => {
+      // `flushReads` pide una sola respuesta por fecha: si hoy se leyera dos veces, fallaría `expectOne`.
+      await open();
+
+      expect(days().map((item) => normalized(item.querySelector('.dhead b')?.textContent))).toEqual(
+        ['Lun 9', 'Mar 10', 'Mié 11', 'Jue 12', 'Vie 13', 'Sáb 14', 'Dom 15'],
+      );
+      expect(tags(day('Lun 9'))).toContain('hoy');
+      expect(days().filter((item) => item.classList.contains('is-today'))).toEqual([day('Lun 9')]);
+      expect(text('app-home-week .sheet-title')).toBe('Esta semana');
+      expect(text('app-home-week .meta')).toBe(
+        'semana del 9 al 15 de noviembre · mesas ocupadas por turno, de 9',
+      );
+    });
+
+    it('weekShowsLoadingUntilItsReads', async () => {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+
+      expect(text('app-home-week')).toContain('Cargando…');
+      expect(days().length).toBe(0);
+
+      await flushReads({});
+
+      expect(text('app-home-week')).not.toContain('Cargando…');
+    });
+
+    it('weekCrossingAMonthNamesBoth', async () => {
+      // Viernes 30 de octubre, 13:00 en Los Ángeles (todavía UTC-7).
+      clock = new Date('2026-10-30T20:00:00Z');
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      await flushReads({ today: [], pending: [] }, 'kafe', '2026-10-30');
+      page = harness.routeNativeElement as HTMLElement;
+
+      expect(text('app-home-week .meta')).toBe(
+        'semana del 26 de octubre al 1 de noviembre · mesas ocupadas por turno, de 9',
+      );
+      expect(days().map((item) => normalized(item.querySelector('.dhead b')?.textContent))).toEqual(
+        ['Lun 26', 'Mar 27', 'Mié 28', 'Jue 29', 'Vie 30', 'Sáb 31', 'Dom 1'],
+      );
+    });
+
+    it('dayTileShowsShiftBarsAndTotals', async () => {
+      await open({
+        week: {
+          '2026-11-10': [
+            reservation({ id: 40, date: '2026-11-10', shiftId: COMIDA.id, tableId: 1 }),
+          ],
+          '2026-11-12': fullDinner('2026-11-12'),
+        },
+      });
+
+      // Hoy: la comida ocupa 2 mesas y la cena 3; 5 reservas activas de 17 personas (la cancelada no cuenta).
+      expect(shiftRows(day('Lun 9'))).toEqual(['Comida 2/9', 'Cena 3/9']);
+      expect(foot(day('Lun 9'))).toBe('5 reservas · 17 personas');
+      expect(shiftRows(day('Mar 10'))).toEqual(['Comida 1/9', 'Cena 0/9']);
+      expect(foot(day('Mar 10'))).toBe('1 reserva · 2 personas');
+      expect(foot(day('Mié 11'))).toBe('sin reservas');
+
+      // La barra mide mesas ocupadas / mesas, y solo la de un turno lleno lleva `full`.
+      const bars = Array.from(day('Lun 9').querySelectorAll<HTMLElement>('.bar span'));
+      expect(bars.map((bar) => bar.style.width)).toEqual(['22%', '33%']);
+      expect(shiftRows(day('Jue 12'))).toEqual(['Comida 0/9', 'Cena 9/9']);
+      expect(day('Jue 12').querySelectorAll('.bar.full').length).toBe(1);
+      expect(day('Jue 12').querySelector('.bar.full span')).toBe(
+        day('Jue 12').querySelectorAll('.bar span')[1],
+      );
+      expect(page.querySelectorAll('app-home-week .bar.full').length).toBe(1);
+    });
+
+    it('dayHeaderTags', async () => {
+      await open({
+        closures: ['2026-11-15'],
+        week: {
+          '2026-11-11': [
+            reservation({ id: 60, status: 'PENDING', date: '2026-11-11', tableId: 1 }),
+          ],
+          '2026-11-13': [
+            reservation({ id: 61, status: 'PENDING', date: '2026-11-13', tableId: 2 }),
+            reservation({ id: 62, status: 'PENDING', date: '2026-11-13', tableId: 3 }),
+          ],
+        },
+      });
+
+      // Hoy tiene una pendiente (Luis Ejemplo): lleva las dos etiquetas.
+      expect(tags(day('Lun 9'))).toEqual(['hoy', '1 pendiente']);
+      expect(tags(day('Mar 10'))).toEqual([]);
+      expect(tags(day('Mié 11'))).toEqual(['1 pendiente']);
+      expect(tags(day('Vie 13'))).toEqual(['2 pendientes']);
+      expect(tags(day('Dom 15'))).toEqual(['cerrado']);
+      expect(day('Mié 11').querySelector('.tag')?.classList).toContain('warn');
+    });
+
+    it('pastDaysAreDimmedButClickable', async () => {
+      // Jueves 12, 17:20 en Los Ángeles: lunes a miércoles ya pasaron.
+      clock = new Date('2026-11-13T01:20:00Z');
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      await flushReads({ today: [], pending: [] }, 'kafe', '2026-11-12');
+      page = harness.routeNativeElement as HTMLElement;
+
+      for (const label of ['Lun 9', 'Mar 10', 'Mié 11']) {
+        expect(day(label).classList).toContain('past');
+        expect(day(label).tagName).toBe('A');
+      }
+      expect(day('Lun 9').getAttribute('href')).toBe('/panel/kafe?fecha=2026-11-09');
+      expect(day('Jue 12').classList).toContain('is-today');
+      expect(day('Jue 12').classList).not.toContain('past');
+      expect(day('Vie 13').classList).not.toContain('past');
+    });
+
+    it('unassignedNoteInAssignedMode', async () => {
+      const withoutTable = reservation({ id: 30, customerName: 'Sara', tableId: undefined });
+      await open({ today: [MARTA, JUAN, withoutTable], pending: [] });
+
+      // Solo cuentan las mesas con reserva; la que no tiene mesa se avisa junto a la fila de su turno.
+      expect(shiftRows(day('Lun 9'))).toEqual(['Comida 0/9', 'Cena 2/9 1 sin mesa']);
+      expect(figures()[4].sub).toContain('1 sin mesa');
+    });
+
+    it('closedDayIsNotClickable', async () => {
+      await open({ closures: ['2026-11-15'] });
+
+      const closed = day('Dom 15');
+      expect(closed.classList).toContain('closed');
+      expect(closed.tagName).not.toBe('A');
+      expect(closed.querySelector('a')).toBeNull();
+      expect(closed.getAttribute('href')).toBeNull();
+      expect(normalized(closed.textContent)).toContain('Día cerrado');
+      expect(page.querySelectorAll('app-home-week a.day').length).toBe(6);
+    });
+
+    it('dayClickOpensReservas', async () => {
+      await open();
+
+      expect(day('Vie 13').getAttribute('href')).toBe('/panel/kafe?fecha=2026-11-13');
+      day('Vie 13').click();
+      await settle();
+      await harness.fixture.whenStable();
+
+      expect(TestBed.inject(Router).url).toBe('/panel/kafe?fecha=2026-11-13');
+    });
+
+    it('weekErrorStaysInItsCard', async () => {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      expectDay(TODAY).flush(TODAY_ROWS);
+      expectPending().flush(PENDING_ROWS);
+      expectClosures(TODAY).flush([]);
+      // Un día que falla da por fallida la semana: las demás lecturas se cancelan.
+      const others = weekOf(TODAY).filter((date) => date !== TODAY);
+      expectDay(others[1]).flush(null, { status: 500, statusText: 'Server Error' });
+      others.filter((_, index) => index !== 1).forEach((date) => expectDay(date));
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+
+      const alerts = Array.from(page.querySelectorAll('[role="alert"]'));
+      expect(alerts.length).toBe(1);
+      expect(alerts[0].closest('app-home-week')).not.toBeNull();
+      expect(normalized(alerts[0].textContent)).toContain('No se pudo cargar la semana');
+      expect(days().length).toBe(0);
+      // El resto de la página sigue con sus datos.
+      expect(figures()[0].value).toBe('5');
+      expect(figures()[4].value).toBe('6 / 9');
+
+      const retry = Array.from(page.querySelectorAll('app-home-week button')).find(
+        (candidate) => normalized(candidate.textContent) === 'Reintentar',
+      ) as HTMLButtonElement;
+      retry.click();
+      await settle();
+      await flushReads({});
+
+      expect(page.querySelector('[role="alert"]')).toBeNull();
+      expect(days().length).toBe(7);
+    });
+
+    it('weekErrorWhenClosuresFail', async () => {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      expectDay(TODAY).flush(TODAY_ROWS);
+      expectPending().flush(PENDING_ROWS);
+      expectClosures(TODAY).flush(null, { status: 500, statusText: 'Server Error' });
+      flushWeek({});
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+
+      // Sin los cierres no se sabe qué días abren: la tarjeta lo dice en vez de quedarse en "Cargando…".
+      expect(text('app-home-week [role="alert"]')).toContain('No se pudo cargar la semana');
+      expect(days().length).toBe(0);
+    });
+
+    /**
+     * Lunes 21:30 (la cena ya empezó): el próximo turno es el de mañana, que está en la semana. Falla la lectura de un
+     * día de la semana; `closuresFirst` dice si los cierres llegan antes o después del fallo.
+     */
+    async function weekFailsAfterTheLastShift(closuresFirst: boolean): Promise<void> {
+      clock = new Date('2026-11-10T05:30:00Z');
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      expectDay(TODAY).flush(TODAY_ROWS);
+      expectPending().flush(PENDING_ROWS);
+      if (closuresFirst) {
+        expectClosures(TODAY).flush([]);
+      }
+      expectDay('2026-11-11').flush(null, { status: 500, statusText: 'Server Error' });
+      if (!closuresFirst) {
+        expectClosures(TODAY).flush([]);
+      }
+
+      // El fallo cancela las demás lecturas de la semana; las reservas de mañana se piden aparte (una sola, viva).
+      const reads = http.match(
+        (candidate) =>
+          candidate.method === 'GET' &&
+          candidate.url.endsWith('/reservations') &&
+          candidate.params.has('date'),
+      );
+      expect(reads.filter((read) => read.cancelled).length).toBe(reads.length - 1);
+      const fallback = reads.find((read) => !read.cancelled)!;
+      expect(fallback.request.params.get('date')).toBe('2026-11-10');
+      fallback.flush([reservation({ id: 20, date: '2026-11-10', shiftId: COMIDA.id, tableId: 1 })]);
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+    }
+
+    for (const [name, closuresFirst] of [
+      ['weekErrorAfterLastShiftKeepsTodayFigures', true],
+      ['weekErrorBeforeClosuresKeepsTodayFigures', false],
+    ] as const) {
+      it(name, async () => {
+        await weekFailsAfterTheLastShift(closuresFirst);
+
+        // Solo la tarjeta de la semana da la alerta; las cifras de hoy siguen, con las reservas de mañana.
+        const alerts = Array.from(page.querySelectorAll('[role="alert"]'));
+        expect(alerts.length).toBe(1);
+        expect(alerts[0].closest('app-home-week')).not.toBeNull();
+        expect(page.querySelector('.today [role="alert"]')).toBeNull();
+        expect(figures()[3].value).toBe('Mañana · Comida 13:00');
+        expect(figures()[4]).toEqual({
+          kicker: 'Mesas libres · mañana, Comida',
+          value: '8 / 9',
+          sub: 'ocupación 11 %',
+        });
+      });
+    }
+
+    it('nextShiftBeyondTheWeekHasItsOwnRead', async () => {
+      // Domingo 15, 21:30 en Los Ángeles: el próximo turno es el del lunes 16, ya fuera de la semana.
+      clock = new Date('2026-11-16T05:30:00Z');
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      await flushReads({ today: [], pending: [] }, 'kafe', '2026-11-15');
+
+      expectDay('2026-11-16').flush([
+        reservation({ id: 20, date: '2026-11-16', shiftId: COMIDA.id, tableId: 1 }),
+      ]);
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+
+      expect(figures()[3].value).toBe('Mañana · Comida 13:00');
+      expect(figures()[4].value).toBe('8 / 9');
+      expect(day('Dom 15').classList).toContain('is-today');
+    });
+
+    it('weekNeedsTodayReadButDoesNotRepeatItsAlert', async () => {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      expectDay(TODAY).flush(null, { status: 500, statusText: 'Server Error' });
+      expectPending().flush(PENDING_ROWS);
+      expectClosures(TODAY).flush([]);
+      flushWeek({});
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+
+      // La tarjeta de hoy da la alerta; la semana, que necesita las reservas de hoy, solo lo explica.
+      expect(text('app-home-week')).toContain('No se pudo cargar la semana');
+      expect(page.querySelectorAll('[role="alert"]').length).toBe(1);
+      expect(days().length).toBe(0);
+    });
+
+    it('homeFitsTheViewport', async () => {
+      await open();
+
+      // La comprobación visual (sin scroll de página a 1024 × 800) se hace en localhost.
+      expect(page.classList).toContain('fit');
     });
   });
 });

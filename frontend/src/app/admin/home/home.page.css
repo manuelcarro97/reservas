@@ -1,5 +1,10 @@
 /* Disposición de Inicio. El aspecto común (hojas, cifras, botones, títulos) sale de styles/base.css. */
-:host {
+/*
+ * `fit`: el marco del panel mide la ventana (admin-shell.component.css) y Inicio reparte ese alto sin scroll de página.
+ * Las cifras, el título y la semana ocupan lo suyo; las tres tarjetas del centro se quedan con lo que sobra y solo la
+ * lista de pendientes se desplaza por dentro.
+ */
+:host(.fit) {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -38,8 +43,15 @@
   color: var(--warn);
 }
 
-/* Con pendientes la cifra es un botón que lleva a su tarjeta: se ve como las demás cifras, con una flecha. */
+/*
+ * Con pendientes la cifra es un botón que lleva a su tarjeta: se ve como las demás cifras, con una flecha. Un botón
+ * centra su contenido en vertical: como columna que empieza arriba, su caja es la de un `.fig` normal aunque el
+ * kicker de otra cifra ocupe dos líneas.
+ */
 button.fig {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   width: 100%;
   border: 0;
   border-right: 1px solid var(--rule);
@@ -89,24 +101,12 @@ button.fig:hover {
   min-height: 0;
 }
 
-/* Título serif de la maqueta de Inicio. */
-.sheet-head {
-  flex: none;
-  align-items: baseline;
-  margin-bottom: 12px;
-}
-
-.sheet-title {
-  font: 400 24px/28px var(--serif);
-}
-
-.week-sheet {
-  flex: none;
-  padding-bottom: 16px;
-}
-
 /* Estrecha: las tarjetas se apilan y la página puede desplazarse. */
 @media (max-width: 1023px) {
+  :host(.fit) {
+    flex: none;
+  }
+
   .grid {
     grid-template-columns: minmax(0, 1fr);
   }
