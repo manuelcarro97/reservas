@@ -84,7 +84,7 @@
           </fieldset>
 
           <label class="field">
-            Plazo de cancelación <small>horas antes</small>
+            <span>Plazo de cancelación <small>horas antes</small></span>
             <input
               class="input mono"
               type="number"
@@ -268,7 +268,9 @@
             </p>
             <form class="delete-form" novalidate (submit)="deletePlan($event)">
               <label class="field">
-                Escribe <code>{{ currentSlug() }}</code> para confirmar
+                <span
+                  >Escribe <code>{{ currentSlug() }}</code> para confirmar</span
+                >
                 <input
                   class="input mono"
                   type="text"
