@@ -66,6 +66,7 @@ describe('routes', () => {
     const host = harness.fixture.nativeElement as HTMLElement;
 
     expect(host.textContent).toContain('Página no encontrada');
+    expect(loadSdk).not.toHaveBeenCalled();
   });
 
   /** Navega a una ruta con guard: mientras espera la sesión, el SDK la comunica. */

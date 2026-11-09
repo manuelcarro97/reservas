@@ -693,7 +693,11 @@ describe('ReservationsPage', () => {
       await open({ day: [ANA], pending: [ANA] });
       await click(row('Ana'), 'Confirmar');
       const confirmation = request('POST', '/api/v1/admin/reservations/1/confirm');
+      await switchToOtherPlan();
+      return confirmation;
+    }
 
+    async function switchToOtherPlan(): Promise<void> {
       await harness.navigateByUrl('/panel/otro');
       http
         .expectOne((candidate) => candidate.url.endsWith('/api/v1/admin/restaurants/otro'))
@@ -714,7 +718,6 @@ describe('ReservationsPage', () => {
         .flush(OCCUPANCY);
       await settle();
       page = harness.routeNativeElement as HTMLElement;
-      return confirmation;
     }
 
     it('finishesAndStillOpensWhatsappForTheCustomer', async () => {
@@ -740,6 +743,38 @@ describe('ReservationsPage', () => {
       expect(page.textContent).not.toContain('confirmada');
       expect(page.querySelector('a.whatsapp')).toBeNull();
       http.expectNone(() => true);
+    });
+
+    it('anAssignmentInFlightAlsoFinishesWithoutTouchingTheNewPlan', async () => {
+      await open({ day: [MARTA], pending: [MARTA] });
+      await click(row('Marta'), 'Asignar mesa');
+      request('GET', '/api/v1/admin/reservations/3/suggestions').flush([]);
+      await settle();
+      table(1).dispatchEvent(new Event('click'));
+      await settle();
+      const assignment = request('PUT', '/api/v1/admin/reservations/3/table');
+      await switchToOtherPlan();
+
+      expect(assignment.cancelled).toBe(false);
+      assignment.flush(details({ ...MARTA, tableLabel: '1' }, 'PENDING'));
+      await settle();
+
+      expect(page.textContent).not.toContain('asignada');
+      expect(page.querySelector('.assign')).toBeNull();
+      http.expectNone(() => true);
+    });
+
+    it('leavingThePageCancelsTheActionInFlightAndOpensNoWindow', async () => {
+      await open({ day: [ANA], pending: [ANA] });
+      await click(row('Ana'), 'Confirmar');
+
+      await harness.navigateByUrl('/otra');
+
+      // La página se destruye: la petición se cancela (y las lecturas pendientes con ella).
+      const cancelled = http.match(() => true);
+      const confirmation = cancelled.find((candidate) => candidate.request.method === 'POST');
+      expect(confirmation?.cancelled).toBe(true);
+      expect(openWindow).not.toHaveBeenCalled();
     });
 
     it('doesNotShowTheFailureOfThePreviousPlanInTheNewOne', async () => {
