@@ -24,6 +24,7 @@ import {
   planoViewBox,
 } from '../../plano/plano.component';
 import { tableName } from '../../plano/table-name';
+import { IconComponent } from '../../shared/icon.component';
 import { THEMES, THEME_KEYS, ThemeKey } from '../../plano/themes';
 import { embedSnippet } from '../embed-snippet';
 import { EditorStore, EditorTable, ServerProblem } from './editor.store';
@@ -99,12 +100,12 @@ type Dialog = { kind: 'leave'; resolve: (leave: boolean) => void } | { kind: 'de
  */
 @Component({
   selector: 'app-editor-page',
-  imports: [PlanoComponent, RouterLink, TablePaletteComponent],
+  imports: [IconComponent, PlanoComponent, RouterLink, TablePaletteComponent],
   providers: [EditorStore],
   templateUrl: './editor.page.html',
   styleUrl: './editor.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '(window:beforeunload)': 'onBeforeUnload($event)' },
+  host: { class: 'rise-stagger', '(window:beforeunload)': 'onBeforeUnload($event)' },
 })
 export class EditorPage implements ConfirmsLeaving {
   protected readonly store = inject(EditorStore);
@@ -114,7 +115,12 @@ export class EditorPage implements ConfirmsLeaving {
   protected readonly status = signal<EditorStatus>('loading');
   protected readonly shapes = SHAPES;
   protected readonly seatOptions = SEAT_OPTIONS;
-  protected readonly themes = THEME_KEYS.map((key) => ({ key, name: THEMES[key].name }));
+  /** Cada tema con su muestra: el degradado del suelo del plano (datos del tema, no colores de la interfaz). */
+  protected readonly themes = THEME_KEYS.map((key) => ({
+    key,
+    name: THEMES[key].name,
+    swatch: `linear-gradient(135deg, ${THEMES[key].floorA}, ${THEMES[key].floorB})`,
+  }));
   protected readonly planName = signal('');
   protected readonly dragging = signal<string | null>(null);
   protected readonly maxTables = MAX_TABLES;
@@ -437,11 +443,8 @@ export class EditorPage implements ConfirmsLeaving {
     this.store.renameTable(this.selectedIndex(), (event.target as HTMLInputElement).value);
   }
 
-  protected setSeats(event: Event): void {
-    this.store.setTableSeats(
-      this.selectedIndex(),
-      Number((event.target as HTMLSelectElement).value),
-    );
+  protected setSeats(seats: number): void {
+    this.store.setTableSeats(this.selectedIndex(), seats);
   }
 
   protected setTableShape(shape: TableShape): void {

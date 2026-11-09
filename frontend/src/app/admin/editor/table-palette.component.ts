@@ -14,6 +14,22 @@ const SHAPES: readonly { shape: TableShape; name: string }[] = [
 
 const SEATS: readonly number[] = [2, 4, 6, 8];
 
+/** Tamaño del dibujo de cada mesa en la paleta (px): crece con las plazas. */
+const GLYPH_SIZES: Record<TableShape, readonly (readonly [number, number])[]> = {
+  SQUARE: [
+    [14, 14],
+    [22, 16],
+    [30, 16],
+    [36, 16],
+  ],
+  ROUND: [
+    [14, 14],
+    [18, 18],
+    [22, 22],
+    [26, 26],
+  ],
+};
+
 /** Paleta de mesas: un botón por forma (cuadrada, redonda) y plazas (2, 4, 6, 8). */
 @Component({
   selector: 'app-table-palette',
@@ -27,10 +43,12 @@ export class TablePaletteComponent {
   readonly add = output<NewTable>();
 
   protected readonly options = SHAPES.flatMap(({ shape, name }) =>
-    SEATS.map((seats) => ({
+    SEATS.map((seats, index) => ({
       shape,
       seats,
       round: shape === 'ROUND',
+      width: GLYPH_SIZES[shape][index][0],
+      height: GLYPH_SIZES[shape][index][1],
       label: `Añadir mesa ${name} de ${seats} plazas`,
     })),
   );

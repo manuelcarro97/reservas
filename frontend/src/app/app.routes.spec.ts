@@ -165,7 +165,7 @@ describe('routes', () => {
           .flush({ slug: 'kafe', name: 'Kafé', status: 'DRAFT', tables: [] });
         await harness.fixture.whenStable();
         harness.detectChanges();
-        expect(host.textContent).toContain('Forma del local');
+        expect(host.textContent).toContain('Kafé / Plano');
       } else if (href === '/panel/kafe/turnos') {
         // Los turnos piden el plano y, con su zona horaria, los días cerrados.
         await flushPromises();

@@ -1,19 +1,38 @@
+/* Rejilla de 4 x 2 con filetes: cuadradas arriba, redondas abajo. */
 .palette {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
 }
 
 button {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid #c4ccd6;
-  border-radius: 6px;
-  background: #fff;
-  font: inherit;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 10px 4px 8px;
+  border: 0;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink-2);
+  font: 500 11px/1 var(--mono);
   cursor: pointer;
+}
+
+button:nth-child(4n) {
+  border-right: 0;
+}
+
+button:nth-child(n + 5) {
+  border-bottom: 0;
+}
+
+button:hover:not(:disabled) {
+  background: var(--wash);
 }
 
 button:disabled {
@@ -21,14 +40,16 @@ button:disabled {
   opacity: 0.5;
 }
 
-/* Icono de la forma: cuadrado o círculo. */
+button:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Icono de la forma: cuadrado o círculo; el tamaño llega de la plantilla. */
 .glyph {
-  width: 0.9rem;
-  height: 0.9rem;
-  border: 2px solid #4a6080;
+  border: 1.5px solid var(--ink);
   border-radius: 2px;
 }
 
 .glyph.round {
-  border-radius: 50%;
+  border-radius: 99px;
 }

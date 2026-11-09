@@ -6,7 +6,13 @@
       [disabled]="disabled()"
       (click)="add.emit({ shape: option.shape, seats: option.seats })"
     >
-      <span class="glyph" [class.round]="option.round" aria-hidden="true"></span>
+      <span
+        class="glyph"
+        [class.round]="option.round"
+        [style.width.px]="option.width"
+        [style.height.px]="option.height"
+        aria-hidden="true"
+      ></span>
       <span aria-hidden="true">{{ option.seats }}</span>
     </button>
   }

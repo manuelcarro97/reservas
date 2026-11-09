@@ -129,6 +129,19 @@ describe('EditorPage: mesas, tema y guardado', () => {
     return found;
   }
 
+  /** Plazas del panel de la mesa: grupo de botones con `aria-pressed` (los de la paleta llevan otro grupo). */
+  function seatButtons(): HTMLButtonElement[] {
+    return Array.from(
+      page.querySelectorAll<HTMLButtonElement>('[role="group"][aria-label="Plazas"] button'),
+    );
+  }
+
+  function pressedSeats(): string | undefined {
+    return seatButtons()
+      .find((option) => option.getAttribute('aria-pressed') === 'true')
+      ?.textContent?.trim();
+  }
+
   function nameInput(): HTMLInputElement {
     return page.querySelector('input[aria-label="Nombre de la mesa"]') as HTMLInputElement;
   }
@@ -233,9 +246,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
       await settle();
       expect(tableGroup(5).getAttribute('class')).toContain('selected');
       expect(nameInput().value).toBe('1');
-      expect((page.querySelector('select[aria-label="Plazas"]') as HTMLSelectElement).value).toBe(
-        '4',
-      );
+      expect(pressedSeats()).toBe('4');
       await key(tableGroup(6), 'Enter');
       expect(nameInput().value).toBe('2');
       expect(tableGroup(5).getAttribute('class')).not.toContain('selected');
@@ -248,12 +259,16 @@ describe('EditorPage: mesas, tema y guardado', () => {
       expect(tableData(5).label).toBe('Barra');
       expect(nameInput().maxLength).toBe(40);
 
-      const seats = page.querySelector('select[aria-label="Plazas"]') as HTMLSelectElement;
-      expect(Array.from(seats.options).map((option) => option.value)).toEqual(['2', '4', '6', '8']);
-      seats.value = '6';
-      seats.dispatchEvent(new Event('change', { bubbles: true }));
+      expect(seatButtons().map((option) => option.textContent?.trim())).toEqual([
+        '2',
+        '4',
+        '6',
+        '8',
+      ]);
+      seatButtons()[2].click();
       await settle();
       expect(tableData(5).seats).toBe(6);
+      expect(pressedSeats()).toBe('6');
 
       await click('Mesa redonda');
       expect(tableData(5).shape).toBe('ROUND');
@@ -261,17 +276,37 @@ describe('EditorPage: mesas, tema y guardado', () => {
       await click('Mesa cuadrada');
       expect(tableData(5).shape).toBe('SQUARE');
 
-      await click('Girar mesa');
+      await click('Girar mesa 90°');
       expect(tableData(5).rotation).toBe(90);
-      await click('Girar mesa');
+      await click('Girar mesa 90°');
       expect(tableData(5).rotation).toBe(0);
+    });
+
+    it('rotateButtonsHaveAnIconAndAName: los botones de girar llevan icono y nombre accesible', async () => {
+      await open();
+      await key(tableGroup(5), 'Enter');
+      const rotate = Array.from(page.querySelectorAll('button')).filter((candidate) =>
+        (candidate.getAttribute('aria-label') ?? candidate.textContent ?? '')
+          .trim()
+          .startsWith('Girar'),
+      );
+      // El del local (barra del lienzo) y el de la mesa seleccionada.
+      expect(rotate.length).toBe(2);
+      for (const candidate of rotate) {
+        expect(candidate.querySelector('app-icon')).not.toBeNull();
+        // Si el texto visible no basta (solo "90°"), el nombre accesible lo contiene.
+        const visible = (candidate.textContent ?? '').trim();
+        const name = candidate.getAttribute('aria-label') ?? visible;
+        expect(name.length).toBeGreaterThan(0);
+        expect(name).toContain(visible);
+      }
     });
 
     it('borrar una mesa nueva la quita sin preguntar', async () => {
       await open();
       await click('Añadir mesa cuadrada de 2 plazas');
       expect(tableGroups().length).toBe(3);
-      await click('Borrar mesa');
+      await click('Quitar mesa');
       expect(dialog()).toBeNull();
       expect(tableGroups().length).toBe(2);
       expect(page.querySelector('.table-panel')).toBeNull();
@@ -280,13 +315,13 @@ describe('EditorPage: mesas, tema y guardado', () => {
     it('borrar una mesa del servidor pide confirmación en la página', async () => {
       await open();
       await key(tableGroup(5), 'Enter');
-      await click('Borrar mesa');
+      await click('Quitar mesa');
       expect(dialog()?.textContent).toContain('Mesa 1');
       expect(tableGroups().length).toBe(2);
       await click('Cancelar');
       expect(dialog()).toBeNull();
       expect(tableGroups().length).toBe(2);
-      await click('Borrar mesa');
+      await click('Quitar mesa');
       await click('Sí, borrar');
       expect(tableGroups().map((group) => group.getAttribute('data-table-id'))).toEqual(['6']);
     });
@@ -413,7 +448,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
   describe('problemas y guardado', () => {
     it('overlapDisablesSave: una mesa solapada sale en rojo y no se puede guardar', async () => {
       await open();
-      expect(button('Guardar').disabled).toBe(true);
+      expect(button('Guardar cambios').disabled).toBe(true);
       const table = tableGroup(5);
       for (let step = 0; step < 40; step++) {
         await key(table, 'ArrowRight');
@@ -421,23 +456,23 @@ describe('EditorPage: mesas, tema y guardado', () => {
       expect(tableData(5).x).toBe(600);
       expect(tableGroup(5).getAttribute('class')).toContain('invalid');
       expect(tableGroup(6).getAttribute('class')).toContain('invalid');
-      expect(button('Guardar').disabled).toBe(true);
+      expect(button('Guardar cambios').disabled).toBe(true);
       expect(page.querySelector('.problems')?.textContent).toContain('se solapa');
       for (let step = 0; step < 30; step++) {
         await key(table, 'ArrowLeft');
       }
       expect(tableData(5).x).toBe(300);
       expect(page.querySelector('app-plano .t.invalid')).toBeNull();
-      expect(button('Guardar').disabled).toBe(false);
+      expect(button('Guardar cambios').disabled).toBe(false);
     });
 
     it('guardar envía el plano, recarga los ids y desactiva Guardar', async () => {
       await open();
       await click('Añadir mesa redonda de 2 plazas');
-      expect(button('Guardar').disabled).toBe(false);
-      button('Guardar').click();
+      expect(button('Guardar cambios').disabled).toBe(false);
+      button('Guardar cambios').click();
       await settle();
-      expect(button('Guardar').disabled).toBe(true);
+      expect(button('Guardar cambios').disabled).toBe(true);
       const put = expectPut();
       expect(put.request.body.tables.length).toBe(3);
       put.flush({
@@ -456,13 +491,13 @@ describe('EditorPage: mesas, tema y guardado', () => {
       ]);
       // La mesa seleccionada sigue seleccionada con su id real.
       expect(nameInput().value).toBe('3');
-      expect(button('Guardar').disabled).toBe(true);
+      expect(button('Guardar cambios').disabled).toBe(true);
     });
 
     it('serverProblemsMarkTables: el 422 marca las mesas del servidor en rojo', async () => {
       await open();
       await click('Añadir mesa redonda de 2 plazas');
-      button('Guardar').click();
+      button('Guardar cambios').click();
       await settle();
       expectPut().flush(
         {
@@ -475,14 +510,14 @@ describe('EditorPage: mesas, tema y guardado', () => {
       expect(tableGroup(6).getAttribute('class')).toContain('invalid');
       expect(page.querySelector('.error')?.textContent).toContain('rojo');
       // Marcas del servidor no desactivan Guardar.
-      expect(button('Guardar').disabled).toBe(false);
+      expect(button('Guardar cambios').disabled).toBe(false);
     });
 
     it('conflictShowsReservationCodes: el 409 lista los códigos de las reservas', async () => {
       await open();
       await key(tableGroup(5), 'Delete');
       await click('Sí, borrar');
-      button('Guardar').click();
+      button('Guardar cambios').click();
       await settle();
       expectPut().flush(
         { code: 'TABLE_HAS_RESERVATIONS', reservations: ['KAFE1234', 'KAFE5678'] },
@@ -498,7 +533,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
     it('el 429 muestra la espera', async () => {
       await open();
       await key(tableGroup(5), 'ArrowRight');
-      button('Guardar').click();
+      button('Guardar cambios').click();
       await settle();
       expectPut().flush(
         { code: 'RATE_LIMITED' },
@@ -518,7 +553,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
       const plano = harness.fixture.debugElement.query((el) => el.name === 'app-plano')
         .componentInstance as PlanoComponent;
       expect(plano.theme()).toBe('NOCHE');
-      button('Guardar').click();
+      button('Guardar cambios').click();
       await settle();
       http.expectNone((request) => request.method === 'PUT');
       const patch = http.expectOne(
@@ -532,7 +567,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
       });
       patch.flush({ ...PLAN, theme: 'NOCHE' });
       await tick();
-      expect(button('Guardar').disabled).toBe(true);
+      expect(button('Guardar cambios').disabled).toBe(true);
     });
   });
 
@@ -542,7 +577,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
       expect(button('Publicar').disabled).toBe(false);
       await key(tableGroup(5), 'ArrowRight');
       expect(button('Publicar').disabled).toBe(true);
-      button('Guardar').click();
+      button('Guardar cambios').click();
       await settle();
       expectPut().flush(PLAN);
       await tick();
@@ -606,7 +641,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
     it('un cambio de forma guardado devuelve el plano a borrador y oculta el enlace', async () => {
       await open({ ...PLAN, status: 'PUBLISHED' });
       await click('Girar 90°');
-      button('Guardar').click();
+      button('Guardar cambios').click();
       await settle();
       expectPut().flush({
         ...PLAN,
@@ -664,15 +699,15 @@ describe('EditorPage: mesas, tema y guardado', () => {
       expectPlan('otro').flush(OTHER);
       expect(await confirmed).toBe(true);
       await settle();
-      expect(page.querySelector('h1')?.textContent).toContain('Otro');
+      expect(page.querySelector('.eyebrow')?.textContent).toContain('Otro');
       expect(dialog()).toBeNull();
-      expect(button('Guardar').disabled).toBe(true);
+      expect(button('Guardar cambios').disabled).toBe(true);
     });
 
     it('mientras se guarda no se sale: la respuesta de un plano no se carga bajo la URL de otro', async () => {
       await open();
       await key(tableGroup(5), 'ArrowRight');
-      button('Guardar').click();
+      button('Guardar cambios').click();
       await settle();
       const router = TestBed.inject(Router);
 

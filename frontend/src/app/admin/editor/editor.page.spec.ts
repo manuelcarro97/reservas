@@ -70,6 +70,11 @@ describe('EditorPage', () => {
     page = harness.routeNativeElement as HTMLElement;
   }
 
+  /** Texto del encabezado (`eyebrow`: "<plano> / Plano") con los espacios normalizados. */
+  function eyebrowText(): string {
+    return (page.querySelector('.eyebrow')?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  }
+
   function slider(label: string): SVGGElement {
     const found = page.querySelector<SVGGElement>(`[role="slider"][aria-label="${label}"]`);
     if (!found) {
@@ -139,7 +144,8 @@ describe('EditorPage', () => {
 
   it('muestra el plano y sus tiradores de ancho y alto', async () => {
     await open();
-    expect(page.querySelector('h1')?.textContent).toContain('Kafé del Puerto');
+    expect(eyebrowText()).toBe('Kafé del Puerto / Plano');
+    expect(page.querySelector('h1')?.textContent).toContain('Sala y mesas');
     expect(page.querySelector('app-plano')).not.toBeNull();
     expect(slider('Pared derecha').getAttribute('aria-valuenow')).toBe('1200');
     expect(slider('Pared derecha').getAttribute('aria-valuemin')).toBe('400');
@@ -512,7 +518,7 @@ describe('EditorPage', () => {
     await navigation;
     expectPlan('otro').flush(L_PLAN);
     await settle();
-    expect(page.querySelector('h1')?.textContent).toContain('Otro');
+    expect(eyebrowText()).toBe('Otro / Plano');
     expect(slider('Pared interior vertical del entrante')).toBeTruthy();
   });
 });
