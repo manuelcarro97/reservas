@@ -34,6 +34,9 @@ const PLAN: PublicPlanResponse = {
 };
 
 // 23:30 UTC del 5 de enero: en Madrid (UTC+1) ya es día 6; con la zona del navegador (UTC en CI) seguiría siendo 5.
+const SLOW_START_NOTICE =
+  'La primera carga puede tardar hasta 2 minutos: la demo usa un servidor gratuito que se apaga tras un rato sin uso.';
+
 const CLOCK = new Date('2030-01-05T23:30:00Z');
 const TODAY = '2030-01-06';
 
@@ -602,6 +605,21 @@ describe('BookingPage', () => {
     expect(page.textContent).toContain(
       'Esta es una demo pública: no uses tu nombre ni teléfono reales.',
     );
+    expect(page.textContent).toContain(SLOW_START_NOTICE);
+  });
+
+  it('loadingWarnsThatTheFirstLoadCanBeSlow', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/r/kafe');
+    page = harness.routeNativeElement as HTMLElement;
+
+    expect(page.textContent).toContain('Cargando…');
+    expect(page.textContent).toContain(SLOW_START_NOTICE);
+    expect(page.querySelectorAll('h1').length).toBe(1);
+
+    expectApi('kafe').flush(PLAN);
+    await flushShifts();
+    expect(page.textContent).not.toContain(SLOW_START_NOTICE);
   });
 
   it('otherPlansHideDemoNotice', async () => {
