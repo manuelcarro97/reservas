@@ -1,0 +1,55 @@
+# Blueprint de Render para la API. Pasos en DEPLOY.md.
+# Nunca pongas aquí un valor secreto: las variables con `sync: false` las pide Render al crear el Blueprint y se
+# guardan solo en su panel. Render las pregunta únicamente la primera vez; una variable secreta nueva se añade luego
+# a mano en el panel del servicio.
+services:
+  - type: web
+    name: reservas-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: frankfurt
+    # Solo se despliega lo que entra en main, y solo si pasan los checks de GitHub (el CI del repo).
+    # Para desplegar sin esperar al CI cambia a `commit`; para desplegar siempre a mano, `'off'`.
+    branch: main
+    autoDeployTrigger: checksPass
+    healthCheckPath: /actuator/health
+    envVars:
+      # Base de datos en Neon. Formato exacto en DEPLOY.md.
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+
+      # Perfil demo: siembra la cuenta y el plano de demostración al arrancar y cada noche.
+      - key: SPRING_PROFILES_ACTIVE
+        value: demo
+
+      # Detrás del proxy de Render la IP del cliente llega en X-Forwarded-For. `native` deja que Tomcat la resuelva
+      # solo si la petición viene de un proxy interno (nunca `framework`). Si tras desplegar la IP que ve la API es
+      # la del proxy, ver "IP del cliente" en DEPLOY.md.
+      - key: FORWARD_HEADERS_STRATEGY
+        value: native
+
+      # Orígenes del frontend (Firebase Hosting) que pueden llamar a la API.
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://reservas-6d51b.web.app,https://reservas-6d51b.firebaseapp.com
+
+      # Firebase Admin: JSON de la cuenta de servicio, en una sola línea.
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+
+      # Cuenta demo en Firebase Authentication.
+      - key: DEMO_EMAIL
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false
+
+      # Telegram, opcional: déjalas vacías para que los avisos vayan solo al log.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false

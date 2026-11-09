@@ -33,7 +33,8 @@ Todas son opcionales y tienen un valor por defecto pensado para local. Los secre
 | `SPRING_DATASOURCE_PASSWORD` | Contraseña de la base de datos. | Sí | sin valor |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Solo para `docker compose`: crean la base y alimentan las tres variables anteriores. | `POSTGRES_PASSWORD` sí | sin valor: salen de `.env` |
 | `PORT` | Puerto HTTP de la API. | No | `8080` |
-| `FORWARD_HEADERS_STRATEGY` | Cómo se obtiene la IP del cliente para el límite de peticiones. Con `none` es la del socket. Detrás de un proxy usa `native` y solo con los proxies internos del proveedor; nunca `framework`, porque toma el valor de `X-Forwarded-For` que escribe el cliente. | No | `none` |
+| `FORWARD_HEADERS_STRATEGY` | Cómo se obtiene la IP del cliente para el límite de peticiones. Con `none` es la del socket. Detrás de un proxy usa `native` y solo con los proxies internos del proveedor; nunca `framework`, porque toma el valor de `X-Forwarded-For` que escribe el cliente. En Render va a `native` ([`DEPLOY.md`](DEPLOY.md)). | No | `none` |
+| `JAVA_TOOL_OPTIONS` | Opciones de la JVM. Solo la imagen Docker la define: heap al 60 % del límite del contenedor, GC serie y solo el compilador C1, para 512 MB (ver `Dockerfile`). Si la defines, sustituye a la de la imagen entera. | No | las del `Dockerfile` |
 | `CORS_ALLOWED_ORIGINS` | Orígenes del frontend que pueden llamar a la API, separados por comas. | No | `http://localhost:4200` |
 | `FIREBASE_PROJECT_ID` | Proyecto de Firebase que emite los tokens que acepta la API. | No | `reservas-6d51b` |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | JSON completo de la cuenta de servicio de Firebase. Con él, borrar una cuenta borra también su usuario de Firebase y se restaura la contraseña de la demo. Sin él, solo se deja constancia en el log. | Sí | vacío |
@@ -116,6 +117,10 @@ Las mesas guardan su posición (`x`, `y`, el centro de la mesa), y el endpoint d
 ```
 
 Los tests `*Test` son unitarios y los `*IT` usan PostgreSQL real con Testcontainers, por lo que requieren Docker.
+
+## Despliegue
+
+La API se publica en Render (plan gratuito, Docker, `render.yaml`), el frontend en Firebase Hosting (`firebase.json`) y la base de datos en Neon. Los pasos, las variables que hay que pegar en Render y las comprobaciones posteriores están en [`DEPLOY.md`](DEPLOY.md).
 
 ## Límites de la v1
 
