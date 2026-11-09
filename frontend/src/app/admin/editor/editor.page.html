@@ -19,26 +19,50 @@
         </div>
         <h1 class="page-title">Sala y <em>mesas</em></h1>
       </div>
-      <div class="actions">
-        @if (store.saving()) {
-          <span class="busy">Guardando…</span>
-        }
-        @if (store.publishing()) {
-          <span class="busy">Publicando…</span>
-        }
-        @if (!store.published()) {
-          <button
-            type="button"
-            class="btn line"
-            [disabled]="!store.canPublish()"
-            (click)="publish()"
-          >
-            <app-icon name="send" />Publicar
+      <div class="side">
+        <div class="actions">
+          @if (store.saving()) {
+            <span class="busy">Guardando…</span>
+          }
+          @if (store.publishing()) {
+            <span class="busy">Publicando…</span>
+          }
+          @if (!store.published()) {
+            <button
+              type="button"
+              class="btn line"
+              [disabled]="!store.canPublish()"
+              (click)="publish()"
+            >
+              <app-icon name="send" />Publicar
+            </button>
+          }
+          <button type="button" class="btn blue" [disabled]="!store.canSave()" (click)="save()">
+            <app-icon name="save" />Guardar cambios
           </button>
-        }
-        <button type="button" class="btn blue" [disabled]="!store.canSave()" (click)="save()">
-          <app-icon name="save" />Guardar cambios
-        </button>
+        </div>
+        <!--
+          Resultado de guardar y publicar: junto a los botones, donde se ve aunque la columna haga scroll. Una sola línea
+          con alto reservado, para que al aparecer no cambie el alto de la cabecera (ni el del lienzo).
+        -->
+        <div class="result">
+          @if (store.saveError(); as message) {
+            <p class="error truncate" role="alert" [attr.title]="message">{{ message }}</p>
+          }
+          @if (store.publishError(); as message) {
+            <p class="error truncate" role="alert" [attr.title]="message">{{ message }}</p>
+          }
+          @if (store.blockingCodes().length > 0) {
+            <ul class="codes" aria-label="Reservas activas">
+              @for (code of store.blockingCodes(); track code) {
+                <li>{{ code }}</li>
+              }
+            </ul>
+          }
+          @if (info(); as text) {
+            <p class="info truncate" role="status" [attr.title]="text">{{ text }}</p>
+          }
+        </div>
       </div>
     </div>
 
@@ -60,9 +84,11 @@
           <button type="button" class="btn quiet sm" (click)="store.rotateRoom()">
             <app-icon name="rot" />Girar 90°
           </button>
-          <span class="hint">
-            Arrastra los tiradores de cada pared, o enfócalos y usa las flechas ·
-            <code>Supr</code> borra la mesa
+          <span
+            class="hint truncate"
+            title="Arrastra paredes y mesas · flechas para moverlas · Supr quita la mesa"
+          >
+            Arrastra paredes y mesas · flechas para moverlas · <code>Supr</code> quita la mesa
           </span>
         </div>
 
@@ -141,22 +167,6 @@
             </ul>
           </div>
         }
-        @if (store.saveError(); as message) {
-          <p class="error" role="alert">{{ message }}</p>
-        }
-        @if (store.publishError(); as message) {
-          <p class="error" role="alert">{{ message }}</p>
-        }
-        @if (store.blockingCodes().length > 0) {
-          <ul class="codes" aria-label="Reservas activas">
-            @for (code of store.blockingCodes(); track code) {
-              <li>{{ code }}</li>
-            }
-          </ul>
-        }
-        @if (info(); as text) {
-          <p class="info" role="status">{{ text }}</p>
-        }
 
         <section class="sheet">
           <h3>Añadir mesa</h3>
@@ -190,6 +200,7 @@
               @for (seats of seatOptions; track seats) {
                 <button
                   type="button"
+                  [attr.aria-label]="seats + ' plazas'"
                   [attr.aria-pressed]="seats === table.seats"
                   (click)="setSeats(seats)"
                 >
@@ -302,16 +313,16 @@
               </button>
             </div>
           } @else {
-            <h2 id="dialog-title">Borrar mesa</h2>
+            <h2 id="dialog-title">Quitar mesa</h2>
             <p id="dialog-text">
-              ¿Borrar {{ tableLabel(deleting()?.label ?? '') }}? Ya está guardada: si tiene reservas
+              ¿Quitar {{ tableLabel(deleting()?.label ?? '') }}? Ya está guardada: si tiene reservas
               activas, no podrás guardar el cambio.
             </p>
             <div class="dialog-actions">
               <button #safe type="button" class="btn line" (click)="dismissDialog()">
                 Cancelar
               </button>
-              <button type="button" class="btn danger" (click)="confirmDelete()">Sí, borrar</button>
+              <button type="button" class="btn danger" (click)="confirmDelete()">Sí, quitar</button>
             </div>
           }
         </div>

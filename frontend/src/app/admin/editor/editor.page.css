@@ -24,10 +24,30 @@
   min-width: 0;
 }
 
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  min-width: 0;
+  width: min(100%, 520px);
+}
+
 .actions {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+/* Alto reservado de una línea: al aparecer el mensaje la cabecera no cambia de alto. */
+.result {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  height: 20px;
+  min-width: 0;
 }
 
 .busy {
@@ -66,8 +86,10 @@
   border-bottom: 1px solid var(--rule);
 }
 
+/* Una línea: si no cabe se corta (el texto completo va en `title`). */
 .bar .hint {
-  margin: 0 0 0 auto;
+  flex: 1 1 0;
+  margin: 0;
   text-align: right;
 }
 
@@ -206,24 +228,30 @@
   outline: 2px solid var(--blue);
 }
 
-.error,
-.info,
 .notice {
   margin: 0;
   padding: 10px 14px;
   border: 1px solid var(--rule);
-  border-left: 2px solid var(--bad);
+  border-left: 2px solid var(--warn);
   background: var(--paper);
   color: var(--ink-2);
   font-size: 13px;
 }
 
+/* Resultado de guardar y publicar: una línea junto a los botones. */
+.error,
 .info {
-  border-left-color: var(--ok);
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.notice {
-  border-left-color: var(--warn);
+.error {
+  color: var(--bad);
+}
+
+.info {
+  color: var(--ok);
 }
 
 .problems p {
@@ -236,9 +264,15 @@
 }
 
 .codes {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
   margin: 0;
-  padding-left: 20px;
-  font: 13px/20px var(--mono);
+  padding: 0;
+  overflow: hidden;
+  font: 12px/20px var(--mono);
+  list-style: none;
+  white-space: nowrap;
 }
 
 .published p {
@@ -326,7 +360,7 @@
   }
 
   .bar .hint {
-    margin-left: 0;
+    flex-basis: 100%;
     text-align: left;
   }
 }

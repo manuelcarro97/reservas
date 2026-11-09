@@ -265,6 +265,12 @@ describe('EditorPage: mesas, tema y guardado', () => {
         '6',
         '8',
       ]);
+      expect(seatButtons().map((option) => option.getAttribute('aria-label'))).toEqual([
+        '2 plazas',
+        '4 plazas',
+        '6 plazas',
+        '8 plazas',
+      ]);
       seatButtons()[2].click();
       await settle();
       expect(tableData(5).seats).toBe(6);
@@ -317,12 +323,13 @@ describe('EditorPage: mesas, tema y guardado', () => {
       await key(tableGroup(5), 'Enter');
       await click('Quitar mesa');
       expect(dialog()?.textContent).toContain('Mesa 1');
+      expect(dialog()?.textContent).toContain('¿Quitar');
       expect(tableGroups().length).toBe(2);
       await click('Cancelar');
       expect(dialog()).toBeNull();
       expect(tableGroups().length).toBe(2);
       await click('Quitar mesa');
-      await click('Sí, borrar');
+      await click('Sí, quitar');
       expect(tableGroups().map((group) => group.getAttribute('data-table-id'))).toEqual(['6']);
     });
   });
@@ -421,7 +428,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
       await key(tableGroup(5), 'Delete');
       expect(dialog()).not.toBeNull();
       expect(tableGroups().length).toBe(2);
-      await click('Sí, borrar');
+      await click('Sí, quitar');
       expect(tableGroups().length).toBe(1);
     });
 
@@ -494,6 +501,42 @@ describe('EditorPage: mesas, tema y guardado', () => {
       expect(button('Guardar cambios').disabled).toBe(true);
     });
 
+    it('saveResultStaysInTheHeader: el resultado de guardar y publicar sale junto a los botones', async () => {
+      await open();
+      await click('Añadir mesa redonda de 2 plazas');
+      button('Guardar cambios').click();
+      await settle();
+      expectPut().flush({
+        ...PLAN,
+        tables: [
+          ...PLAN.tables!,
+          { id: 40, label: '3', shape: 'ROUND', seats: 2, rotation: 0, x: 90, y: 60 },
+        ],
+      });
+      await tick();
+      expect(page.querySelector('.top [role="status"].info')?.textContent).toContain('guardado');
+      expect(page.querySelector('.col .info')).toBeNull();
+    });
+
+    it('saveResultStaysInTheHeader: un 409 al guardar enseña el error y los códigos junto a los botones', async () => {
+      await open();
+      await key(tableGroup(5), 'Delete');
+      await click('Sí, quitar');
+      button('Guardar cambios').click();
+      await settle();
+      expectPut().flush(
+        { code: 'TABLE_HAS_RESERVATIONS', reservations: ['KAFE1234'] },
+        { status: 409, statusText: 'Conflict' },
+      );
+      await tick();
+      expect(page.querySelector('.top [role="alert"].error')?.textContent).toContain(
+        'reservas activas',
+      );
+      expect(page.querySelector('.top .codes li')?.textContent?.trim()).toBe('KAFE1234');
+      expect(page.querySelector('.col .error')).toBeNull();
+      expect(page.querySelector('.col .codes')).toBeNull();
+    });
+
     it('serverProblemsMarkTables: el 422 marca las mesas del servidor en rojo', async () => {
       await open();
       await click('Añadir mesa redonda de 2 plazas');
@@ -516,7 +559,7 @@ describe('EditorPage: mesas, tema y guardado', () => {
     it('conflictShowsReservationCodes: el 409 lista los códigos de las reservas', async () => {
       await open();
       await key(tableGroup(5), 'Delete');
-      await click('Sí, borrar');
+      await click('Sí, quitar');
       button('Guardar cambios').click();
       await settle();
       expectPut().flush(
