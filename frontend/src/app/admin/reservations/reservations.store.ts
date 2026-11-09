@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Router } from '@angular/router';
 import { EMPTY, Subject, Subscription, catchError, map, of, switchMap } from 'rxjs';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { PlanResponse } from '../../core/api/models/plan-response';
@@ -23,6 +24,15 @@ export type { Question, QuestionKind } from './reservation-actions';
 
 export type PageStatus = 'loading' | 'ready' | 'notFound' | 'error';
 export type Tab = 'day' | 'pending';
+
+/** Con qué abre la página (los enlaces de Inicio): un día, una reserva y/o la pestaña de pendientes. */
+export interface StartingPoint {
+  /** `YYYY-MM-DD`; si no es una fecha real se ignora y se abre hoy. */
+  date?: string;
+  /** Reserva pendiente que se abre al llegar la lista de pendientes. */
+  reservationId?: number;
+  tab?: Tab;
+}
 
 /** Rango de años que acepta el backend (`SupportedDateValidator`). */
 const MIN_YEAR = 2000;
@@ -60,9 +70,12 @@ export class ReservationsStore implements ActionHost {
   private readonly restaurantApi = inject(AdminRestaurantControllerService);
   private readonly pendingApi = inject(PendingReservationsService);
   private readonly actions = inject(ReservationActions);
+  private readonly router = inject(Router);
   private readonly now = inject(NOW);
 
   private slug = '';
+  /** Reserva que pidió la URL: se abre una sola vez, con la primera lista de pendientes de esta carga. */
+  private reservationToOpen: number | null = null;
   private loadRequest: Subscription | undefined;
   /**
    * Asignaciones de mesa en vuelo (las acciones de la reserva, en `ReservationActions`). Cambiar de plano no las
@@ -86,6 +99,8 @@ export class ReservationsStore implements ActionHost {
 
   readonly date = signal('');
   readonly shiftId = signal<number | null>(null);
+  /** Reserva resaltada en la lista (la que abrió un enlace de Inicio); `null` si no hay ninguna. */
+  readonly highlighted = signal<number | null>(null);
 
   /** Reservas de la fecha (de todos los turnos); `null` mientras se piden. */
   readonly day = signal<AdminReservation[] | null>(null);
@@ -190,6 +205,7 @@ export class ReservationsStore implements ActionHost {
         if (failed) {
           this.loadFailed.set(true);
         }
+        this.openRequestedReservation();
       });
 
     this.occupancyRequests
@@ -234,14 +250,20 @@ export class ReservationsStore implements ActionHost {
     });
   }
 
-  load(slug: string): void {
+  /**
+   * Carga el plano y, con él, el día de `start.date` (o hoy), la pestaña de `start.tab` (o la del día) y la reserva
+   * de `start.reservationId`, que se abre al llegar los pendientes.
+   */
+  load(slug: string, start: StartingPoint = {}): void {
     this.slug = slug;
     this.view++;
     this.loadRequest?.unsubscribe();
     this.planReload?.unsubscribe();
     this.status.set('loading');
     this.plan.set(null);
-    this.tab.set('day');
+    this.tab.set(start.tab ?? 'day');
+    this.reservationToOpen = start.reservationId ?? null;
+    this.highlighted.set(null);
     this.day.set(null);
     this.pending.set([]);
     this.occupied.set(null);
@@ -257,8 +279,10 @@ export class ReservationsStore implements ActionHost {
     this.loadRequest = this.plans.get({ slug }).subscribe({
       next: (plan) => {
         this.plan.set(plan);
-        // "Hoy" es el de la zona del local, no el del navegador.
-        this.date.set(todayIn(plan.timeZone, this.now()));
+        // "Hoy" es el de la zona del local, no el del navegador. Una fecha de la URL que no existe se ignora; una
+        // pasada vale (la semana de Inicio también abre sus días ya pasados).
+        const requested = start.date !== undefined && isRealDate(start.date) ? start.date : null;
+        this.date.set(requested ?? todayIn(plan.timeZone, this.now()));
         this.shiftId.set(this.shifts()[0]?.id ?? null);
         this.status.set('ready');
         this.refresh();
@@ -319,6 +343,13 @@ export class ReservationsStore implements ActionHost {
     this.loadFailed.set(false);
     this.dayRequests.next(date);
     this.requestOccupancy();
+    // La fecha queda en la URL (recargar no pierde el día) y lo que abrió la página ya no cuenta. Sin entrada nueva
+    // en el historial, y como el cambio es solo de query la página no se recarga.
+    void this.router.navigate([], {
+      queryParams: { fecha: date, reserva: null, tab: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
     return true;
   }
 
@@ -402,6 +433,33 @@ export class ReservationsStore implements ActionHost {
       this.requestOccupancy();
     }
     this.suggestionRequests.next(reservation.id ?? null);
+  }
+
+  /**
+   * Abre la reserva que pidió la URL, una sola vez: si no tiene mesa, la elección de mesa; si la tiene, su día y turno
+   * con la fila resaltada. Si no está entre las pendientes (ya la atendieron) solo se queda el día.
+   */
+  private openRequestedReservation(): void {
+    const id = this.reservationToOpen;
+    if (id === null) {
+      return;
+    }
+    this.reservationToOpen = null;
+    const reservation = this.pending().find((item) => item.id === id);
+    if (!reservation) {
+      return;
+    }
+    if (reservation.tableId === undefined || reservation.tableId === null) {
+      this.startAssign(reservation);
+      return;
+    }
+    if (reservation.date) {
+      this.setDate(reservation.date);
+    }
+    if (reservation.shiftId !== undefined) {
+      this.selectShift(reservation.shiftId);
+    }
+    this.highlighted.set(id);
   }
 
   cancelAssign(): void {

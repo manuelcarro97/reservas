@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, ParamMap, RouterLink } from '@angular/router';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { formatDate, longDateParts } from '../../core/time';
 import { PlanoComponent } from '../../plano/plano.component';
@@ -9,7 +9,7 @@ import { STATE_COLORS } from '../../plano/themes';
 import { FeedService } from '../notifications/feed.service';
 import { dayFigures } from './day-figures';
 import { ReservationActions } from './reservation-actions';
-import { ReservationsStore } from './reservations.store';
+import { ReservationsStore, StartingPoint } from './reservations.store';
 
 type Status = NonNullable<AdminReservation['status']>;
 
@@ -27,6 +27,17 @@ const STATUS_DOT: Record<Status, string> = {
   CANCELLED: 'draft',
   NO_SHOW: 'gone',
 };
+
+/** Lo que piden `?fecha=`, `?reserva=` y `?tab=`. Lo que no se entiende (un id que no es un número, otra pestaña) se ignora. */
+function startingPoint(query: ParamMap): StartingPoint {
+  const reservation = query.get('reserva');
+  const id = reservation !== null && /^\d+$/.test(reservation) ? Number(reservation) : undefined;
+  return {
+    date: query.get('fecha') ?? undefined,
+    reservationId: id,
+    tab: query.get('tab') === 'pendientes' ? 'pending' : undefined,
+  };
+}
 
 /**
  * `/panel/:slug`: reservas del día. Fecha y turno eligen qué se ve; el plano muestra la ocupación del turno
@@ -81,12 +92,13 @@ export class ReservationsPage {
 
   constructor() {
     // Cambiar de plano desde la cabecera reutiliza esta página: se recarga con cada slug, no solo con el primero.
-    inject(ActivatedRoute)
-      .paramMap.pipe(takeUntilDestroyed())
-      .subscribe((params) => {
-        this.slug = params.get('slug') ?? '';
-        this.store.load(this.slug);
-      });
+    const route = inject(ActivatedRoute);
+    route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      this.slug = params.get('slug') ?? '';
+      // La query se lee del snapshot y solo aquí: no hay suscripción a ella, porque `setDate` la cambia al elegir fecha
+      // y no debe provocar una recarga.
+      this.store.load(this.slug, startingPoint(route.snapshot.queryParamMap));
+    });
 
     // Sin el marco del panel no hay servicio de avisos (opcional): la página sigue funcionando, sin recarga en vivo.
     inject(FeedService, { optional: true })

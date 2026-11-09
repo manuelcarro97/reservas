@@ -160,6 +160,7 @@
                   reservation.status === 'CANCELLED' || reservation.status === 'NO_SHOW'
                 "
                 [class.sel]="isAssigning(reservation)"
+                [class.highlight]="store.highlighted() === reservation.id"
               >
                 <div class="time">
                   <span class="hour">{{ reservation.arrivalTime?.slice(0, 5) ?? '—' }}</span>
