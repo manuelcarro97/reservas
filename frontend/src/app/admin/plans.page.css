@@ -1,170 +1,270 @@
-h1 {
-  margin: 0 0 1rem;
-  font-size: 1.5rem;
+/* Disposición de Mis planos. El aspecto común (hojas, botones, cifras, plano enmarcado) sale de styles/base.css. */
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 
-h2 {
-  margin: 0;
-  font-size: 1.1rem;
+.top {
+  flex: none;
+  margin-bottom: 18px;
 }
 
 .state {
-  color: #5b6877;
+  color: var(--muted);
 }
 
-.plans {
+.grid {
   display: grid;
-  gap: 0.75rem;
-  margin: 0 0 1.5rem;
-  padding: 0;
-  list-style: none;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 22px;
+  min-height: 0;
 }
 
-.plan {
-  display: grid;
-  gap: 0.6rem;
-  padding: 1rem;
-  border: 1px solid #e3e7ec;
-  border-radius: 10px;
-  background: #fff;
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* Plano destacado: crece con la ventana y el plano se lleva lo que sobra. */
+.featured {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.featured .drawing {
+  min-height: 200px;
+}
+
+.drawing .state {
+  margin: auto;
 }
 
 .plan-head {
   display: flex;
-  flex-wrap: wrap;
+  gap: 14px;
   align-items: center;
-  gap: 0.75rem;
+  margin-bottom: 14px;
 }
 
-.status {
-  padding: 0.1rem 0.6rem;
-  border-radius: 999px;
-  background: #eef1f4;
-  color: #5b6877;
-  font-size: 0.85rem;
-}
-
-.status.published {
-  background: #e4f4ea;
-  color: #14532d;
-}
-
-.links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.create-plan {
-  padding: 1rem;
-  border: 1px solid #e3e7ec;
-  border-radius: 10px;
-  background: #fff;
-}
-
-fieldset {
-  display: grid;
-  gap: 1rem;
+.plan-id {
+  flex: 1;
   min-width: 0;
-  margin: 0.75rem 0 0;
-  padding: 0;
-  border: 0;
 }
 
-label {
-  display: grid;
-  gap: 0.25rem;
-  font-weight: 600;
-}
-
-input {
-  padding: 0.5rem;
-  border: 1px solid #c4ccd6;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 400;
-}
-
-.hint {
-  color: #5b6877;
-  font-size: 0.9rem;
-  font-weight: 400;
-}
-
-button {
-  padding: 0.5rem 1.2rem;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.primary {
-  justify-self: start;
-  border: 0;
-  background: #2457a6;
-  color: #fff;
-}
-
-.secondary {
-  border: 1px solid #c4ccd6;
-  background: #fff;
-  color: inherit;
-}
-
-.danger {
-  border: 0;
-  background: #b3261e;
-  color: #fff;
-}
-
-.link-danger {
-  justify-self: start;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #b3261e;
-  font-weight: 400;
-  text-decoration: underline;
-}
-
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.confirm {
-  padding: 0.75rem;
-  border-radius: 6px;
-  background: #fdf3f2;
-}
-
-.confirm p {
-  margin: 0 0 0.6rem;
-}
-
-.buttons {
+.plan-line {
   display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.plan-name {
+  margin: 0;
+  font: 400 30px/32px var(--serif);
+}
+
+.link {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--muted);
+  font: 12.5px/1 var(--mono);
+}
+
+.figures {
+  flex: none;
+  margin-top: 14px;
+}
+
+.actions {
+  display: flex;
+  flex: none;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
 }
 
-.error {
-  margin: 0 0 1rem;
-  padding: 0.6rem 0.8rem;
+.spacer {
+  flex: 1;
+}
+
+.copy-status {
+  color: var(--ok);
+  font: 500 11px/1 var(--mono);
+  text-transform: uppercase;
+}
+
+/* Otros planos */
+.others {
+  flex: none;
+}
+
+.others-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.others-title {
+  margin: 0;
+  font: 400 22px/1.2 var(--serif);
+}
+
+.mini {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mini .sheet {
+  min-width: 0;
+  padding: 14px 18px;
+}
+
+.mini-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mini-name {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mini p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.row-sb {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.row-sb a {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--blue-deep);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.free-slot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: 84px;
+  border: 1px dashed var(--rule-strong);
   border-radius: 6px;
-  background: #fde8e6;
-  color: #8e1d14;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--muted);
+  font-size: 13px;
 }
 
-.error p {
+.empty-state p {
   margin: 0;
 }
 
-.error ul {
-  max-height: 10rem;
-  overflow-y: auto;
-  margin: 0.4rem 0 0;
-  padding-left: 1.2rem;
-  font-family: ui-monospace, monospace;
+/* Crear un plano */
+.create-plan h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.create-plan fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.create-plan .btn {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.create-plan .centered {
+  text-align: center;
+}
+
+.aside-note {
+  padding: 4px 0 4px 14px;
+  border-left: 2px solid var(--blue);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.aside-note b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ink);
+  font: 400 20px/1.2 var(--serif);
+}
+
+.error {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--bad);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+/* Poca altura: la ficha y las tarjetas se compactan para dejar sitio al plano. */
+@media (min-width: 1024px) and (max-height: 899px) {
+  .lead,
+  .mini p {
+    display: none;
+  }
+
+  .fig b {
+    font-size: 28px;
+    line-height: 30px;
+  }
+}
+
+/* Estrecha: una columna y la página hace scroll. */
+@media (max-width: 1023px) {
+  :host {
+    flex: none;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .featured .drawing {
+    min-height: 320px;
+  }
+
+  .mini {
+    grid-template-columns: 1fr;
+  }
 }

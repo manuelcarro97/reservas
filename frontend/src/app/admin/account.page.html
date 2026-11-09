@@ -1,17 +1,20 @@
-<h1>Mi cuenta</h1>
+<div class="top">
+  <div class="eyebrow">Panel <span>/</span> <b>Cuenta</b></div>
+  <h1 class="page-title">Mi <em>cuenta</em></h1>
+</div>
 
 @if (store.status() === 'loading') {
   <p class="state" role="status">Cargando…</p>
 } @else if (store.status() === 'error') {
   <p class="state" role="alert">No se pudo cargar tu cuenta. Inténtalo de nuevo.</p>
-  <button type="button" class="secondary" (click)="store.retry()">Reintentar</button>
+  <div><button type="button" class="btn line" (click)="store.retry()">Reintentar</button></div>
 } @else {
-  <p>
+  <p class="lead">
     Has entrado como <strong>{{ store.email() }}</strong
     >.
   </p>
 
-  <section class="danger-zone">
+  <section class="sheet danger-zone">
     <h2>Borrar mi cuenta</h2>
 
     @if (failure(); as problem) {
@@ -35,16 +38,16 @@
         reservas se anonimizarán. No se puede deshacer.
       </p>
       <div class="buttons">
-        <button type="button" class="danger" [disabled]="deleting()" (click)="deleteAccount()">
+        <button type="button" class="btn danger" [disabled]="deleting()" (click)="deleteAccount()">
           Sí, borrar mi cuenta
         </button>
-        <button type="button" class="secondary" [disabled]="deleting()" (click)="keepAccount()">
+        <button type="button" class="btn line" [disabled]="deleting()" (click)="keepAccount()">
           Cancelar
         </button>
       </div>
     } @else {
       <p>Borra tu cuenta y todos tus planos. No podrás borrarla si tienes reservas activas.</p>
-      <button type="button" class="danger" (click)="askConfirmation()">Borrar mi cuenta</button>
+      <button type="button" class="btn danger" (click)="askConfirmation()">Borrar mi cuenta</button>
     }
   </section>
 }

@@ -10,6 +10,7 @@ import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ApiConfiguration } from '../core/api/api-configuration';
 import { MeResponse } from '../core/api/models/me-response';
+import { PlanResponse } from '../core/api/models/plan-response';
 import { PlanSummaryResponse } from '../core/api/models/plan-summary-response';
 import { MeStore } from './me.store';
 import { PlansPage } from './plans.page';
@@ -19,7 +20,63 @@ class EditorStub {}
 
 const KAFE: PlanSummaryResponse = { slug: 'kafe', name: 'Kafé del Puerto', status: 'PUBLISHED' };
 const TAPAS: PlanSummaryResponse = { slug: 'tapas', name: 'Tapas <b>Sol</b>', status: 'DRAFT' };
+const TERRAZA: PlanSummaryResponse = { slug: 'terraza', name: 'Terraza', status: 'DRAFT' };
 const CUSTOM: PlanSummaryResponse = { slug: 'otro', name: 'Otro', status: 'DRAFT' };
+
+const ROOM = {
+  shape: 'RECTANGLE',
+  width: 800,
+  height: 600,
+  cutWidth: 0,
+  cutDepth: 0,
+  rotation: 0,
+} as const;
+
+function table(id: number, seats: number) {
+  return {
+    id,
+    label: String(id),
+    shape: 'SQUARE',
+    seats,
+    rotation: 0,
+    x: 100 * id,
+    y: 200,
+  } as const;
+}
+
+/** El `PlanResponse` de cada plano de las pruebas; los que no están aquí llegan vacíos. */
+const DETAILS: Record<string, PlanResponse> = {
+  kafe: {
+    ...KAFE,
+    theme: 'AZUL',
+    bookingMode: 'FREE_CHOICE',
+    cancellationDeadlineHours: 2,
+    room: ROOM,
+    tables: [table(1, 2), table(2, 4), table(3, 6)],
+    shifts: [
+      { id: 1, name: 'Comida', days: ['MONDAY'], start: '13:00', end: '16:00' },
+      { id: 2, name: 'Cena', days: ['MONDAY'], start: '20:00', end: '23:00' },
+    ],
+  },
+  tapas: {
+    ...TAPAS,
+    theme: 'BOSQUE',
+    bookingMode: 'ASSIGNED',
+    cancellationDeadlineHours: 0,
+    room: ROOM,
+    tables: [table(1, 2), table(2, 4)],
+    shifts: [{ id: 3, name: 'Noche', days: ['FRIDAY'], start: '20:00', end: '23:00' }],
+  },
+  terraza: {
+    ...TERRAZA,
+    theme: 'TERRACOTA',
+    bookingMode: 'FREE_CHOICE',
+    cancellationDeadlineHours: 2,
+    room: ROOM,
+    tables: [table(1, 4), table(2, 4)],
+    shifts: [],
+  },
+};
 
 function meWith(plans: PlanSummaryResponse[], extra: Partial<MeResponse> = {}): MeResponse {
   return {
@@ -31,11 +88,6 @@ function meWith(plans: PlanSummaryResponse[], extra: Partial<MeResponse> = {}): 
     plans,
     ...extra,
   };
-}
-
-/** Cuerpo de error de un DELETE: el cliente generado lo pide como texto (`responseType: 'text'`), no como JSON. */
-function problem(body: object): string {
-  return JSON.stringify(body);
 }
 
 describe('PlansPage', () => {
@@ -61,6 +113,8 @@ describe('PlansPage', () => {
 
   afterEach(() => {
     http.verify();
+    // Algunos tests sustituyen el portapapeles.
+    Reflect.deleteProperty(navigator, 'clipboard');
   });
 
   async function settle(): Promise<void> {
@@ -73,20 +127,61 @@ describe('PlansPage', () => {
       (candidate) => candidate.method === method && candidate.url.endsWith(`/api/v1/admin/${path}`),
     );
     // El contrato declara `*/*` y el generador pediría `blob`: el cuerpo (y el `code` de los errores) debe llegar como JSON.
-    expect(request.request.responseType).toBe(method === 'DELETE' ? 'text' : 'json');
+    expect(request.request.responseType).toBe('json');
     return request;
   }
 
-  async function open(me: MeResponse = meWith([KAFE, TAPAS])): Promise<void> {
+  /** Las peticiones del plano de cada tarjeta (`GET /admin/restaurants/{slug}`), sin las de otros recursos. */
+  function planGets(): TestRequest[] {
+    return http.match(
+      (request) =>
+        request.method === 'GET' && /\/api\/v1\/admin\/restaurants\/[^/]+$/.test(request.url),
+    );
+  }
+
+  function slugOf(request: TestRequest): string {
+    return request.request.url.split('/').pop()!;
+  }
+
+  /** Atiende las peticiones del plano pendientes y devuelve los slugs pedidos. */
+  async function flushPlanGets(details: Record<string, PlanResponse> = DETAILS): Promise<string[]> {
+    const requests = planGets();
+    for (const request of requests) {
+      const slug = slugOf(request);
+      request.flush(details[slug] ?? { slug, name: slug, status: 'DRAFT', tables: [], shifts: [] });
+    }
+    await settle();
+    return requests.map(slugOf);
+  }
+
+  async function open(
+    me: MeResponse = meWith([KAFE, TAPAS]),
+    options: { url?: string; details?: Record<string, PlanResponse> } = {},
+  ): Promise<void> {
     harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl(options.url ?? '/panel');
     page = harness.routeNativeElement as HTMLElement;
     expectApi('GET', 'me').flush(me);
     await settle();
+    await flushPlanGets(options.details);
   }
 
-  function planItems(): HTMLElement[] {
-    return Array.from(page.querySelectorAll<HTMLElement>('li.plan'));
+  function planCards(): HTMLElement[] {
+    return Array.from(page.querySelectorAll<HTMLElement>('[data-plan]'));
+  }
+
+  function card(slug: string): HTMLElement {
+    return page.querySelector<HTMLElement>(`[data-plan="${slug}"]`)!;
+  }
+
+  function featured(): HTMLElement | null {
+    return page.querySelector<HTMLElement>('[data-plan].featured');
+  }
+
+  function figure(kicker: string): HTMLElement | undefined {
+    return Array.from(page.querySelectorAll<HTMLElement>('.fig')).find(
+      (candidate) => candidate.querySelector('.kicker')?.textContent?.trim() === kicker,
+    );
   }
 
   function createForm(): HTMLFormElement | null {
@@ -124,28 +219,43 @@ describe('PlansPage', () => {
     await settle();
   }
 
+  function copyButton(): HTMLButtonElement | null {
+    return page.querySelector<HTMLButtonElement>('button[aria-label="Copiar enlace"]');
+  }
+
+  /** Nombre accesible y destino de cada enlace de una tarjeta. */
+  function links(root: HTMLElement): (string | null)[][] {
+    return Array.from(root.querySelectorAll('a')).map((link) => [
+      link.getAttribute('aria-label') ?? link.textContent?.trim() ?? null,
+      link.getAttribute('href'),
+    ]);
+  }
+
   it('listsPlans', async () => {
     await open();
 
-    const items = planItems();
-    expect(items).toHaveLength(2);
-    expect(items[0].textContent).toContain('Kafé del Puerto');
-    expect(items[0].textContent).toContain('Publicado');
-    expect(items[1].textContent).toContain('Borrador');
+    expect(planCards()).toHaveLength(2);
+    expect(page.querySelector('.eyebrow')?.textContent).toContain('2 de 3 planos');
+    const main = featured()!;
+    expect(main.getAttribute('data-plan')).toBe('kafe');
+    expect(main.textContent).toContain('Kafé del Puerto');
+    expect(main.textContent).toContain('Publicado');
+    const other = card('tapas');
+    expect(other.textContent).toContain('Borrador');
     // El nombre se pinta como texto, nunca como HTML.
-    expect(items[1].textContent).toContain('Tapas <b>Sol</b>');
-    expect(items[1].querySelector('b')).toBeNull();
+    expect(other.textContent).toContain('Tapas <b>Sol</b>');
+    expect(other.querySelector('b')).toBeNull();
 
-    const links = Array.from(items[0].querySelectorAll('a')).map((link) => [
-      link.textContent?.trim(),
-      link.getAttribute('href'),
-    ]);
-    expect(links).toEqual([
+    // Del plano destacado se llega a su plano, sus reservas, sus turnos y su configuración.
+    expect(links(main)).toEqual([
+      ['Plano interactivo', '/panel/kafe/plano'],
       ['Reservas', '/panel/kafe'],
-      ['Plano', '/panel/kafe/plano'],
       ['Turnos', '/panel/kafe/turnos'],
-      ['Ajustes', '/panel/kafe/ajustes'],
+      ['Configuración', '/panel/kafe/ajustes'],
+      ['Código para tu web', '/panel/kafe/ajustes'],
     ]);
+    // De los demás se llega a "Abrir", que lo sube a la tarjeta grande.
+    expect(links(other)).toEqual([['Abrir Tapas <b>Sol</b>', '/panel?plano=tapas']]);
   });
 
   it('showsLoadingThenFailureWithRetry', async () => {
@@ -161,7 +271,186 @@ describe('PlansPage', () => {
     await click('Reintentar');
     expectApi('GET', 'me').flush(meWith([KAFE]));
     await settle();
-    expect(planItems()).toHaveLength(1);
+    await flushPlanGets();
+    expect(planCards()).toHaveLength(1);
+  });
+
+  it('featuredPlanShowsItsFigures', async () => {
+    await open();
+
+    expect(figure('Mesas')!.querySelector('b')!.textContent).toBe('3');
+    // Mesas de 2 + 4 + 6 plazas.
+    expect(figure('Capacidad')!.querySelector('b')!.textContent).toBe('12');
+    expect(figure('Turnos')!.querySelector('b')!.textContent).toBe('2');
+    expect(figure('Turnos')!.textContent).toContain('Comida · Cena');
+    expect(figure('Modo')!.querySelector('b')!.textContent).toBe('Elección libre');
+    expect(figure('Modo')!.textContent).toContain('cancelación hasta 2 h antes');
+    expect(featured()!.textContent).toContain('Tema · Azul');
+  });
+
+  it('featuredPlanShowsTheAssignedModeAndTheSingularForms', async () => {
+    await open(meWith([TAPAS]), {
+      details: {
+        tapas: { ...DETAILS['tapas'], tables: [table(1, 2)], cancellationDeadlineHours: 1 },
+      },
+    });
+
+    expect(figure('Mesas')!.textContent).toContain('1');
+    expect(figure('Modo')!.querySelector('b')!.textContent).toBe('Asigno yo la mesa');
+    expect(figure('Modo')!.textContent).toContain('cancelación hasta 1 h antes');
+    expect(figure('Turnos')!.textContent).toContain('Noche');
+  });
+
+  it('featuredPlanDrawsTheRoomReadOnly', async () => {
+    await open();
+
+    const plano = featured()!.querySelector('app-plano svg.plano');
+    expect(plano).not.toBeNull();
+    expect(plano!.querySelectorAll('[tabindex]')).toHaveLength(0);
+    expect(plano!.hasAttribute('data-interactive')).toBe(false);
+  });
+
+  it('otherPlansShowTheirTablesAndSeats', async () => {
+    await open();
+
+    expect(card('tapas').textContent).toContain('2 mesas · 6 plazas');
+  });
+
+  it('eachPlanIsRequestedOnceAndOpenDoesNotRepeatIt', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/panel');
+    page = harness.routeNativeElement as HTMLElement;
+    expectApi('GET', 'me').flush(meWith([KAFE, TAPAS, CUSTOM]));
+    await settle();
+
+    expect((await flushPlanGets()).sort()).toEqual(['kafe', 'otro', 'tapas']);
+
+    page.querySelector<HTMLAnchorElement>('[data-plan="tapas"] a')!.click();
+    await settle();
+    expect(planGets()).toHaveLength(0);
+  });
+
+  it('openPromotesAnotherPlan', async () => {
+    await open(meWith([KAFE, TERRAZA]));
+    expect(featured()!.getAttribute('data-plan')).toBe('kafe');
+
+    page.querySelector<HTMLAnchorElement>('[data-plan="terraza"] a')!.click();
+    await settle();
+
+    expect(TestBed.inject(Router).url).toBe('/panel?plano=terraza');
+    expect(featured()!.getAttribute('data-plan')).toBe('terraza');
+    expect(featured()!.textContent).toContain('Terraza');
+    expect(featured()!.textContent).toContain('Tema · Terracota');
+    expect(figure('Capacidad')!.querySelector('b')!.textContent).toBe('8');
+    // Kafé pasa a ser una de las tarjetas pequeñas.
+    expect(card('kafe').classList.contains('featured')).toBe(false);
+    expect(planCards()).toHaveLength(2);
+  });
+
+  it('theQueryInTheUrlPicksTheFeaturedPlanOnLoad', async () => {
+    await open(meWith([KAFE, TAPAS]), { url: '/panel?plano=tapas' });
+
+    expect(featured()!.getAttribute('data-plan')).toBe('tapas');
+  });
+
+  it('anUnknownPlanInTheQueryFallsBackToTheFirst', async () => {
+    await open(meWith([KAFE, TAPAS]), { url: '/panel?plano=no-existe' });
+
+    expect(featured()!.getAttribute('data-plan')).toBe('kafe');
+  });
+
+  it('aPlanThatFailsToLoadShowsAMessageInsteadOfAFigureSheet', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/panel');
+    page = harness.routeNativeElement as HTMLElement;
+    expectApi('GET', 'me').flush(meWith([KAFE, TAPAS]));
+    await settle();
+    for (const request of planGets()) {
+      request.flush({}, { status: 500, statusText: 'Server Error' });
+    }
+    await settle();
+
+    expect(featured()!.textContent).toContain('No se pudo cargar el plano');
+    expect(featured()!.querySelector('app-plano')).toBeNull();
+    expect(card('tapas').textContent).not.toContain('mesas');
+    // Los enlaces siguen ahí: el plano se puede abrir aunque su ficha no cargue.
+    expect(links(featured()!)).toContainEqual(['Plano interactivo', '/panel/kafe/plano']);
+  });
+
+  it('longPlanNamesAreTruncatedWithTheFullNameInTheTitle', async () => {
+    const name = 'Un local con un nombre larguísimo '.repeat(4).slice(0, 120);
+    const long: PlanSummaryResponse = { slug: 'largo', name, status: 'PUBLISHED' };
+    await open(meWith([long, TAPAS]));
+
+    const title = featured()!.querySelector<HTMLElement>('.plan-name');
+    expect(title?.classList.contains('truncate')).toBe(true);
+    expect(title?.getAttribute('title')).toBe(name);
+    expect(title?.textContent?.trim()).toBe(name);
+  });
+
+  it('copyLinkOnlyWhenPublished', async () => {
+    await open(meWith([KAFE, TAPAS]));
+    expect(copyButton()).not.toBeNull();
+
+    // El borrador no tiene página pública: no se ofrece copiar su enlace.
+    page.querySelector<HTMLAnchorElement>('[data-plan="tapas"] a')!.click();
+    await settle();
+
+    expect(featured()!.getAttribute('data-plan')).toBe('tapas');
+    expect(copyButton()).toBeNull();
+  });
+
+  it('copyLinkPutsThePublicUrlOnTheClipboard', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    await open();
+
+    copyButton()!.click();
+    await settle();
+
+    expect(writeText).toHaveBeenCalledWith(`${location.origin}/r/kafe`);
+    expect(page.querySelector('.copy-status')?.textContent).toContain('Copiado');
+  });
+
+  it('copyLinkFallsBackToAskingForACopyByHand', async () => {
+    // jsdom no trae portapapeles: es el caso de un navegador que lo niega.
+    await open();
+
+    copyButton()!.click();
+    await settle();
+
+    expect(page.querySelector('.copy-status')?.textContent).toContain('Copia el enlace a mano');
+  });
+
+  it('emptyAccountShowsEmptyState', async () => {
+    await open(meWith([]));
+
+    expect(page.querySelector('.empty-state')?.textContent).toContain(
+      'Todavía no tienes ningún plano.',
+    );
+    expect(planCards()).toHaveLength(0);
+    expect(page.querySelector('app-plano')).toBeNull();
+    // Sin planos se puede crear el primero.
+    expect(createForm()).not.toBeNull();
+  });
+
+  it('noDeleteOnThisPage', async () => {
+    await open();
+
+    expect(button('Borrar')).toBeUndefined();
+    expect(page.textContent).not.toContain('Borrar plano');
+  });
+
+  it('freeSlotTellsHowManyPlansAreLeftInThePlural', async () => {
+    await open(meWith([KAFE]));
+
+    expect(page.querySelector('.free-slot')?.textContent).toContain('Te quedan 2 planos libres');
+  });
+
+  it('freeSlotTellsHowManyPlansAreLeftInTheSingular', async () => {
+    await open(meWith([KAFE, TAPAS]));
+
+    expect(page.querySelector('.free-slot')?.textContent).toContain('Te queda 1 plano libre');
   });
 
   it('createShownBelowTheLimit', async () => {
@@ -174,6 +463,7 @@ describe('PlansPage', () => {
     await open(meWith([KAFE, TAPAS, CUSTOM]));
 
     expect(createForm()).toBeNull();
+    expect(page.querySelector('.free-slot')).toBeNull();
     expect(page.textContent).toContain('máximo de 3 planos');
   });
 
@@ -218,6 +508,8 @@ describe('PlansPage', () => {
         .plans()
         .map((plan) => plan.slug),
     ).toEqual(['la-mesa-del-puerto']);
+    // La página ya se cerró: si llegó a pedir el plano nuevo, la petición quedó cancelada.
+    planGets();
   });
 
   it('createValidatesBeforeCallingTheApi', async () => {
@@ -274,94 +566,20 @@ describe('PlansPage', () => {
     await settle();
     expectApi('GET', 'me').flush(meWith([KAFE, TAPAS, CUSTOM]));
     await settle();
+    // Kafé ya estaba pedido: solo faltan los dos planos nuevos.
+    expect((await flushPlanGets()).sort()).toEqual(['otro', 'tapas']);
 
     expect(alertText()).toContain('máximo de planos');
     expect(createForm()).toBeNull();
   });
 
-  it('demoHidesCreateAndDeletePlan', async () => {
+  it('demoHidesCreateAndTheFreeSlot', async () => {
     await open(meWith([KAFE], { demo: true }));
 
-    expect(planItems()).toHaveLength(1);
+    expect(planCards()).toHaveLength(1);
     expect(createForm()).toBeNull();
+    expect(page.querySelector('.free-slot')).toBeNull();
     expect(button('Borrar')).toBeUndefined();
     expect(page.textContent).toContain('demostración');
-  });
-
-  it('deletePlanAsksForConfirmationAndWarnsAboutAnonymization', async () => {
-    await open();
-
-    await click('Borrar');
-    expect(page.textContent).toContain('se anonimizarán');
-    expect(page.textContent).toContain('Kafé del Puerto');
-
-    await click('Cancelar');
-    expect(page.textContent).not.toContain('se anonimizarán');
-  });
-
-  it('deletePlanRemovesItAfterConfirming', async () => {
-    await open();
-
-    await click('Borrar');
-    await click('Sí, borrar el plano');
-    expectApi('DELETE', 'restaurants/kafe').flush(null, { status: 204, statusText: 'No Content' });
-    await settle();
-    expectApi('GET', 'me').flush(meWith([TAPAS]));
-    await settle();
-
-    expect(planItems()).toHaveLength(1);
-    expect(page.textContent).not.toContain('Kafé del Puerto');
-    expect(page.textContent).not.toContain('se anonimizarán');
-  });
-
-  it('deletePlanBlockedShowsCodes', async () => {
-    await open();
-
-    await click('Borrar');
-    await click('Sí, borrar el plano');
-    expectApi('DELETE', 'restaurants/kafe').flush(
-      problem({
-        code: 'PLAN_HAS_RESERVATIONS',
-        reservations: ['KAFE23456789ABCD', 'KAFEZZZZ99998888'],
-      }),
-      { status: 409, statusText: 'Conflict' },
-    );
-    await settle();
-
-    expect(alertText()).toContain('reservas activas');
-    expect(alertText()).toContain('KAFE23456789ABCD');
-    expect(alertText()).toContain('KAFEZZZZ99998888');
-    expect(planItems()).toHaveLength(2);
-  });
-
-  it('deletePlanAlreadyGoneReloadsTheList', async () => {
-    await open();
-
-    await click('Borrar');
-    await click('Sí, borrar el plano');
-    expectApi('DELETE', 'restaurants/kafe').flush(problem({ code: 'RESTAURANT_NOT_FOUND' }), {
-      status: 404,
-      statusText: 'Not Found',
-    });
-    await settle();
-    expectApi('GET', 'me').flush(meWith([TAPAS]));
-    await settle();
-
-    expect(alertText()).toContain('ya no existe');
-    expect(planItems()).toHaveLength(1);
-  });
-
-  it('deletePlanShowsRateLimitError', async () => {
-    await open();
-
-    await click('Borrar');
-    await click('Sí, borrar el plano');
-    expectApi('DELETE', 'restaurants/kafe').flush(problem({ code: 'RATE_LIMITED' }), {
-      status: 429,
-      statusText: 'Too Many',
-    });
-    await settle();
-
-    expect(alertText()).toContain('Demasiados intentos');
   });
 });

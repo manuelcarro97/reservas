@@ -114,13 +114,25 @@ describe('routes', () => {
       });
     await harness.fixture.whenStable();
     harness.detectChanges();
+    // Mis planos pide el plano del destacado para pintarlo (el interceptor espera al token, de ahí el await).
+    await flushPromises();
+    backend
+      .expectOne((request) => request.url.endsWith('/api/v1/admin/restaurants/kafe'))
+      .flush({ slug: 'kafe', name: 'Kafé', status: 'DRAFT', tables: [], shifts: [] });
+    await harness.fixture.whenStable();
+    harness.detectChanges();
     const host = harness.fixture.nativeElement as HTMLElement;
-    const hrefs = Array.from(host.querySelectorAll('li.plan a')).map((link) =>
-      link.getAttribute('href'),
-    );
+    // Configuración y "Código para tu web" llevan al mismo sitio: cada destino se recorre una vez.
+    const hrefs = [
+      ...new Set(
+        Array.from(host.querySelectorAll('[data-plan].featured a')).map((link) =>
+          link.getAttribute('href'),
+        ),
+      ),
+    ];
     expect(hrefs).toEqual([
-      '/panel/kafe',
       '/panel/kafe/plano',
+      '/panel/kafe',
       '/panel/kafe/turnos',
       '/panel/kafe/ajustes',
     ]);

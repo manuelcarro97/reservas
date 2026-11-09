@@ -1,62 +1,47 @@
-h1 {
-  margin: 0 0 1rem;
-  font-size: 1.5rem;
+/* Disposición de Cuenta: una columna estrecha. El aspecto común sale de styles/base.css. */
+:host {
+  display: block;
+  width: 100%;
+  max-width: 640px;
 }
 
-h2 {
-  margin: 0 0 0.6rem;
-  font-size: 1.1rem;
+.top {
+  margin-bottom: 18px;
 }
 
 .state {
-  color: #5b6877;
+  color: var(--muted);
 }
 
 .danger-zone {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  border: 1px solid #e8b9b5;
-  border-radius: 10px;
-  background: #fff;
+  margin-top: 22px;
+  border-color: #f0c4c0;
 }
 
-button {
-  padding: 0.5rem 1.2rem;
-  border-radius: 6px;
-  font: inherit;
+.danger-zone h2 {
+  margin: 0 0 10px;
+  color: var(--bad);
+  font-size: 15px;
   font-weight: 600;
-  cursor: pointer;
 }
 
-.danger {
-  border: 0;
-  background: #b3261e;
-  color: #fff;
-}
-
-.secondary {
-  border: 1px solid #c4ccd6;
-  background: #fff;
-  color: inherit;
-}
-
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.danger-zone p {
+  margin: 0 0 14px;
 }
 
 .buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 8px;
 }
 
 .error {
-  margin: 0 0 1rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 6px;
-  background: #fde8e6;
-  color: #8e1d14;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-left: 2px solid var(--bad);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 13px;
 }
 
 .error p {
@@ -66,5 +51,5 @@ button:disabled {
 .error ul {
   margin: 0.4rem 0 0;
   padding-left: 1.2rem;
-  font-family: ui-monospace, monospace;
+  font-family: var(--mono);
 }

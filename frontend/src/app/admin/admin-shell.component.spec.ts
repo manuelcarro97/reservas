@@ -102,14 +102,40 @@ describe('AdminShellComponent', () => {
     return http.expectOne((request) => request.url.endsWith('/api/v1/admin/me'));
   }
 
-  async function open(url: string): Promise<void> {
+  /**
+   * Mis planos pide el plano de cada tarjeta (`GET /admin/restaurants/{slug}`). Aquí solo se atienden (o se recogen,
+   * si la página se cerró y la petición quedó cancelada) para que `http.verify()` no las vea pendientes.
+   */
+  function planGets(): TestRequest[] {
+    return http.match(
+      (request) =>
+        request.method === 'GET' && /\/api\/v1\/admin\/restaurants\/[^/]+$/.test(request.url),
+    );
+  }
+
+  function flushPlanGets(): void {
+    for (const request of planGets()) {
+      const slug = request.request.url.split('/').pop();
+      request.flush({ slug, name: slug, status: 'DRAFT', tables: [], shifts: [] });
+    }
+  }
+
+  async function open(url: string, me: MeResponse = ME): Promise<void> {
     await harness.navigateByUrl(url);
-    expectMe().flush(ME);
+    expectMe().flush(me);
+    await settle();
+    flushPlanGets();
     await settle();
   }
 
   function switcher(): HTMLSelectElement | null {
     return host.querySelector<HTMLSelectElement>('select[name="plan"]');
+  }
+
+  function tab(name: string): HTMLAnchorElement | undefined {
+    return Array.from(host.querySelectorAll<HTMLAnchorElement>('header nav.tabs a')).find((link) =>
+      link.textContent?.includes(name),
+    );
   }
 
   async function choose(slug: string): Promise<void> {
@@ -122,7 +148,7 @@ describe('AdminShellComponent', () => {
   it('loadsMeOnceForTheShellAndItsPage', async () => {
     await open('/panel');
 
-    expect(host.querySelectorAll('li.plan')).toHaveLength(2);
+    expect(host.querySelectorAll('[data-plan]')).toHaveLength(2);
     // `expectMe()` exige exactamente una petición: la cabecera y la página comparten el mismo almacén.
   });
 
@@ -154,21 +180,127 @@ describe('AdminShellComponent', () => {
     expect(TestBed.inject(Router).url).toBe('/panel/kafe');
   });
 
-  it('switcherFromThePlanListOpensThePlanEditor', async () => {
+  it('switcherFromThePlanListPromotesThePlan', async () => {
     await open('/panel');
-    expect(switcher()!.value).toBe('');
+    // En la lista no hay slug en la URL: el selector enseña el plano destacado, el primero.
+    expect(switcher()!.value).toBe('kafe');
 
-    await choose('kafe');
+    await choose('tapas');
 
-    expect(TestBed.inject(Router).url).toBe('/panel/kafe/plano');
+    expect(TestBed.inject(Router).url).toBe('/panel?plano=tapas');
+    expect(switcher()!.value).toBe('tapas');
+    // La página sigue viva y ya tenía el plano de "tapas": no lo vuelve a pedir.
+    expect(planGets()).toHaveLength(0);
+  });
+
+  it('switcherFromTheAccountPagePromotesThePlanToo', async () => {
+    await open('/panel/cuenta');
+    expect(switcher()!.value).toBe('kafe');
+
+    await choose('tapas');
+    // Mis planos es una página nueva: pide los datos del dueño al abrirse, como al volver de cualquier sección.
+    expectMe().flush(ME);
+    await settle();
+    flushPlanGets();
+    await settle();
+
+    expect(TestBed.inject(Router).url).toBe('/panel?plano=tapas');
+    expect(switcher()!.value).toBe('tapas');
   });
 
   it('switcherIsHiddenWithoutPlans', async () => {
-    await harness.navigateByUrl('/panel');
-    expectMe().flush({ ...ME, plans: [] });
-    await settle();
+    await open('/panel', { ...ME, plans: [] });
 
     expect(switcher()).toBeNull();
+  });
+
+  it('switcherShowsTheStateOfThePlan', async () => {
+    await open('/panel/tapas/plano');
+
+    expect(host.querySelector('.switcher .dot-state')?.textContent?.trim()).toBe('Borrador');
+    await choose('kafe');
+    expect(host.querySelector('.switcher .dot-state')?.textContent?.trim()).toBe('Publicado');
+  });
+
+  it('longPlanNameIsTruncated', async () => {
+    const name = 'Restaurante con un nombre larguísimo '.repeat(4).slice(0, 120);
+    await open('/panel/largo/plano', {
+      ...ME,
+      plans: [{ slug: 'largo', name, status: 'PUBLISHED' }],
+    });
+
+    const label = host.querySelector<HTMLElement>('.switcher .truncate');
+    expect(label?.textContent?.trim()).toBe(name);
+    expect(label?.getAttribute('title')).toBe(name);
+  });
+
+  it('tabsPointToTheCurrentPlan', async () => {
+    await open('/panel');
+
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel');
+    expect(tab('Reservas')!.getAttribute('href')).toBe('/panel/kafe');
+    expect(tab('Turnos')!.getAttribute('href')).toBe('/panel/kafe/turnos');
+    expect(tab('Configuración')!.getAttribute('href')).toBe('/panel/kafe/ajustes');
+  });
+
+  it('tabsFollowThePlanPromotedByTheQuery', async () => {
+    await open('/panel?plano=tapas');
+
+    expect(tab('Reservas')!.getAttribute('href')).toBe('/panel/tapas');
+    expect(tab('Configuración')!.getAttribute('href')).toBe('/panel/tapas/ajustes');
+  });
+
+  it('tabsDisabledWithoutPlans', async () => {
+    await open('/panel', { ...ME, plans: [] });
+
+    for (const name of ['Reservas', 'Turnos', 'Configuración']) {
+      const link = tab(name)!;
+      expect(link.getAttribute('aria-disabled')).toBe('true');
+      expect(link.hasAttribute('href')).toBe(false);
+    }
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel');
+  });
+
+  it('currentTabIsMarked', async () => {
+    await open('/panel');
+    expect(tab('Planos')!.getAttribute('aria-current')).toBe('page');
+    expect(tab('Reservas')!.hasAttribute('aria-current')).toBe(false);
+
+    await harness.navigateByUrl('/panel/tapas');
+    harness.detectChanges();
+    expect(tab('Reservas')!.getAttribute('aria-current')).toBe('page');
+    expect(tab('Planos')!.hasAttribute('aria-current')).toBe(false);
+
+    // El editor no tiene pestaña propia: ninguna queda marcada.
+    await harness.navigateByUrl('/panel/tapas/plano');
+    harness.detectChanges();
+    expect(host.querySelectorAll('header nav.tabs [aria-current]')).toHaveLength(0);
+  });
+
+  it('iconButtonsHaveNames', async () => {
+    await open('/panel');
+
+    // La campana es un indicador con icono: el icono lleva el nombre.
+    expect(host.querySelector('header [role="img"][aria-label="Avisos"]')).not.toBeNull();
+    const sound = Array.from(host.querySelectorAll<HTMLButtonElement>('header button')).find(
+      (button) => button.textContent?.includes('Silenciar'),
+    )!;
+    expect(sound.getAttribute('aria-label')).toBe('Silenciar');
+    // Los iconos de dentro de los botones con texto son decorativos.
+    for (const svg of Array.from(host.querySelectorAll('header button svg'))) {
+      expect(svg.getAttribute('aria-hidden')).toBe('true');
+    }
+  });
+
+  it('theFooterCreditsTheAuthorOnce', async () => {
+    await open('/panel');
+
+    const footers = host.querySelectorAll('footer');
+    expect(footers).toHaveLength(1);
+    expect(footers[0].textContent).toContain('© 2026 reservas. · Proyecto de portafolio');
+    const link = footers[0].querySelector('a')!;
+    expect(link.textContent).toContain('Desarrollado por Manuel Carro');
+    expect(link.getAttribute('href')).toBe('https://www.linkedin.com/in/manuelcarro');
   });
 
   it('headerLinksToTheAccount', async () => {
@@ -248,7 +380,7 @@ describe('AdminShellComponent', () => {
 
   it('sessionEndedInAnotherTabSendsThePanelToLogin', async () => {
     await open('/panel');
-    expect(host.querySelectorAll('li.plan')).toHaveLength(2);
+    expect(host.querySelectorAll('[data-plan]')).toHaveLength(2);
     await signIn('uid-a');
 
     sdk.emit(null);
@@ -256,7 +388,7 @@ describe('AdminShellComponent', () => {
     await flushPromises();
 
     expect(TestBed.inject(Router).url).toBe('/entrar');
-    expect(host.querySelector('li.plan')).toBeNull();
+    expect(host.querySelector('[data-plan]')).toBeNull();
   });
 
   it('aSessionLostRightAfterOpeningThePanelStillLeaves', async () => {
@@ -273,6 +405,8 @@ describe('AdminShellComponent', () => {
 
     expect(TestBed.inject(Router).url).toBe('/entrar');
     feedRequests();
+    // Si la lista llegó a pintarse, sus peticiones del plano quedaron canceladas al salir.
+    planGets();
   });
 
   it('anotherOwnerSignedInElsewhereSendsThePanelToLoginInsteadOfShowingTheirData', async () => {
@@ -321,7 +455,7 @@ describe('AdminShellComponent', () => {
     await flushPromises();
 
     expect(TestBed.inject(Router).url).toBe('/panel');
-    expect(host.querySelectorAll('li.plan')).toHaveLength(2);
+    expect(host.querySelectorAll('[data-plan]')).toHaveLength(2);
     expect(feedRequests()).toHaveLength(0);
   });
 
@@ -457,9 +591,9 @@ describe('AdminShellComponent', () => {
     // Otro dueño entra después: no debe ver los planos del anterior mientras llega su respuesta.
     await harness.navigateByUrl('/panel');
     harness.detectChanges();
-    expect(host.querySelectorAll('li.plan')).toHaveLength(0);
+    expect(host.querySelectorAll('[data-plan]')).toHaveLength(0);
     expectMe().flush({ ...ME, email: 'otro@example.com', plans: [] });
     await settle();
-    expect(host.querySelectorAll('li.plan')).toHaveLength(0);
+    expect(host.querySelectorAll('[data-plan]')).toHaveLength(0);
   });
 });

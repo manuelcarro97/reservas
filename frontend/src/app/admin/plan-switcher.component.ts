@@ -1,50 +1,86 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router } from '@angular/router';
-import { filter } from 'rxjs';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { IconComponent } from '../shared/icon.component';
+import { currentPlanSlug, panelLocation, routerUrl } from './current-plan';
 import { MeStore } from './me.store';
+import { PLAN_STATUS_LABELS } from './plan-status';
 
-/** Sección a la que se va al elegir un plano desde una página que no es de un plano (lista, cuenta). */
-const DEFAULT_SECTION = 'plano';
-
-/** Plano y sección de la URL actual: `/panel/:slug/:section`. `/panel` y `/panel/cuenta` no son de ningún plano. */
-function planAndSection(url: string, router: Router): { slug: string | null; section: string } {
-  const segments =
-    router.parseUrl(url).root.children['primary']?.segments.map((segment) => segment.path) ?? [];
-  const isPlanUrl =
-    segments[0] === 'panel' &&
-    segments.length >= 2 &&
-    !(segments[1] === 'cuenta' && segments.length === 2);
-  return isPlanUrl
-    ? { slug: segments[1], section: segments.slice(2).join('/') }
-    : { slug: null, section: DEFAULT_SECTION };
-}
-
-/** Menú de la cabecera del panel para pasar de un plano a otro conservando la sección (plano, turnos…). */
+/**
+ * Selector de plano de la cabecera del panel. Enseña el plano actual con su estado y deja pasar a otro:
+ * - En la página de un plano conserva la sección (plano, turnos…).
+ * - En `/panel` y `/panel/cuenta` no hay sección: el elegido pasa a ser el destacado de Mis planos (`?plano=`).
+ *
+ * El `<select>` nativo cubre toda la caja con opacidad 0: se conserva su teclado y su lista, y la caja pinta el
+ * nombre (recortado si es largo, con el nombre completo en `title`) y el estado.
+ */
 @Component({
   selector: 'app-plan-switcher',
+  imports: [IconComponent],
   template: `
     @if (store.plans().length > 0) {
-      <select name="plan" aria-label="Cambiar de plano" (change)="choose($event)">
-        @if (!current().slug) {
-          <option value="" selected>Ir a un plano…</option>
+      <div class="switcher">
+        <span class="name truncate" [attr.title]="label()">{{ label() }}</span>
+        @if (current(); as plan) {
+          <span
+            class="dot-state"
+            [class.live]="plan.status === 'PUBLISHED'"
+            [class.draft]="plan.status === 'DRAFT'"
+            >{{ plan.status ? statusLabels[plan.status] : '' }}</span
+          >
         }
-        @for (plan of store.plans(); track plan.slug) {
-          <option [value]="plan.slug" [selected]="plan.slug === current().slug">
-            {{ plan.name }}
-          </option>
-        }
-      </select>
+        <app-icon name="chev" />
+        <select name="plan" aria-label="Cambiar de plano" (change)="choose($event)">
+          @if (!current()) {
+            <option value="" selected>Ir a un plano…</option>
+          }
+          @for (plan of store.plans(); track plan.slug) {
+            <option [value]="plan.slug" [selected]="plan.slug === slug()">
+              {{ plan.name }}
+            </option>
+          }
+        </select>
+      </div>
     }
   `,
   styles: `
+    :host {
+      display: flex;
+      min-width: 0;
+    }
+
+    .switcher {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      max-width: 22rem;
+      padding: 6px 10px 6px 12px;
+      border: 1px solid var(--rule-strong);
+      border-radius: 4px;
+      background: var(--paper);
+    }
+
+    .switcher:hover {
+      border-color: var(--ink-2);
+    }
+
+    .switcher:has(select:focus-visible) {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
+
+    .name {
+      font-weight: 600;
+    }
+
     select {
-      max-width: 14rem;
-      padding: 0.35rem 0.5rem;
-      border: 1px solid #c4ccd6;
-      border-radius: 6px;
-      background: #fff;
+      position: absolute;
+      inset: 0;
+      width: 100%;
       font: inherit;
+      opacity: 0;
+      cursor: pointer;
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -52,26 +88,29 @@ function planAndSection(url: string, router: Router): { slug: string | null; sec
 export class PlanSwitcherComponent {
   protected readonly store = inject(MeStore);
   private readonly router = inject(Router);
+  private readonly url = routerUrl(this.router);
 
-  protected readonly current = signal(planAndSection(this.router.url, this.router));
+  protected readonly statusLabels = PLAN_STATUS_LABELS;
 
-  constructor() {
-    this.router.events
-      .pipe(
-        filter((event) => event instanceof NavigationEnd),
-        takeUntilDestroyed(),
-      )
-      .subscribe((event) => this.current.set(planAndSection(event.urlAfterRedirects, this.router)));
-  }
+  protected readonly slug = computed(() =>
+    currentPlanSlug(this.url(), this.router, this.store.plans()),
+  );
+  /** El plano actual, si está en la lista (la URL puede traer uno que ya no existe). */
+  protected readonly current = computed(() =>
+    this.store.plans().find((plan) => plan.slug === this.slug()),
+  );
+  protected readonly label = computed(() => this.current()?.name ?? 'Ir a un plano…');
 
   protected async choose(event: Event): Promise<void> {
     const select = event.target as HTMLSelectElement;
     if (!select.value) {
       return;
     }
-    const { section } = this.current();
-    await this.router.navigate(['/panel', select.value, ...(section ? section.split('/') : [])]);
+    const { slug, section } = panelLocation(this.url(), this.router);
+    await (slug
+      ? this.router.navigate(['/panel', select.value, ...(section ? section.split('/') : [])])
+      : this.router.navigate(['/panel'], { queryParams: { plano: select.value } }));
     // Si la página no dejó salir (cambios sin guardar en el editor) el selector no debe seguir enseñando el plano elegido.
-    select.value = this.current().slug ?? '';
+    select.value = this.current() ? (this.slug() ?? '') : '';
   }
 }
