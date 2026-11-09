@@ -284,13 +284,30 @@
   gap: 8px;
 }
 
-/* Poca altura o poca anchura: el marco del panel no fija el alto, así que el lienzo lleva el suyo y la página hace scroll. */
-@media (max-height: 799px), (max-width: 1023px) {
+/*
+ * Ancha pero baja: el marco del panel no fija el alto y la página hace scroll. La rejilla lleva un alto propio y la
+ * columna hace scroll por dentro: que salga el panel de una mesa o un aviso en mitad de un arrastre no cambia la altura
+ * de la página (ni saca la barra de scroll), y con ella el tamaño del lienzo.
+ */
+@media (min-width: 1024px) and (max-height: 799px) {
   :host {
     flex: none;
   }
 
   .grid {
+    flex: none;
+    height: clamp(360px, 70vh, 640px);
+  }
+}
+
+/* Estrecha: una columna, el lienzo con alto propio y la página hace scroll. */
+@media (max-width: 1023px) {
+  :host {
+    flex: none;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto;
     align-items: start;
   }
@@ -302,12 +319,10 @@
   .col {
     overflow: visible;
   }
-}
 
-/* Estrecha: una columna. */
-@media (max-width: 1023px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
+  .bar .seg {
+    max-width: 100%;
+    overflow-x: auto;
   }
 
   .bar .hint {
