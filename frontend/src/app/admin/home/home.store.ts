@@ -8,7 +8,7 @@ import { AdminReservationControllerService } from '../../core/api/services/admin
 import { AdminShiftControllerService } from '../../core/api/services/admin-shift-controller.service';
 import { NOW, timeIn, todayIn } from '../../core/time';
 import { PendingReservationsService } from '../reservations/pending-reservations.service';
-import { byDateThenArrival } from '../reservations/reservations.store';
+import { byDateThenArrival } from '../reservations/reservation-order';
 import { NextShift, nextShift, weekStart } from './home-figures';
 
 export type HomeStatus = 'loading' | 'ready' | 'notFound' | 'error';

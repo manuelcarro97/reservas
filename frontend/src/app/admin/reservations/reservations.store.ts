@@ -17,6 +17,7 @@ import { knownTheme } from '../../plano/themes';
 import { opensOn } from '../shift-days';
 import { PendingReservationsService } from './pending-reservations.service';
 import { ActionHost, QuestionKind, ReservationActions } from './reservation-actions';
+import { byArrival, byDateThenArrival } from './reservation-order';
 
 export type { Question, QuestionKind } from './reservation-actions';
 
@@ -41,21 +42,6 @@ export function isRealDate(isoDate: string): boolean {
   }
   const date = new Date(year, month - 1, day);
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
-}
-
-/** Orden de la lista: por hora de llegada; las que no tienen hora (anteriores a V5) al final. */
-export function byArrival(a: AdminReservation, b: AdminReservation): number {
-  if (a.arrivalTime === undefined || a.arrivalTime === null) {
-    return b.arrivalTime === undefined || b.arrivalTime === null ? (a.id ?? 0) - (b.id ?? 0) : 1;
-  }
-  if (b.arrivalTime === undefined || b.arrivalTime === null) {
-    return -1;
-  }
-  return a.arrivalTime.localeCompare(b.arrivalTime) || (a.id ?? 0) - (b.id ?? 0);
-}
-
-export function byDateThenArrival(a: AdminReservation, b: AdminReservation): number {
-  return (a.date ?? '').localeCompare(b.date ?? '') || byArrival(a, b);
 }
 
 function byStart(a: ShiftResponse, b: ShiftResponse): number {
