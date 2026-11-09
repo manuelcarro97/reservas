@@ -1,59 +1,39 @@
-# Frontend
+# Frontend de reservas
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.5.
+Angular 22 (componentes standalone, signals, sin zone.js). Contiene la página pública de reservas, la consulta de una reserva por código y el panel del dueño. La visión general del proyecto está en el [README principal](../README.md).
 
-## Development server
+## Comandos
 
-To start a local development server, run:
-
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+Requiere Node 24.
 
 ```bash
-ng generate component component-name
+npm ci
+npm start      # http://localhost:4200, contra la API de http://localhost:8080
+npm test       # Vitest
+npm run build  # build de producción en dist/frontend/browser
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+`npm start`, `npm test` y `npm run build` regeneran antes el cliente de la API (`npm run api`, con ng-openapi-gen) desde [`../contracts/openapi.json`](../contracts/openapi.json). El cliente generado no se versiona: si el contrato cambia, el compilador marca lo que hay que tocar.
 
-```bash
-ng generate --help
+Tras el build, `scripts/check-hosting-config.mjs` comprueba que cada script en línea del `index.html` está permitido por la CSP de `../firebase.json`. Si falla, el despliegue no llega a hacerse.
+
+## Estructura
+
+```
+src/app/
+  public/   página de reservas (/r/<local>) y consulta por código (/reserva/<código>)
+  admin/    panel del dueño: planos, editor, reservas, turnos, configuración, cuenta
+  plano/    dibujo del plano en SVG, compartido por el editor, el panel y la página pública
+  core/     cliente de la API, autenticación, hora y utilidades
+  shared/   componentes reutilizables
+  shell/    cabeceras y pie
+src/environments/
+  environment.development.ts   local
+  environment.ts               producción: URL de la API en Render y configuración web de Firebase
 ```
 
-## Building
+La página pública es la que se incrusta en la web de un restaurante. Va en un chunk aparte y no descarga Firebase ni código del panel.
 
-To build the project run:
+## Estilos
 
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Los colores, tipografías y espacios salen de los tokens de `src/styles/tokens.css`. Un test falla si aparece un color suelto fuera de ellos. Las fuentes (Geist, Geist Mono e Instrument Serif, de @fontsource) se sirven desde el propio sitio, sin peticiones a terceros.
