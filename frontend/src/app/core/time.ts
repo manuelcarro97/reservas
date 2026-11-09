@@ -64,10 +64,12 @@ export function longDateParts(isoDate: string): { weekday: string; day: string }
 export function calendarLeaf(isoDate: string): { month: string; day: string } {
   const [year, month, day] = isoDate.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
-  return {
-    month: new Intl.DateTimeFormat('es-ES', { month: 'short', timeZone: 'UTC' }).format(date),
-    day: String(day),
-  };
+  const shortMonth = new Intl.DateTimeFormat('es-ES', {
+    month: 'short',
+    timeZone: 'UTC',
+  }).format(date);
+  // Según la versión de ICU, septiembre es "sep", "sept" o "sept.": siempre 3 letras y sin punto.
+  return { month: shortMonth.replace('.', '').slice(0, 3), day: String(day) };
 }
 
 /** `YYYY-MM-DD` como `dd/mm/aaaa`. */

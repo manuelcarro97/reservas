@@ -37,6 +37,15 @@ describe('time', () => {
     expect(calendarLeaf('2026-03-09')).toEqual({ month: 'mar', day: '9' });
   });
 
+  it('calendarLeafMonthIsAlwaysThreeLettersWithoutDot', () => {
+    // Según la versión de ICU, septiembre sale como "sep", "sept" o "sept.": la banda del calendario es de 3 letras.
+    expect(calendarLeaf('2026-09-15').month).toBe('sep');
+    for (let month = 1; month <= 12; month++) {
+      const iso = `2026-${String(month).padStart(2, '0')}-10`;
+      expect(calendarLeaf(iso).month).toMatch(/^[a-zñ]{3}$/);
+    }
+  });
+
   it('formatsDateAsDayMonthYear', () => {
     expect(formatDate('2030-01-05')).toBe('05/01/2030');
   });

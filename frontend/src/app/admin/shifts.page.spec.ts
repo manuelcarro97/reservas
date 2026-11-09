@@ -499,17 +499,20 @@ describe('ShiftsPage', () => {
     });
 
     it('eachClosedDayShowsACalendarLeafAndItsWeekday', async () => {
-      await open(PLAN, ['2026-11-12', '2026-12-24']);
+      // Un jueves y un viernes: el día de la semana distingue una fila de la otra.
+      await open(PLAN, ['2026-11-12', '2026-12-25']);
 
       const leaf = (index: number) => closureItems()[index].querySelector('.cal');
       expect(leaf(0)?.querySelector('small')?.textContent).toBe('nov');
       expect(leaf(0)?.querySelector('b')?.textContent).toBe('12');
       expect(leaf(1)?.querySelector('small')?.textContent).toBe('dic');
-      expect(leaf(1)?.querySelector('b')?.textContent).toBe('24');
+      expect(leaf(1)?.querySelector('b')?.textContent).toBe('25');
       // La hoja es decorativa: el día completo sigue en el texto.
       expect(leaf(0)?.getAttribute('aria-hidden')).toBe('true');
       expect(closureItems()[0].textContent).toContain('Jueves');
-      expect(closureItems()[1].textContent).toContain('Jueves');
+      expect(closureItems()[0].textContent).not.toContain('Viernes');
+      expect(closureItems()[1].textContent).toContain('Viernes');
+      expect(closureItems()[1].textContent).not.toContain('Jueves');
     });
 
     it('addAndRemoveClosure', async () => {
