@@ -124,7 +124,7 @@ La API se publica en Render (plan gratuito, Docker, `render.yaml`), el frontend 
 
 ## Límites de la v1
 
-Sin juntar mesas, turnos que cruzan medianoche, emails, pagos ni rate limiting. Hay un único administrador global.
+Sin juntar mesas, turnos que cruzan medianoche, emails ni pagos. El límite de peticiones es en memoria y de una sola instancia: por IP en las altas de reserva (10 por minuto) y en las consultas y cancelaciones por código (30 por minuto), y por usuario en las escrituras de la gestión. Hay un único administrador global.
 
 La comprobación de turnos solapados y de reservas al cerrar un día se hace en la aplicación, no en la base de datos: dos operaciones exactamente simultáneas podrían saltársela. Con un único administrador, el riesgo es asumible.
 
