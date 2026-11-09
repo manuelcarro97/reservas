@@ -283,6 +283,7 @@ describe('PlansPage', () => {
     expect(figure('Capacidad')!.querySelector('b')!.textContent).toBe('12');
     expect(figure('Turnos')!.querySelector('b')!.textContent).toBe('2');
     expect(figure('Turnos')!.textContent).toContain('Comida · Cena');
+    expect(figure('Turnos')!.querySelector('.sub')?.getAttribute('title')).toBe('Comida · Cena');
     expect(figure('Modo')!.querySelector('b')!.textContent).toBe('Elección libre');
     expect(figure('Modo')!.textContent).toContain('cancelación hasta 2 h antes');
     expect(featured()!.textContent).toContain('Tema · Azul');
@@ -463,8 +464,13 @@ describe('PlansPage', () => {
     await open(meWith([KAFE, TAPAS, CUSTOM]));
 
     expect(createForm()).toBeNull();
-    expect(page.querySelector('.free-slot')).toBeNull();
     expect(page.textContent).toContain('máximo de 3 planos');
+  });
+
+  it('noFreeSlotAtTheLimit', async () => {
+    await open(meWith([KAFE, TAPAS, CUSTOM]));
+
+    expect(page.querySelector('.free-slot')).toBeNull();
   });
 
   it('slugSuggestedFromName', async () => {
@@ -573,13 +579,18 @@ describe('PlansPage', () => {
     expect(createForm()).toBeNull();
   });
 
-  it('demoHidesCreateAndTheFreeSlot', async () => {
+  it('demoHidesCreateAndDeletePlan', async () => {
     await open(meWith([KAFE], { demo: true }));
 
     expect(planCards()).toHaveLength(1);
     expect(createForm()).toBeNull();
-    expect(page.querySelector('.free-slot')).toBeNull();
     expect(button('Borrar')).toBeUndefined();
     expect(page.textContent).toContain('demostración');
+  });
+
+  it('demoDoesNotOfferAFreeSlot', async () => {
+    await open(meWith([KAFE], { demo: true }));
+
+    expect(page.querySelector('.free-slot')).toBeNull();
   });
 });

@@ -67,7 +67,7 @@
                 </div>
                 <div class="fig">
                   <span class="kicker">Turnos</span><b>{{ f.shifts }}</b
-                  ><span class="sub truncate">{{ f.shiftNames }}</span>
+                  ><span class="sub truncate" [attr.title]="f.shiftNames">{{ f.shiftNames }}</span>
                 </div>
                 <div class="fig">
                   <span class="kicker">Modo</span><b class="txt">{{ f.mode }}</b>

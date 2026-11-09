@@ -29,7 +29,13 @@ import { PLAN_STATUS_LABELS } from './plan-status';
           >
         }
         <app-icon name="chev" />
-        <select name="plan" aria-label="Cambiar de plano" (change)="choose($event)">
+        <!-- El select cubre la caja: el nombre completo también va en su title, o el ratón nunca lo vería. -->
+        <select
+          name="plan"
+          aria-label="Cambiar de plano"
+          [attr.title]="label()"
+          (change)="choose($event)"
+        >
           @if (!current()) {
             <option value="" selected>Ir a un plano…</option>
           }

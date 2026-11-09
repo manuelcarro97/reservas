@@ -232,6 +232,8 @@ describe('AdminShellComponent', () => {
     const label = host.querySelector<HTMLElement>('.switcher .truncate');
     expect(label?.textContent?.trim()).toBe(name);
     expect(label?.getAttribute('title')).toBe(name);
+    // El select cubre la caja y recibe el ratón: el nombre completo tiene que estar también en él.
+    expect(switcher()!.getAttribute('title')).toBe(name);
   });
 
   it('tabsPointToTheCurrentPlan', async () => {

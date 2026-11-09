@@ -84,6 +84,11 @@
   margin-top: 14px;
 }
 
+/* Los nombres de los turnos pueden ser largos: en bloque para que el recorte con puntos suspensivos actúe. */
+.fig .sub.truncate {
+  display: block;
+}
+
 .actions {
   display: flex;
   flex: none;
