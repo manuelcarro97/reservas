@@ -1,4 +1,4 @@
-import { addDays, formatDate, todayIn } from './time';
+import { addDays, formatDate, longDateParts, todayIn } from './time';
 
 describe('time', () => {
   it('todayFollowsTheRestaurantZoneNotTheBrowser', () => {
@@ -24,6 +24,11 @@ describe('time', () => {
   it('addsDaysAcrossDaylightSavingChanges', () => {
     expect(addDays('2030-03-30', 2)).toBe('2030-04-01');
     expect(addDays('2030-10-26', 2)).toBe('2030-10-28');
+  });
+
+  it('longDateKeepsTheCalendarDayWhateverTheBrowserZoneIs', () => {
+    expect(longDateParts('2026-11-09')).toEqual({ weekday: 'Lunes', day: '9 de noviembre' });
+    expect(longDateParts('2026-03-01')).toEqual({ weekday: 'Domingo', day: '1 de marzo' });
   });
 
   it('formatsDateAsDayMonthYear', () => {

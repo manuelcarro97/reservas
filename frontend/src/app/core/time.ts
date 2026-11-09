@@ -40,6 +40,26 @@ export function addDays(isoDate: string, days: number): string {
   return `${moved.getUTCFullYear()}-${pad(moved.getUTCMonth() + 1)}-${pad(moved.getUTCDate())}`;
 }
 
+/**
+ * Fecha larga de un `YYYY-MM-DD` en dos partes: "Lunes" y "9 de noviembre". Se formatea en UTC desde el propio día
+ * de calendario (como `addDays`), así que la zona del navegador no la corre un día.
+ */
+export function longDateParts(isoDate: string): { weekday: string; day: string } {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = new Intl.DateTimeFormat('es-ES', { weekday: 'long', timeZone: 'UTC' }).format(
+    date,
+  );
+  return {
+    weekday: weekday.charAt(0).toUpperCase() + weekday.slice(1),
+    day: new Intl.DateTimeFormat('es-ES', {
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC',
+    }).format(date),
+  };
+}
+
 /** `YYYY-MM-DD` como `dd/mm/aaaa`. */
 export function formatDate(isoDate: string): string {
   const [year, month, day] = isoDate.split('-');

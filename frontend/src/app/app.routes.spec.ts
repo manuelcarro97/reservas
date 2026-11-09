@@ -156,7 +156,7 @@ describe('routes', () => {
           .forEach((request) => request.flush([]));
         await harness.fixture.whenStable();
         harness.detectChanges();
-        expect(host.textContent).toContain('Reservas · Kafé');
+        expect(host.textContent).toContain('Kafé / Reservas');
       } else if (href === '/panel/kafe/plano') {
         // El editor ya existe: pide el plano al abrirse (el interceptor espera al token, de ahí el await).
         await flushPromises();

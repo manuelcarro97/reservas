@@ -1,98 +1,334 @@
-h1 {
-  margin: 0 0 1rem;
-  font-size: 1.5rem;
+/* Disposición de Reservas. El aspecto común (hojas, botones, segmentado, estado, cifras, plano enmarcado) sale de styles/base.css. */
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 
-.state,
-.hint,
-.legend {
-  color: #5b6877;
+.state {
+  color: var(--muted);
 }
 
-/* Funcional y sobrio; el pulido visual llega en una tarea posterior. */
+.top {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.heading {
+  min-width: 0;
+}
+
+.fig b.warn {
+  color: var(--warn);
+}
+
 .toolbar {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.75rem 1.5rem;
-  margin-bottom: 0.75rem;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
-.shifts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  border: 0;
+.input.date {
+  width: auto;
+  font-family: var(--mono);
+}
+
+.toolbar .hint {
   margin: 0;
-  padding: 0;
 }
 
-.tabs {
+.spacer {
+  flex: 1;
+}
+
+.error,
+.notice {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-button[aria-pressed='true'] {
-  font-weight: 700;
-  outline: 2px solid #2f9e68;
-}
-
-.error {
-  color: #b3261e;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--bad);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 13px;
 }
 
 .notice {
-  color: #1f6f4a;
+  border-left-color: var(--ok);
 }
 
-.question,
-.assign {
-  border: 1px solid #c4ccd6;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
+.grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 540px;
+  gap: 22px;
+  min-height: 0;
 }
 
-.suggestions {
+/* Pendientes: sin plano, una sola columna centrada. */
+.grid.single {
+  grid-template-columns: minmax(0, 720px);
+  justify-content: center;
+}
+
+.board {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
 
-app-plano {
-  display: block;
-  max-width: 48rem;
+.board .drawing {
+  min-height: 240px;
 }
 
-.reservations {
-  list-style: none;
-  margin: 1rem 0 0;
+.legend {
+  display: flex;
+  flex: none;
+  gap: 16px;
+  align-items: center;
+  padding-top: 10px;
+  color: var(--muted);
+  font: 500 10.5px/1 var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sw {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.sw.free {
+  border: 1px solid var(--faint);
+  background: var(--paper);
+}
+
+.tip {
+  font: 12px/16px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* La lista hace scroll por dentro; la cabecera se queda arriba. */
+.list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
 }
 
-.reservation {
+.grid.single .list {
+  align-self: start;
+  max-height: 100%;
+}
+
+.list .state {
+  margin: 0;
+  padding: 14px 20px;
+}
+
+.head {
   display: flex;
-  flex-wrap: wrap;
+  flex: none;
+  gap: 12px;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 0.5rem;
-  border-bottom: 1px solid #e1e6ec;
-  padding: 0.6rem 0;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--rule);
 }
 
-.reservation.inactive {
-  color: #7a8696;
+.head b {
+  font: 400 22px/1.2 var(--serif);
 }
 
-.summary {
+ul {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.res {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--rule);
+  transition: background 0.15s;
+}
+
+.res:hover {
+  background: color-mix(in srgb, var(--wash) 45%, var(--paper));
+}
+
+.res.sel {
+  background: var(--blue-tint);
+  box-shadow: inset 2px 0 0 var(--blue);
+}
+
+.res.inactive {
+  color: var(--muted);
+}
+
+.empty {
+  padding: 14px 20px;
+}
+
+.time {
+  font: 500 17px/22px var(--mono);
+}
+
+.main {
+  min-width: 0;
+}
+
+.who {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.who .dot-state {
+  flex: none;
+}
+
+.meta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.contact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.phone {
+  color: var(--ink-2);
+  font: 12.5px/22px var(--mono);
+}
+
+.res.inactive .phone {
+  color: var(--muted);
+}
+
+.code {
+  color: var(--muted);
+  font: 11px/14px var(--mono);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 6px;
+  align-items: center;
+}
+
+.actions:not(:empty) {
+  margin-top: 10px;
+}
+
+.question,
+.assign {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.question {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--bad-soft);
+  background: color-mix(in srgb, var(--bad) 5%, var(--paper));
+  color: var(--ink);
+}
+
+.assign {
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink-2);
+}
+
+.assign p {
+  margin: 0 0 8px;
+}
+
+.assign .hint {
+  margin: 0 0 8px;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* Poca altura: cifras más compactas para dejar sitio al plano y a la lista. */
+@media (min-width: 1024px) and (max-height: 899px) {
+  .fig b {
+    font-size: 28px;
+    line-height: 30px;
+  }
+}
+
+/* Estrecha: una columna y la página hace scroll. */
+@media (max-width: 1023px) {
+  :host {
+    flex: none;
+  }
+
+  .grid,
+  .grid.single {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .board .drawing {
+    min-height: 320px;
+  }
+
+  .list,
+  ul {
+    overflow: visible;
+  }
+
+  .grid.single .list {
+    max-height: none;
+  }
+
+  .toolbar .spacer {
+    display: none;
+  }
 }

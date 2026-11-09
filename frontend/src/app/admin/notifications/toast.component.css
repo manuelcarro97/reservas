@@ -1,21 +1,26 @@
+/* Aviso oscuro con filete azul (maqueta v3). Sube sobre el pie para no taparlo. */
 .toasts {
   position: fixed;
-  right: 1rem;
-  bottom: 1rem;
+  right: var(--page-gutter);
+  bottom: 54px;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  max-width: min(24rem, calc(100vw - 2rem));
+  gap: 8px;
+  width: 360px;
+  max-width: calc(100vw - 2 * var(--page-gutter));
 }
 
 .toast {
   display: flex;
   align-items: stretch;
-  border: 1px solid #c4ccd6;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 4px 14px rgb(0 0 0 / 15%);
+  border-left: 3px solid var(--blue);
+  border-radius: 6px;
+  background: var(--ink);
+  box-shadow: 0 24px 40px -16px color-mix(in srgb, var(--ink) 45%, transparent);
+  color: color-mix(in srgb, var(--paper) 88%, var(--ink));
+  font-size: 13px;
+  animation: rise 0.4s both;
 }
 
 .toast-text,
@@ -29,12 +34,32 @@
 
 .toast-text {
   flex: 1;
-  padding: 0.7rem 0.9rem;
+  padding: 14px 16px;
   text-align: left;
 }
 
 .toast-close {
-  padding: 0 0.8rem;
-  font-size: 1.25rem;
+  padding: 0 14px;
+  font-size: 20px;
   line-height: 1;
+  opacity: 0.75;
+}
+
+.toast-text:hover,
+.toast-close:hover {
+  color: var(--paper);
+  opacity: 1;
+}
+
+/* Sobre el fondo oscuro el anillo de foco azul no se vería: se pasa a blanco. */
+.toast-text:focus-visible,
+.toast-close:focus-visible {
+  outline-color: var(--paper);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
 }

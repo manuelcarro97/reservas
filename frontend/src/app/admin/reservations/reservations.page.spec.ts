@@ -231,6 +231,16 @@ describe('ReservationsPage', () => {
     return found;
   }
 
+  /** Hora de llegada que enseña la fila (o el guion si la reserva no tiene). */
+  function timeOf(name: string): string {
+    return row(name).querySelector('.time .hour')?.textContent?.trim() ?? '';
+  }
+
+  /** Texto del encabezado (`eyebrow`) con los espacios normalizados. */
+  function eyebrowText(): string {
+    return (page.querySelector('.eyebrow')?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  }
+
   function button(scope: ParentNode, name: string): HTMLButtonElement {
     const found = Array.from(scope.querySelectorAll('button')).find(
       (candidate) => candidate.textContent?.trim() === name,
@@ -291,17 +301,17 @@ describe('ReservationsPage', () => {
       'Ana',
       'Marta',
     ]);
-    expect(row('Luis').textContent).toContain('20:30 · Cena');
-    expect(row('Ana').textContent).toContain('21:30 · Cena');
-    // Sin hora (reserva anterior a la hora de llegada) va la última, solo con el turno.
-    expect(row('Marta').textContent).toContain('Cena');
-    expect(row('Marta').textContent).not.toMatch(/\d{2}:\d{2} · Cena/);
+    expect(timeOf('Luis')).toBe('20:30');
+    expect(timeOf('Ana')).toBe('21:30');
+    // Sin hora (reserva anterior a la hora de llegada) va la última, con un guion en lugar de la hora.
+    expect(timeOf('Marta')).toBe('—');
+    expect(row('Marta').textContent).not.toMatch(/\d{2}:\d{2}/);
   });
 
   it('showsAnArrivalTimeOutsideTheCurrentGridAsIs', async () => {
     await open({ day: [{ ...ANA, arrivalTime: '03:15:00' }] });
 
-    expect(row('Ana').textContent).toContain('03:15 · Cena');
+    expect(timeOf('Ana')).toBe('03:15');
   });
 
   it('defaultsToTodayInTheTimeZoneOfThePlan', async () => {
@@ -430,16 +440,16 @@ describe('ReservationsPage', () => {
     await settle();
     page = harness.routeNativeElement as HTMLElement;
 
-    expect(button(page, 'Pendientes (1)')).toBeTruthy();
-    expect(page.textContent).toContain('Reservas · Otro');
+    expect(button(page, 'Pendientes · 1')).toBeTruthy();
+    expect(eyebrowText()).toBe('Otro / Reservas');
   });
 
   it('pendingTabListsEveryPendingReservationWithItsDate', async () => {
     const later = { ...ANA, id: 9, date: '2026-11-15', customerName: 'Zoe' };
     await open({ day: [LUIS], pending: [later, ANA] });
 
-    expect(button(page, 'Pendientes (2)')).toBeTruthy();
-    await click(page, 'Pendientes (2)');
+    expect(button(page, 'Pendientes · 2')).toBeTruthy();
+    await click(page, 'Pendientes · 2');
 
     expect(rows().map((item) => item.querySelector('.name')?.textContent?.trim())).toEqual([
       'Ana',
@@ -447,6 +457,173 @@ describe('ReservationsPage', () => {
     ]);
     expect(row('Zoe').textContent).toContain('15/11/2026');
     expect(page.querySelector('app-plano')).toBeNull();
+  });
+
+  /** Cifras de la cabecera, por su etiqueta. */
+  function figures(): Record<string, string> {
+    return Object.fromEntries(
+      Array.from(page.querySelectorAll('.figures .fig')).map((fig) => [
+        fig.querySelector('.kicker')?.textContent?.trim() ?? '',
+        fig.querySelector('b')?.textContent?.trim() ?? '',
+      ]),
+    );
+  }
+
+  function title(): string {
+    return (page.querySelector('h1')?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+  it('titleIsTheLongDateInThePlanZone', async () => {
+    await open();
+    expect(title()).toBe('Martes, 10 de noviembre');
+
+    const input = page.querySelector<HTMLInputElement>('input[type="date"]') as HTMLInputElement;
+    input.value = '2026-11-09';
+    input.dispatchEvent(new Event('change'));
+    await settle();
+    expectDay('2026-11-09').flush([]);
+    expectOccupancy('2026-11-09', 11).flush(OCCUPANCY);
+    await settle();
+
+    expect(title()).toBe('Lunes, 9 de noviembre');
+  });
+
+  it('titleDoesNotShiftWestOfUtc', async () => {
+    // 23:30 UTC del 9: en Nueva York es el 9 a las 18:30. El título no puede correrse al día 8.
+    await open({ plan: { ...PLAN, timeZone: 'America/New_York' }, date: '2026-11-09' });
+
+    expect(title()).toBe('Lunes, 9 de noviembre');
+  });
+
+  it('eyebrowNamesThePlanAndTruncatesALongOne', async () => {
+    const longName = 'Restaurante '.repeat(10).trim();
+    await open({ plan: { ...PLAN, name: longName } });
+
+    const name = page.querySelector<HTMLElement>('.eyebrow .truncate');
+    expect(name?.textContent?.trim()).toBe(longName);
+    expect(name?.getAttribute('title')).toBe(longName);
+    expect(eyebrowText()).toBe(`${longName} / Reservas`);
+  });
+
+  it('figuresFollowTheSelectedShift', async () => {
+    const cancelled: AdminReservation = { ...LUIS, id: 20, status: 'CANCELLED', partySize: 8 };
+    await open({ plan: TWO_SHIFTS, day: [PEPE, LUIS, ANA, cancelled] });
+
+    // Comida: solo Pepe (2 personas, confirmada); de las 3 mesas, 2 ocupadas.
+    expect(figures()).toEqual({
+      Reservas: '1',
+      Comensales: '2',
+      Pendientes: '0',
+      'Mesas libres': '1',
+    });
+
+    await click(page, 'Cena · 20:00');
+    // Mientras llega la ocupación del turno nuevo no se sabe cuántas mesas hay libres.
+    expect(figures()['Mesas libres']).toBe('—');
+    expectOccupancy(TODAY, 11).flush([
+      { tableId: 1, label: '1', seats: 2, occupied: false },
+      { tableId: 2, label: '2', seats: 4, occupied: false },
+      { tableId: 3, label: '3', seats: 6, occupied: true },
+    ]);
+    await settle();
+
+    // Cena: Luis (6, confirmada) y Ana (4, pendiente); la cancelada no cuenta.
+    expect(figures()).toEqual({
+      Reservas: '2',
+      Comensales: '10',
+      Pendientes: '1',
+      'Mesas libres': '2',
+    });
+  });
+
+  it('pendingTabIsSingleColumn', async () => {
+    await open({ day: [LUIS], pending: [ANA] });
+    expect(page.querySelector('.grid')).not.toBeNull();
+    expect(page.querySelector('.single')).toBeNull();
+
+    await click(page, 'Pendientes · 1');
+
+    expect(page.querySelector('.grid.single')).not.toBeNull();
+    expect(page.querySelector('app-plano')).toBeNull();
+    expect(rows()).toHaveLength(1);
+  });
+
+  it('longCustomerNameIsTruncated', async () => {
+    const longName = 'Cliente con un nombre larguísimo '.repeat(5).trim();
+    await open({ day: [{ ...LUIS, customerName: longName }] });
+
+    const name = row(longName).querySelector<HTMLElement>('.name');
+    expect(name?.classList).toContain('truncate');
+    expect(name?.getAttribute('title')).toBe(longName);
+    expect(name?.textContent?.trim()).toBe(longName);
+  });
+
+  it('questionAndAssignLiveInTheirRow', async () => {
+    await open({ day: [LUIS, MARTA], pending: [MARTA] });
+
+    await click(row('Luis'), 'Cancelar');
+    expect(row('Luis').querySelector('.question')?.textContent).toContain(
+      '¿Cancelar la reserva de Luis?',
+    );
+    expect(row('Marta').querySelector('.question')).toBeNull();
+
+    // Pedir mesa para Marta cierra la pregunta de Luis y abre la elección dentro de la fila de Marta.
+    await click(row('Marta'), 'Asignar mesa');
+    request('GET', '/api/v1/admin/reservations/3/suggestions').flush([
+      { tableId: 1, label: '1', seats: 2 },
+    ]);
+    await settle();
+
+    expect(row('Luis').querySelector('.question')).toBeNull();
+    expect(row('Luis').querySelector('.assign')).toBeNull();
+    expect(row('Marta').querySelector('.assign')?.textContent).toContain('Marta');
+    expect(
+      Array.from(row('Marta').querySelectorAll('.assign .suggestions button')).map((item) =>
+        item.textContent?.trim(),
+      ),
+    ).toEqual(['Mesa 1 · 2 plazas']);
+    expect(row('Marta').classList).toContain('sel');
+    expect(row('Luis').classList).not.toContain('sel');
+  });
+
+  it('theAssignmentShowsInsideItsRowInThePendingTabToo', async () => {
+    const far: AdminReservation = { ...MARTA, id: 7, date: '2026-11-15', customerName: 'Zoe' };
+    await open({ day: [], pending: [far] });
+
+    await click(page, 'Pendientes · 1');
+    await click(row('Zoe'), 'Rechazar');
+
+    expect(row('Zoe').querySelector('.question')?.textContent).toContain(
+      '¿Rechazar la reserva de Zoe?',
+    );
+  });
+
+  it('showsTheStateOfEachReservationAsADotWithText', async () => {
+    await open({
+      day: [
+        ANA,
+        LUIS,
+        { ...MARTA, status: 'NO_SHOW' },
+        { ...PEPE, shiftId: 11, status: 'CANCELLED' },
+      ],
+    });
+
+    const state = (name: string) => row(name).querySelector('.dot-state') as HTMLElement;
+    expect(state('Ana').textContent?.trim()).toBe('Pendiente');
+    expect(state('Ana').classList).toContain('pend');
+    expect(state('Luis').textContent?.trim()).toBe('Confirmada');
+    expect(state('Luis').classList).toContain('conf');
+    expect(state('Marta').classList).toContain('gone');
+    expect(state('Pepe').textContent?.trim()).toBe('Cancelada');
+  });
+
+  it('theLegendNamesTheStatesOfATable', async () => {
+    await open({ day: [LUIS] });
+
+    const legend = (page.querySelector('.legend')?.textContent ?? '').replace(/\s+/g, ' ');
+    expect(legend).toContain('Libre');
+    expect(legend).toContain('Pendiente');
+    expect(legend).toContain('Confirmada');
   });
 
   it('confirmOpensWhatsapp', async () => {
@@ -561,7 +738,7 @@ describe('ReservationsPage', () => {
     const far: AdminReservation = { ...MARTA, id: 7, date: '2026-11-15', customerName: 'Zoe' };
     await open({ day: [], pending: [far] });
 
-    await click(page, 'Pendientes (1)');
+    await click(page, 'Pendientes · 1');
     await click(row('Zoe'), 'Asignar mesa');
 
     expect(page.querySelector<HTMLInputElement>('input[type="date"]')?.value).toBe('2026-11-15');
@@ -631,7 +808,7 @@ describe('ReservationsPage', () => {
     expect(openWindow).not.toHaveBeenCalled();
     // La fila ya no tiene acciones; "No presentado" es ahora su estado.
     expect(row('Luis').querySelectorAll('button').length).toBe(0);
-    expect(row('Luis').querySelector('.status')?.textContent).toContain('No presentado');
+    expect(row('Luis').querySelector('.dot-state')?.textContent).toContain('No presentado');
   });
 
   it('masksOfTheDemoAccountGetNoWhatsappButTheActionStillRuns', async () => {
@@ -965,7 +1142,7 @@ describe('ReservationsPage', () => {
     expect(link?.getAttribute('target')).toBe('_blank');
     expect(link?.getAttribute('rel')).toBe('noopener');
 
-    await click(page, 'Pendientes (0)');
+    await click(page, 'Pendientes · 0');
 
     expect(page.querySelector('a.whatsapp')).toBeNull();
   });
