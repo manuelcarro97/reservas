@@ -1,12 +1,22 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { longDateParts } from '../../core/time';
 import { MeStore } from '../me.store';
 import { FeedService } from '../notifications/feed.service';
+import { ReservationActions } from '../reservations/reservation-actions';
+import { HomePendingComponent } from './home-pending.component';
 import { HomePlanCardComponent } from './home-plan-card.component';
+import { HomeSettingsComponent } from './home-settings.component';
 import { shiftLoad, todayFigures } from './home-figures';
 import { HomeStore } from './home.store';
 
@@ -20,19 +30,15 @@ function durationText(minutes: number): string {
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
 
-/** "la" o "el" para el nombre de un turno ("la cena", "el desayuno"): los nombres los pone el dueño. */
-function articleOf(shiftName: string): string {
-  return shiftName.trim().toLowerCase().endsWith('a') ? 'la' : 'el';
-}
-
 /**
- * `/panel/:slug/inicio`: la entrada por defecto del panel, un resumen del día del plano actual: las cifras de hoy
- * y la tarjeta del plano. Cada parte se lee por su lado y, si falla, solo ella lo dice.
+ * `/panel/:slug/inicio`: la entrada por defecto del panel, un resumen del día del plano actual: las cifras de hoy,
+ * la tarjeta del plano, las pendientes con sus acciones y la configuración. Cada parte se lee por su lado y, si
+ * falla, solo ella lo dice.
  */
 @Component({
   selector: 'app-home-page',
-  imports: [HomePlanCardComponent, RouterLink],
-  providers: [HomeStore],
+  imports: [HomePendingComponent, HomePlanCardComponent, HomeSettingsComponent, RouterLink],
+  providers: [HomeStore, ReservationActions],
   templateUrl: './home.page.html',
   styleUrl: './home.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -72,6 +78,18 @@ export class HomePage {
     later: this.store.pendingLater().length,
   }));
 
+  /** Primer cierre de hoy en adelante, para la tarjeta de configuración. */
+  protected readonly nextClosure = computed(
+    () => [...this.store.upcomingClosures()].sort()[0] ?? null,
+  );
+  protected readonly closureStatus = computed(() =>
+    this.store.partFailed().has('closures')
+      ? 'failed'
+      : this.store.partLoading().has('closures')
+        ? 'loading'
+        : 'ready',
+  );
+
   /** Las dos últimas cifras: el próximo turno y las mesas libres en él. `null` si no hay próximo turno. */
   protected readonly nextShift = computed(() => {
     const next = this.store.next();
@@ -83,12 +101,13 @@ export class HomePage {
     const weekday = longDateParts(next.date).weekday;
     const rows = next.day === 'today' ? this.store.todayRows() : this.store.nextRows();
     const load = rows === null ? null : shiftLoad(rows, next.shift, this.store.tableCount());
+    // El nombre del turno va tal cual, sin artículo: lo pone el dueño ("Cena", "Noche", "Mediodía").
     const when =
       next.day === 'today'
         ? ''
         : next.day === 'tomorrow'
-          ? ' mañana'
-          : ` el ${weekday.toLowerCase()}`;
+          ? 'mañana, '
+          : `${weekday.toLowerCase()}, `;
     return {
       value:
         next.day === 'today'
@@ -98,7 +117,7 @@ export class HomePage {
         next.minutesToStart === null
           ? 'hoy no quedan turnos'
           : `empieza en ${durationText(next.minutesToStart)}`,
-      freeKicker: `Mesas libres${when} en ${articleOf(name)} ${name.toLowerCase()}`,
+      freeKicker: `Mesas libres · ${when}${name}`,
       load,
       free: load === null ? 0 : load.total - load.occupied,
       occupancy:
@@ -121,6 +140,15 @@ export class HomePage {
           this.store.refresh();
         }
       });
+  }
+
+  private readonly pendingCard = viewChild(HomePendingComponent, { read: ElementRef });
+
+  /** La cifra Pendientes lleva a su tarjeta: se desplaza hasta ella y le da el foco (no es un `href="#…"`: `<base href="/">`). */
+  protected goToPending(): void {
+    const card = this.pendingCard()?.nativeElement as HTMLElement | undefined;
+    card?.scrollIntoView({ block: 'nearest' });
+    card?.focus();
   }
 
   protected retry(): void {

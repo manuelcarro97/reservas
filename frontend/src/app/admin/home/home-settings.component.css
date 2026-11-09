@@ -1,0 +1,85 @@
+/* Disposición de la tarjeta "Configuración". El aspecto común (hoja, campos) sale de styles/base.css. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sheet-head {
+  flex: none;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.sheet-title {
+  font: 400 24px/28px var(--serif);
+}
+
+.more,
+.link {
+  color: var(--blue-deep);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.more {
+  font-size: 13px;
+}
+
+.more:hover,
+.link:hover {
+  text-decoration: underline;
+}
+
+/* Lista de valores: nombre a la izquierda, valor a la derecha, un filete entre filas. */
+.settings {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+}
+
+.settings > div {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.settings dt {
+  color: var(--muted);
+}
+
+.settings dd {
+  margin: 0;
+  font-weight: 500;
+  text-align: right;
+}
+
+.warn {
+  color: var(--warn);
+}
+
+/* "Copiar código" es un botón que se ve como un enlace. */
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.copy-status {
+  margin-right: 10px;
+  color: var(--ok);
+  font: 500 11px/1 var(--mono);
+  text-transform: uppercase;
+}
+
+.snippet {
+  flex: none;
+  margin-top: 10px;
+  resize: none;
+}

@@ -2,9 +2,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { Subject } from 'rxjs';
+import type { Mock } from 'vitest';
 import { ApiConfiguration } from '../../core/api/api-configuration';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { FeedEvent } from '../../core/api/models/feed-event';
@@ -12,6 +13,7 @@ import { PlanResponse } from '../../core/api/models/plan-response';
 import { ShiftResponse } from '../../core/api/models/shift-response';
 import { OPEN_WINDOW } from '../../core/open-window';
 import { NOW } from '../../core/time';
+import { embedSnippet } from '../embed-snippet';
 import { MeStore } from '../me.store';
 import { FeedService } from '../notifications/feed.service';
 import { HomePage } from './home.page';
@@ -80,6 +82,10 @@ function reservation(extra: Partial<AdminReservation>): AdminReservation {
     shiftId: CENA.id,
     partySize: 2,
     arrivalTime: '20:30:00',
+    // Un móvil de verdad: sin él `Confirmar` y `Rechazar` no abrirían WhatsApp.
+    customerPhone: '612 345 678',
+    // El servidor manda el nombre de la mesa junto a su id: aquí es el propio id.
+    tableLabel: extra.tableId === undefined ? undefined : String(extra.tableId),
     ...extra,
   };
 }
@@ -111,8 +117,23 @@ const CANCELLED = reservation({ id: 6, status: 'CANCELLED', tableId: 7, partySiz
 /** 5 activas (1 pendiente) con 17 comensales; la cena ocupa 3 de 9 mesas. */
 const TODAY_ROWS = [ANA, PEPE, MARTA, JUAN, LUIS, CANCELLED];
 
-const PEDRO = reservation({ id: 7, customerName: 'Pedro', status: 'PENDING', date: '2026-11-13' });
-const JORGE = reservation({ id: 8, customerName: 'Jorge', status: 'PENDING', date: '2026-11-14' });
+const PEDRO = reservation({
+  id: 7,
+  customerName: 'Pedro',
+  status: 'PENDING',
+  date: '2026-11-13',
+  arrivalTime: '21:30:00',
+  tableId: 7,
+});
+const JORGE = reservation({
+  id: 8,
+  customerName: 'Jorge',
+  status: 'PENDING',
+  date: '2026-11-14',
+  arrivalTime: '22:30:00',
+  partySize: 4,
+  tableId: 8,
+});
 /** 1 pendiente hoy y 2 en los días siguientes. */
 const PENDING_ROWS = [LUIS, PEDRO, JORGE];
 
@@ -129,9 +150,16 @@ describe('HomePage', () => {
   let page: HTMLElement;
   let feedEvents: Subject<FeedEvent>;
   let clock: Date;
+  let openWindow: Mock<(url: string) => void>;
+  let meRefresh: Mock<() => void>;
+  /** Lo que el `MeStore` falso contesta; cada test lo cambia antes de `open()`. */
+  let account: { demo: boolean; telegramAvailable: boolean; telegramLinked: boolean };
 
   beforeEach(() => {
     clock = CLOCK;
+    openWindow = vi.fn<(url: string) => void>();
+    meRefresh = vi.fn<() => void>();
+    account = { demo: false, telegramAvailable: false, telegramLinked: false };
     feedEvents = new Subject<FeedEvent>();
     TestBed.configureTestingModule({
       providers: [
@@ -144,19 +172,19 @@ describe('HomePage', () => {
           { path: 'panel/:slug/ajustes', component: Stub },
         ]),
         { provide: NOW, useValue: () => clock },
-        { provide: OPEN_WINDOW, useValue: vi.fn() },
+        { provide: OPEN_WINDOW, useFactory: () => openWindow },
         { provide: FeedService, useValue: { events: feedEvents.asObservable() } },
         {
           provide: MeStore,
           useValue: {
-            demo: () => false,
-            telegramAvailable: () => false,
-            me: () => null,
+            demo: () => account.demo,
+            telegramAvailable: () => account.telegramAvailable,
+            me: () => ({ telegramLinked: account.telegramLinked }),
             plans: () => [
               { slug: 'kafe', name: 'Kafé del Puerto' },
               { slug: 'otro', name: 'Otro' },
             ],
-            refresh: vi.fn(),
+            refresh: () => meRefresh(),
           },
         },
       ],
@@ -295,7 +323,7 @@ describe('HomePage', () => {
       { kicker: 'Comensales', value: '17', sub: 'de 34 plazas por turno' },
       { kicker: 'Pendientes', value: '3', sub: '1 hoy · 2 próximos días' },
       { kicker: 'Próximo turno', value: 'Cena · 20:00', sub: 'empieza en 2 h 40 min' },
-      { kicker: 'Mesas libres en la cena', value: '6 / 9', sub: 'ocupación 33 %' },
+      { kicker: 'Mesas libres · Cena', value: '6 / 9', sub: 'ocupación 33 %' },
     ]);
   });
 
@@ -344,7 +372,7 @@ describe('HomePage', () => {
       sub: 'hoy no quedan turnos',
     });
     expect(figures()[4]).toEqual({
-      kicker: 'Mesas libres mañana en la comida',
+      kicker: 'Mesas libres · mañana, Comida',
       value: '8 / 9',
       sub: 'ocupación 11 %',
     });
@@ -364,7 +392,7 @@ describe('HomePage', () => {
 
     expect(figures()[3].value).toBe('Miércoles · Comida 13:00');
     expect(figures()[4]).toEqual({
-      kicker: 'Mesas libres el miércoles en la comida',
+      kicker: 'Mesas libres · miércoles, Comida',
       value: '9 / 9',
       sub: 'sin reservas aún',
     });
@@ -386,7 +414,7 @@ describe('HomePage', () => {
     await open({ today: [MARTA, JUAN, withoutTable], pending: [] });
 
     expect(figures()[4]).toEqual({
-      kicker: 'Mesas libres en la cena',
+      kicker: 'Mesas libres · Cena',
       value: '7 / 9',
       sub: 'ocupación 22 % · 1 sin mesa',
     });
@@ -576,5 +604,419 @@ describe('HomePage', () => {
     await flushReads({ today: [ANA] });
 
     expect(figures()[0].value).toBe('1');
+  });
+
+  describe('pendientes', () => {
+    /** La fila de una pendiente, por el nombre del cliente. */
+    function row(name: string): HTMLElement {
+      const found = Array.from(page.querySelectorAll<HTMLElement>('#pendientes .row')).find(
+        (item) => normalized(item.textContent).includes(name),
+      );
+      if (!found) {
+        throw new Error(`No hay fila de ${name}`);
+      }
+      return found;
+    }
+
+    function rowButton(name: string, label: string): HTMLButtonElement | undefined {
+      return Array.from(row(name).querySelectorAll('button')).find(
+        (candidate) => normalized(candidate.textContent) === label,
+      );
+    }
+
+    async function click(target: HTMLElement | undefined): Promise<void> {
+      target!.click();
+      await settle();
+    }
+
+    function post(id: number, action: 'confirm' | 'cancel') {
+      return request('POST', `/api/v1/admin/reservations/${id}/${action}`);
+    }
+
+    /** Lo que el servidor devuelve al confirmar o rechazar: la reserva con su turno. */
+    function details(source: AdminReservation, status: string): Record<string, unknown> {
+      return {
+        code: 'ABC123',
+        date: source.date,
+        status,
+        shiftId: source.shiftId,
+        shiftName: 'Cena',
+        arrivalTime: source.arrivalTime,
+        partySize: source.partySize,
+        restaurantName: 'Kafé del Puerto',
+        slug: 'kafe',
+        tableLabel: source.tableLabel,
+      };
+    }
+
+    it('pendingSplitTodayAndLater', async () => {
+      await open();
+
+      const groups = Array.from(page.querySelectorAll('#pendientes .group')).map((group) =>
+        normalized(group.textContent),
+      );
+      expect(groups).toEqual(['Hoy 1', 'Próximos días 2']);
+
+      // La de hoy lleva la hora y el aviso de que caduca; las de otros días, la fecha.
+      expect(normalized(row('Luis Ejemplo').querySelector('.time')?.textContent)).toBe('20:30');
+      expect(normalized(row('Luis Ejemplo').querySelector('.meta')?.textContent)).toBe(
+        'Cena · 6 personas · Mesa 6',
+      );
+      expect(normalized(row('Luis Ejemplo').querySelector('.deadline')?.textContent)).toBe(
+        'Se cancela sola a las 20:00 si no la confirmas',
+      );
+      expect(row('Luis Ejemplo').classList).toContain('urgent');
+      expect(page.querySelectorAll('#pendientes .deadline').length).toBe(1);
+
+      expect(normalized(row('Pedro').querySelector('.date')?.textContent)).toBe('13vie');
+      expect(normalized(row('Jorge').querySelector('.date')?.textContent)).toBe('14sáb');
+      expect(normalized(row('Pedro').querySelector('.meta')?.textContent)).toBe(
+        'Cena 21:30 · 2 personas · Mesa 7',
+      );
+      expect(row('Pedro').classList).not.toContain('urgent');
+    });
+
+    it('pendingCardWaitsForItsRead', async () => {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+
+      expect(text('#pendientes')).toContain('Cargando…');
+      expect(text('#pendientes')).not.toContain('Todo al día');
+
+      await flushReads({});
+      expect(text('#pendientes')).not.toContain('Cargando…');
+    });
+
+    it('confirmFromHome', async () => {
+      await open();
+
+      await click(rowButton('Luis Ejemplo', 'Confirmar'));
+      post(5, 'confirm').flush(details(LUIS, 'CONFIRMED'));
+      await settle();
+
+      // Se avisa al cliente por WhatsApp y se vuelven a leer hoy y las pendientes.
+      expect(openWindow).toHaveBeenCalledTimes(1);
+      expect(openWindow).toHaveBeenCalledWith(expect.stringContaining('https://wa.me/34612345678'));
+      await flushReads({ today: [ANA, { ...LUIS, status: 'CONFIRMED' }], pending: [PEDRO, JORGE] });
+
+      expect(text('#pendientes [role="status"]')).toContain('Reserva de Luis Ejemplo confirmada.');
+      expect(link('Abrir WhatsApp')?.getAttribute('href')).toContain('https://wa.me/');
+      expect(figures()[2].value).toBe('2');
+      expect(button('Confirmar')).toBeDefined();
+      expect(page.querySelector('#pendientes .group')?.textContent).toContain('Próximos días');
+    });
+
+    it('rejectAsksFirstThenOpensWhatsapp', async () => {
+      await open();
+
+      await click(rowButton('Luis Ejemplo', 'Rechazar'));
+      // Antes de llamar a la API se pregunta, en la propia fila.
+      http.expectNone((candidate) => candidate.method === 'POST');
+      expect(normalized(row('Luis Ejemplo').querySelector('.confirm-box')?.textContent)).toContain(
+        '¿Rechazar la reserva de Luis Ejemplo?',
+      );
+      expect(openWindow).not.toHaveBeenCalled();
+
+      await click(rowButton('Luis Ejemplo', 'Sí, rechazar'));
+      post(5, 'cancel').flush(details(LUIS, 'CANCELLED'));
+      await settle();
+
+      expect(openWindow).toHaveBeenCalledWith(expect.stringContaining('https://wa.me/'));
+      await flushReads({ pending: [PEDRO, JORGE] });
+      expect(text('#pendientes [role="status"]')).toContain('Reserva de Luis Ejemplo rechazada.');
+    });
+
+    it('declineRejectLeavesEverythingAsIs', async () => {
+      await open();
+
+      await click(rowButton('Luis Ejemplo', 'Rechazar'));
+      await click(rowButton('Luis Ejemplo', 'No'));
+
+      expect(row('Luis Ejemplo').querySelector('.confirm-box')).toBeNull();
+      http.expectNone((candidate) => candidate.method === 'POST');
+    });
+
+    it('demoConfirmsWithoutWhatsapp', async () => {
+      account.demo = true;
+      await open();
+
+      await click(rowButton('Luis Ejemplo', 'Confirmar'));
+      post(5, 'confirm').flush(details(LUIS, 'CONFIRMED'));
+      await settle();
+      await flushReads({ pending: [PEDRO, JORGE] });
+
+      expect(openWindow).not.toHaveBeenCalled();
+      expect(link('Abrir WhatsApp')).toBeUndefined();
+      expect(text('#pendientes [role="status"]')).toContain('Reserva de Luis Ejemplo confirmada.');
+    });
+
+    it('withoutTableShowsAssign', async () => {
+      const withoutTable = { ...LUIS, tableId: undefined, tableLabel: undefined };
+      await open({ pending: [withoutTable] });
+
+      expect(rowButton('Luis Ejemplo', 'Confirmar')).toBeUndefined();
+      expect(normalized(row('Luis Ejemplo').querySelector('.meta')?.textContent)).toBe(
+        'Cena · 6 personas · sin mesa',
+      );
+
+      await click(rowButton('Luis Ejemplo', 'Asignar mesa'));
+      await harness.fixture.whenStable();
+
+      http.expectNone((candidate) => candidate.method === 'POST');
+      expect(TestBed.inject(Router).url).toBe('/panel/kafe?fecha=2026-11-09&reserva=5');
+    });
+
+    it('staleReservationReloadsTheList', async () => {
+      await open();
+
+      await click(rowButton('Luis Ejemplo', 'Confirmar'));
+      post(5, 'confirm').flush(
+        { code: 'INVALID_TRANSITION' },
+        { status: 409, statusText: 'Conflict' },
+      );
+      await settle();
+
+      // Otro dispositivo ya la cambió: se avisa y se vuelven a leer las pendientes.
+      await flushReads({ today: [ANA, { ...LUIS, status: 'CANCELLED' }], pending: [PEDRO, JORGE] });
+      expect(text('#pendientes [role="alert"]')).toBe(
+        'Esa reserva ya no admite esa acción. Se ha actualizado la lista.',
+      );
+      expect(openWindow).not.toHaveBeenCalled();
+      expect(page.textContent).not.toContain('Luis Ejemplo');
+      // Sin `busy`: se puede seguir confirmando las demás.
+      expect(rowButton('Pedro', 'Confirmar')?.disabled).toBe(false);
+    });
+
+    it('buttonsAreDisabledWhileAnActionIsInFlight', async () => {
+      await open();
+
+      await click(rowButton('Luis Ejemplo', 'Confirmar'));
+
+      expect(rowButton('Pedro', 'Confirmar')?.disabled).toBe(true);
+      post(5, 'confirm').flush(details(LUIS, 'CONFIRMED'));
+      await settle();
+      await flushReads({});
+    });
+
+    it('noPendingShowsAllClear', async () => {
+      await open({ today: [ANA, MARTA], pending: [] });
+
+      expect(text('#pendientes')).toContain('Todo al día');
+      expect(text('#pendientes')).toContain('No hay reservas esperando confirmación.');
+      expect(figures()[2]).toEqual({ kicker: 'Pendientes', value: '0', sub: 'todo al día' });
+      expect(link('Ver en Reservas →')).toBeUndefined();
+      expect(page.querySelector('#pendientes .group')).toBeNull();
+    });
+
+    it('draftWithoutReservationsShowsPublishNotice', async () => {
+      await open({ plan: { ...PLAN, status: 'DRAFT' }, today: [], pending: [] });
+
+      const card = page.querySelector('#pendientes') as HTMLElement;
+      expect(normalized(card.querySelector('.callout')?.textContent)).toContain(
+        'Tu plano está en borrador.',
+      );
+      expect(normalized(card.textContent)).toContain('Los clientes aún no pueden reservar');
+      expect(
+        Array.from(card.querySelectorAll('button')).map((item) => normalized(item.textContent)),
+      ).toEqual(['Publicar plano']);
+      expect(
+        Array.from(card.querySelectorAll('a')).find(
+          (item) => normalized(item.textContent) === 'Editar plano',
+        )?.href,
+      ).toContain('/panel/kafe/plano');
+      expect(card.textContent).not.toContain('Todo al día');
+      // El aviso no es un error: la única alerta posible es la de una lectura que falla.
+      expect(card.querySelector('[role="alert"]')).toBeNull();
+    });
+
+    it('draftWithReservationsKeepsTheList', async () => {
+      await open({ plan: { ...PLAN, status: 'DRAFT' } });
+
+      const card = page.querySelector('#pendientes') as HTMLElement;
+      expect(normalized(card.querySelector('.callout')?.textContent)).toContain(
+        'Tu plano está en borrador.',
+      );
+      // La lista y las cifras son las reales; el aviso va encima.
+      expect(card.querySelectorAll('.row').length).toBe(3);
+      expect(figures()[2].value).toBe('3');
+      const notice = card.querySelector('.callout') as HTMLElement;
+      const list = card.querySelector('.pending-list') as HTMLElement;
+      expect(notice.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('publishFromHome', async () => {
+      await open({ plan: { ...PLAN, status: 'DRAFT' }, today: [], pending: [] });
+
+      await click(button('Publicar plano'));
+      expect(button('Publicar plano')?.disabled).toBe(true);
+      request('POST', `${base()}/publish`).flush({ ...PLAN, status: 'PUBLISHED' });
+      await settle();
+
+      // El plano ya está publicado: sin aviso, con "Todo al día", y el selector de la cabecera se actualiza.
+      expect(meRefresh).toHaveBeenCalledTimes(1);
+      expect(page.querySelector('#pendientes .callout')).toBeNull();
+      expect(text('#pendientes')).toContain('Todo al día');
+      expect(normalized(page.querySelector('app-home-plan-card .dot-state')?.textContent)).toBe(
+        'Publicado',
+      );
+      expect(link('Ver página pública')).toBeDefined();
+    });
+
+    it('publishFailureShowsItsMessage', async () => {
+      await open({ plan: { ...PLAN, status: 'DRAFT' }, today: [], pending: [] });
+
+      await click(button('Publicar plano'));
+      request('POST', `${base()}/publish`).flush(
+        { code: 'PLAN_NOT_PUBLISHABLE' },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+      await settle();
+
+      expect(text('#pendientes [role="alert"]')).toBe(
+        'Para publicar, el plano necesita al menos una mesa y que todas quepan en el local.',
+      );
+      expect(meRefresh).not.toHaveBeenCalled();
+      // Se puede volver a intentar.
+      expect(button('Publicar plano')?.disabled).toBe(false);
+      expect(button('Reintentar')).toBeUndefined();
+    });
+
+    it('pendingFigureScrollsToCard', async () => {
+      // jsdom no implementa `scrollIntoView`.
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      try {
+        await open();
+
+        const figure = page.querySelector<HTMLButtonElement>('.today button.fig');
+        expect(normalized(figure?.querySelector('.kicker')?.textContent)).toBe('Pendientes');
+        await click(figure ?? undefined);
+
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
+        expect(document.activeElement).toBe(page.querySelector('#pendientes'));
+      } finally {
+        Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+      }
+    });
+
+    it('pendingFigureIsOnlyAButtonWhenThereAreOnes', async () => {
+      await open({ pending: [] });
+
+      expect(Array.from(page.querySelectorAll('.today button.fig')).length).toBe(0);
+    });
+
+    it('pendingNameLinksToReservas', async () => {
+      await open();
+
+      expect(link('Luis Ejemplo')?.getAttribute('href')).toBe(
+        '/panel/kafe?fecha=2026-11-09&reserva=5',
+      );
+      expect(link('Pedro')?.getAttribute('href')).toBe('/panel/kafe?fecha=2026-11-13&reserva=7');
+    });
+
+    it('seeInReservasLinksToPendingTab', async () => {
+      await open();
+
+      expect(link('Ver en Reservas →')?.getAttribute('href')).toBe('/panel/kafe?tab=pendientes');
+    });
+  });
+
+  describe('configuración', () => {
+    /** Las filas de la tarjeta: `dt` → texto del `dd`. */
+    function settings(): Record<string, string> {
+      const card = page.querySelector('app-home-settings') as HTMLElement;
+      return Object.fromEntries(
+        Array.from(card.querySelectorAll('.settings > div')).map((item) => [
+          normalized(item.querySelector('dt')?.textContent),
+          normalized(item.querySelector('dd')?.textContent),
+        ]),
+      );
+    }
+
+    it('settingsCardValues', async () => {
+      account.telegramAvailable = true;
+      // El cierre anterior a hoy no cuenta: el próximo es el del domingo.
+      await open({
+        plan: { ...PLAN, cancellationDeadlineHours: 2 },
+        closures: ['2026-11-01', '2026-11-20', '2026-11-15'],
+      });
+
+      expect(settings()).toEqual({
+        'Modo de reserva': 'Elección libre',
+        'Cancelación del cliente': 'hasta 2 h antes',
+        'Reservas hasta': '90 días vista',
+        'Próximo día cerrado': 'dom 15 nov',
+        'Avisos por Telegram': 'Sin vincular',
+        'Incrustar en tu web': 'Copiar código',
+      });
+      expect(link('Editar →')?.getAttribute('href')).toBe('/panel/kafe/ajustes');
+    });
+
+    it('settingsCardWithoutClosuresAndWithZeroHours', async () => {
+      account.telegramAvailable = true;
+      account.telegramLinked = true;
+      await open({
+        plan: { ...PLAN, bookingMode: 'ASSIGNED', cancellationDeadlineHours: 0 },
+        closures: ['2026-11-01'],
+      });
+
+      expect(settings()).toMatchObject({
+        'Modo de reserva': 'Asigno yo la mesa',
+        'Cancelación del cliente': 'hasta la hora de la reserva',
+        'Próximo día cerrado': 'ninguno',
+        'Avisos por Telegram': 'Vinculado',
+      });
+    });
+
+    it('telegramRowIsHiddenWithoutTelegram', async () => {
+      await open();
+
+      expect(Object.keys(settings())).not.toContain('Avisos por Telegram');
+    });
+
+    it('telegramRowIsHiddenInTheDemo', async () => {
+      account.telegramAvailable = true;
+      account.demo = true;
+      await open();
+
+      expect(Object.keys(settings())).not.toContain('Avisos por Telegram');
+    });
+
+    it('embedCodeOnlyWhenPublished', async () => {
+      const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      await open();
+
+      expect(Object.keys(settings())).toContain('Incrustar en tu web');
+      button('Copiar código')!.click();
+      await settle();
+
+      expect(writeText).toHaveBeenCalledWith(
+        embedSnippet(location.origin, 'kafe', 'Kafé del Puerto'),
+      );
+      expect(text('app-home-settings [role="status"]')).toBe('Copiado');
+    });
+
+    it('embedCodeIsHiddenInADraft', async () => {
+      await open({ plan: { ...PLAN, status: 'DRAFT' }, today: [], pending: [] });
+
+      expect(Object.keys(settings())).not.toContain('Incrustar en tu web');
+      expect(button('Copiar código')).toBeUndefined();
+    });
+
+    it('embedCodeFallsBackToManualCopy', async () => {
+      await open();
+
+      // jsdom no trae portapapeles: es el caso de un navegador que lo niega.
+      button('Copiar código')!.click();
+      await settle();
+
+      const field = page.querySelector('app-home-settings textarea') as HTMLTextAreaElement;
+      expect(field.value).toBe(embedSnippet(location.origin, 'kafe', 'Kafé del Puerto'));
+      expect(text('app-home-settings [role="status"]')).toBe('Copia el código a mano');
+    });
   });
 });

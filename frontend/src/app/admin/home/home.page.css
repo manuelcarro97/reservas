@@ -38,6 +38,31 @@
   color: var(--warn);
 }
 
+/* Con pendientes la cifra es un botón que lleva a su tarjeta: se ve como las demás cifras, con una flecha. */
+button.fig {
+  width: 100%;
+  border: 0;
+  border-right: 1px solid var(--rule);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.fig:hover {
+  background: var(--wash);
+}
+
+.today .figlink .sub {
+  color: var(--warn);
+}
+
+/* La flecha es adorno: va fuera del texto de la cifra. */
+.today .figlink .sub::after {
+  content: ' →';
+}
+
 .part-error {
   display: flex;
   gap: 12px;

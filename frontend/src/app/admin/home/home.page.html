@@ -61,19 +61,29 @@
               <b>—</b><span class="sub">Cargando…</span>
             }
           </div>
-          <div class="fig" [class.warn]="counts.today + counts.later > 0">
-            <span class="kicker">Pendientes</span>
-            @if (store.partFailed().has('pending')) {
-              <b>—</b><span class="sub">no disponible</span>
-            } @else if (store.partLoading().has('pending')) {
-              <b>—</b><span class="sub">Cargando…</span>
-            } @else if (counts.today + counts.later === 0) {
-              <b>0</b><span class="sub">todo al día</span>
-            } @else {
+          @if (
+            !store.partFailed().has('pending') &&
+            !store.partLoading().has('pending') &&
+            counts.today + counts.later > 0
+          ) {
+            <!-- Con pendientes la cifra lleva a su tarjeta. -->
+            <button type="button" class="fig warn figlink" (click)="goToPending()">
+              <span class="kicker">Pendientes</span>
               <b>{{ counts.today + counts.later }}</b>
               <span class="sub">{{ counts.today }} hoy · {{ counts.later }} próximos días</span>
-            }
-          </div>
+            </button>
+          } @else {
+            <div class="fig">
+              <span class="kicker">Pendientes</span>
+              @if (store.partFailed().has('pending')) {
+                <b>—</b><span class="sub">no disponible</span>
+              } @else if (store.partLoading().has('pending')) {
+                <b>—</b><span class="sub">Cargando…</span>
+              } @else {
+                <b>0</b><span class="sub">todo al día</span>
+              }
+            </div>
+          }
           <div class="fig">
             <span class="kicker">Próximo turno</span>
             @if (waitingForClosures) {
@@ -114,24 +124,12 @@
     <div class="grid">
       <app-home-plan-card [plan]="plan" [publicUrl]="publicUrl()" />
 
-      <!-- Pendientes y configuración: sus tarjetas se montan aquí en la tarea siguiente. -->
-      <section class="sheet pending" id="pendientes" tabindex="-1">
-        <div class="sheet-head">
-          <h2 class="sheet-title">Pendientes de confirmar</h2>
-        </div>
-        @if (store.partFailed().has('pending')) {
-          <p class="state" role="alert">No se pudieron cargar las pendientes.</p>
-          <div>
-            <button type="button" class="btn line sm" (click)="refresh()">Reintentar</button>
-          </div>
-        }
-      </section>
-
-      <section class="sheet">
-        <div class="sheet-head">
-          <h2 class="sheet-title">Configuración</h2>
-        </div>
-      </section>
+      <app-home-pending />
+      <app-home-settings
+        [plan]="plan"
+        [nextClosure]="nextClosure()"
+        [closureStatus]="closureStatus()"
+      />
     </div>
 
     <!-- La semana se monta aquí en la tarea de la semana. -->

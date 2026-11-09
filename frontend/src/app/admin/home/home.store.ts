@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Observable, Subscription } from 'rxjs';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { PlanResponse } from '../../core/api/models/plan-response';
@@ -7,7 +8,10 @@ import { AdminPlanControllerService } from '../../core/api/services/admin-plan-c
 import { AdminReservationControllerService } from '../../core/api/services/admin-reservation-controller.service';
 import { AdminShiftControllerService } from '../../core/api/services/admin-shift-controller.service';
 import { NOW, timeIn, todayIn } from '../../core/time';
+import { adminErrorMessage } from '../admin-errors';
+import { MeStore } from '../me.store';
 import { PendingReservationsService } from '../reservations/pending-reservations.service';
+import { ActionHost, ReservationActions } from '../reservations/reservation-actions';
 import { byDateThenArrival } from '../reservations/reservation-order';
 import { NextShift, nextShift, weekStart } from './home-figures';
 
@@ -19,20 +23,30 @@ export type HomePart = 'today' | 'pending' | 'closures' | 'week';
 /** Lo que cuenta como fallo: `next` (reservas del próximo turno, si no es hoy) se muestra junto a las de hoy. */
 type FailureKey = HomePart | 'next';
 
+const PUBLISH_FAILED = 'No se pudo publicar el plano. Inténtalo de nuevo.';
+
 /**
  * Estado de `/panel/:slug/inicio`: el plano, las reservas de hoy, las pendientes y los cierres. Cada lectura es
- * independiente: si una falla, solo su tarjeta lo dice. `load` cancela todo lo del plano anterior.
+ * independiente: si una falla, solo su tarjeta lo dice. `load` cancela todo lo del plano anterior. Confirmar y
+ * rechazar las hace `ReservationActions`, que lo usa como su `ActionHost`.
  */
 @Injectable()
-export class HomeStore {
+export class HomeStore implements ActionHost {
   private readonly plans = inject(AdminPlanControllerService);
   private readonly reservationsApi = inject(AdminReservationControllerService);
   private readonly shiftsApi = inject(AdminShiftControllerService);
   private readonly pendingApi = inject(PendingReservationsService);
+  private readonly actions = inject(ReservationActions);
+  private readonly me = inject(MeStore);
+  private readonly router = inject(Router);
   private readonly now = inject(NOW);
 
   private slug = '';
+  /** Cuenta los planos cargados: una acción solo toca la pantalla si sigue siendo la del plano que la lanzó. */
+  private view = 0;
   private planRequest: Subscription | undefined;
+  private planReload: Subscription | undefined;
+  private readonly publishRequest = new Subscription();
   /** Las lecturas del plano que se ve ahora (sin el plano): `refresh` y `load` las cancelan antes de pedir otras. */
   private reads = new Subscription();
   private nextRequest: Subscription | undefined;
@@ -58,6 +72,9 @@ export class HomeStore {
   readonly partFailed = signal<ReadonlySet<HomePart>>(new Set());
   /** Lecturas que aún no han tenido su primera respuesta (ni buena ni mala). */
   readonly partLoading = signal<ReadonlySet<HomePart>>(new Set());
+  /** "Publicar plano" en vuelo y el motivo del último fallo. */
+  readonly publishing = signal(false);
+  readonly publishError = signal<string | null>(null);
 
   readonly tableCount = computed(() => this.plan()?.tables?.length ?? 0);
   /** Plazas del plano: lo que cabe en un turno si estuviera lleno. */
@@ -88,19 +105,30 @@ export class HomeStore {
   );
 
   constructor() {
+    this.actions.attach(this);
     inject(DestroyRef).onDestroy(() => {
       this.planRequest?.unsubscribe();
+      this.planReload?.unsubscribe();
+      this.publishRequest.unsubscribe();
       this.reads.unsubscribe();
     });
   }
 
   load(slug: string): void {
     this.slug = slug;
+    this.view++;
     this.planRequest?.unsubscribe();
+    this.planReload?.unsubscribe();
     this.reads.unsubscribe();
     this.reads = new Subscription();
     this.nextRowsDate = null;
     this.failures.clear();
+    // Una acción de la pantalla anterior ya no va a contestar aquí: sin esto los botones se quedarían desactivados.
+    this.actions.resetMessages();
+    this.actions.dismissQuestion();
+    this.actions.busy.set(false);
+    this.publishing.set(false);
+    this.publishError.set(null);
     this.status.set('loading');
     this.plan.set(null);
     this.todayRows.set(null);
@@ -140,6 +168,76 @@ export class HomeStore {
       // Qué turno es el próximo depende de los cierres: hasta entonces no se sabe de qué día pedir las reservas.
       () => this.readNextRows(),
     );
+  }
+
+  /** Publica el plano (borrador → publicado). Un fallo deja su motivo en `publishError`. */
+  publish(): void {
+    if (this.publishing()) {
+      return;
+    }
+    const view = this.view;
+    this.publishing.set(true);
+    this.publishError.set(null);
+    this.publishRequest.add(
+      this.plans.publish({ slug: this.slug }).subscribe({
+        next: (plan) => {
+          // El selector de la cabecera pinta Publicado/Borrador desde `MeStore`, aunque la pantalla ya sea otra.
+          this.me.refresh();
+          if (view === this.view) {
+            this.plan.set(plan);
+            this.publishing.set(false);
+          }
+        },
+        error: (error: HttpErrorResponse) => {
+          if (view === this.view) {
+            this.publishing.set(false);
+            this.publishError.set(adminErrorMessage(error, PUBLISH_FAILED));
+          }
+        },
+      }),
+    );
+  }
+
+  // --- ActionHost: lo que `ReservationActions` pide a esta página ---
+
+  viewToken(): number {
+    return this.view;
+  }
+
+  messageFallback(reservation: AdminReservation): { restaurantName: string; shiftName: string } {
+    const shift = this.plan()?.shifts?.find((item) => item.id === reservation.shiftId);
+    return { restaurantName: this.plan()?.name ?? '', shiftName: shift?.name ?? '' };
+  }
+
+  /** Tras una acción (o su 404/409/422) se vuelve a leer lo de hoy y las pendientes. */
+  afterAction(): void {
+    this.refresh();
+  }
+
+  /** Inicio no tiene nada abierto sobre una reserva (la pregunta de rechazar la cierra `ReservationActions`). */
+  forget(): void {
+    // Nada que cerrar.
+  }
+
+  /** `TABLE_NOT_FOUND`: se vuelve a pedir el plano, sin pasar por "Cargando…" ni tocar las demás lecturas. */
+  reloadPlan(): void {
+    this.planReload?.unsubscribe();
+    this.planReload = this.plans.get({ slug: this.slug }).subscribe({
+      next: (plan) => this.plan.set(plan),
+      // Si falla se queda el plano que había; la próxima recarga lo intenta otra vez.
+      error: () => undefined,
+    });
+  }
+
+  needsTable(reservation: AdminReservation): void {
+    this.chooseTable(reservation);
+  }
+
+  /** Elegir mesa para una reserva sin ella se hace en Reservas, con el plano delante. */
+  chooseTable(reservation: AdminReservation): void {
+    void this.router.navigate(['/panel', this.slug], {
+      queryParams: { fecha: reservation.date, reserva: reservation.id },
+    });
   }
 
   /**

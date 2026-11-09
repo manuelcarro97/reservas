@@ -1,0 +1,60 @@
+<div class="sheet-head">
+  <h2 class="sheet-title">Configuración</h2>
+  <a class="more" [routerLink]="['/panel', plan().slug, 'ajustes']">Editar →</a>
+</div>
+
+<dl class="settings">
+  <div>
+    <dt>Modo de reserva</dt>
+    <dd>{{ mode() }}</dd>
+  </div>
+  @if (cancellation(); as text) {
+    <div>
+      <dt>Cancelación del cliente</dt>
+      <dd>{{ text }}</dd>
+    </div>
+  }
+  <div>
+    <dt>Reservas hasta</dt>
+    <dd>{{ windowDays }} días vista</dd>
+  </div>
+  <div>
+    <dt>Próximo día cerrado</dt>
+    <dd>{{ closure() }}</dd>
+  </div>
+  @if (telegramVisible()) {
+    <div>
+      <dt>Avisos por Telegram</dt>
+      <dd [class.warn]="!telegramLinked()">
+        {{ telegramLinked() ? 'Vinculado' : 'Sin vincular' }}
+      </dd>
+    </div>
+  }
+  @if (published()) {
+    <div>
+      <dt>Incrustar en tu web</dt>
+      <dd>
+        @switch (copyStatus()) {
+          @case ('copied') {
+            <span class="copy-status" role="status">Copiado</span>
+          }
+          @case ('manual') {
+            <span class="copy-status" role="status">Copia el código a mano</span>
+          }
+        }
+        <button type="button" class="link" (click)="copyEmbed()">Copiar código</button>
+      </dd>
+    </div>
+  }
+</dl>
+
+@if (copyStatus() === 'manual') {
+  <textarea
+    class="input mono snippet"
+    rows="3"
+    readonly
+    aria-label="Código para incrustar"
+    [value]="snippet()"
+    (focus)="select($event)"
+  ></textarea>
+}
