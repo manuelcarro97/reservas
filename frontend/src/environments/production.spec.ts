@@ -96,10 +96,12 @@ describe('production API', () => {
  * Comprueba `firebase.json` (en la raíz del repo): las cabeceras de seguridad y de caché del frontend publicado.
  *
  * Firebase Hosting casa cada regla de `headers` con la ruta que pide el navegador, antes de aplicar el rewrite a
- * `/index.html`, y no documenta qué pasa si dos reglas dan la misma cabecera a una ruta. Por eso aquí se exige que las
- * reglas que dan la misma cabecera sean complementarias (`X` y `!X`): ninguna ruta casa con las dos y el resultado no
- * depende de cuál gane. Qué rutas casan con cada glob lo decide Hosting; después de desplegar se comprueba con
- * `curl -I` (ver DEPLOY.md).
+ * `/index.html`, y no documenta qué pasa si dos reglas dan la misma cabecera a una ruta. Por eso las reglas que dan la
+ * misma cabecera (Content-Security-Policy y Cache-Control) no se solapan: cada una es una ruta concreta y la última es
+ * la negación de todas las demás (`!/{a,b,...}`), de modo que el resultado no depende de cuál gane. Ninguna regla toca
+ * `/__/**`, el espacio que Hosting reserva para sí (el helper de `signInWithPopup` vive en `/__/auth/*`): una CSP o un
+ * COOP nuestros ahí romperían el login con Google. Qué rutas casan con cada glob lo decide Hosting; esto solo fija el
+ * diseño y, después de desplegar, se comprueba con `curl -I` (ver DEPLOY.md).
  */
 interface HeaderRule {
   source: string;
@@ -144,7 +146,8 @@ function directives(policy: string): Record<string, string[]> {
 
 describe('firebase.json (Hosting)', () => {
   const embeddable = '/@(r|reserva)/**';
-  const notEmbeddable = `!${embeddable}`;
+  // Todo lo demás salvo el espacio reservado de Hosting.
+  const notEmbeddable = '!/@(r|reserva|__)/**';
   const csp = 'Content-Security-Policy';
 
   it('publishesTheAngularBuildAndRewritesEveryRouteToIndexHtml', () => {
@@ -152,24 +155,10 @@ describe('firebase.json (Hosting)', () => {
     expect(config.hosting.rewrites).toEqual([{ source: '**', destination: '/index.html' }]);
   });
 
-  it('everyHeaderGivenByMoreThanOneRuleComesFromComplementaryRules', () => {
-    const keys = new Set(rules.flatMap((rule) => rule.headers.map((header) => header.key)));
-    for (const key of keys) {
-      const given = rulesGiving(key);
-      if (given.length === 1) {
-        continue;
-      }
-      expect(given, key).toHaveLength(2);
-      const [first, second] = given.map((rule) => rule.source);
-      const complementary = first === `!${second}` || second === `!${first}`;
-      expect(complementary, `${key}: ${first} y ${second} no son complementarias`).toBe(true);
-    }
-  });
-
-  it('sendsTheCommonSecurityHeadersOnEveryPath', () => {
+  it('sendsTheCommonSecurityHeadersOnEveryPathExceptTheReservedOnes', () => {
     const [common] = rulesGiving('X-Content-Type-Options');
 
-    expect(common.source).toBe('**');
+    expect(common.source).toBe('!/__/**');
     expect(valueOf(common, 'X-Content-Type-Options')).toBe('nosniff');
     expect(valueOf(common, 'Referrer-Policy')).toBe('strict-origin-when-cross-origin');
     // `same-origin` rompería el popup de Google (signInWithPopup).
@@ -229,12 +218,31 @@ describe('firebase.json (Hosting)', () => {
   });
 
   it('cachesHashedAssetsForeverAndEverythingElseRevalidates', () => {
-    const [assets, others] = rulesGiving('Cache-Control');
+    const given = rulesGiving('Cache-Control');
+    const others = given[given.length - 1];
+    const assets = given.slice(0, -1);
 
-    expect(valueOf(assets, 'Cache-Control')).toBe('public, max-age=31536000, immutable');
-    expect(assets.source).toBe('**/*.@(js|css|woff|woff2)');
-    // index.html y cualquier ruta de la SPA (que Hosting sirve con index.html) casan aquí, no con los assets.
+    // Los ficheros con hash que emite Angular: en la raíz y las fuentes de /media.
+    expect(assets.map((rule) => rule.source)).toEqual(['/*.@(js|css)', '/media/*.@(woff|woff2)']);
+    for (const rule of assets) {
+      expect(valueOf(rule, 'Cache-Control')).toBe('public, max-age=31536000, immutable');
+    }
+    // index.html y cualquier ruta de la SPA (que Hosting sirve con index.html) revalidan. La última regla es la
+    // negación de las anteriores y del espacio reservado de Hosting.
     expect(valueOf(others, 'Cache-Control')).toBe('no-cache');
-    expect(others.source).toBe(`!${assets.source}`);
+    const covered = [...assets.map((rule) => rule.source.slice(1)), '__/**'];
+    expect(others.source).toBe(`!/{${covered.join(',')}}`);
+  });
+
+  it('keepsEveryHeaderRuleAwayFromTheReservedHostingPaths', () => {
+    // Ninguna regla puede casar con /__/auth/*. Las positivas no apuntan a /__/ y las negativas lo excluyen.
+    for (const rule of rules) {
+      const positive = !rule.source.startsWith('!');
+      if (positive) {
+        expect(rule.source, rule.source).not.toMatch(/^\/?(__|\*\*)/);
+      } else {
+        expect(rule.source, rule.source).toContain('__');
+      }
+    }
   });
 });

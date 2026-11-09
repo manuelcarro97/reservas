@@ -10,7 +10,7 @@
     ],
     "headers": [
       {
-        "source": "**",
+        "source": "!/__/**",
         "headers": [
           { "key": "X-Content-Type-Options", "value": "nosniff" },
           { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
@@ -22,7 +22,7 @@
         ]
       },
       {
-        "source": "!/@(r|reserva)/**",
+        "source": "!/@(r|reserva|__)/**",
         "headers": [
           {
             "key": "Content-Security-Policy",
@@ -40,11 +40,15 @@
         ]
       },
       {
-        "source": "**/*.@(js|css|woff|woff2)",
+        "source": "/*.@(js|css)",
         "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
       },
       {
-        "source": "!**/*.@(js|css|woff|woff2)",
+        "source": "/media/*.@(woff|woff2)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      },
+      {
+        "source": "!/{*.@(js|css),media/*.@(woff|woff2),__/**}",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       }
     ]

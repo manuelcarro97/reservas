@@ -114,13 +114,14 @@ cd ..
 npx firebase-tools deploy --only hosting
 ```
 
-`npm run build` acaba con `check-csp-hashes`, que falla si el `index.html` construido lleva un script en línea que la política de `firebase.json` no autoriza (ver abajo). `deploy` sube `frontend/dist/frontend/browser` al proyecto `reservas-6d51b` (`.firebaserc`).
+`npm run build` acaba con `scripts/check-hosting-config.mjs`, que falla si el `index.html` construido lleva un script en línea que la política de `firebase.json` no autoriza (ver abajo) y avisa si hay ficheros con hash fuera de los sitios que cubre la caché `immutable`. `deploy` sube `frontend/dist/frontend/browser` al proyecto `reservas-6d51b` (`.firebaserc`).
 
 ### Cabeceras de `firebase.json`
 
-- **Para todo:** `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy: same-origin-allow-popups` (con `same-origin` se rompe el popup de Google) y un `Permissions-Policy` sin cámara, micrófono, geolocalización ni pagos.
-- **Content-Security-Policy**, con `frame-ancestors 'none'` en todo menos en `/r/**` y `/reserva/**`, que sí se incrustan en webs ajenas (`frame-ancestors *`). Firebase casa las reglas de `headers` con la ruta que pide el navegador, antes del rewrite a `index.html`, y no documenta qué pasa cuando dos reglas dan la misma cabecera. Por eso las dos reglas de CSP (y las dos de `Cache-Control`) son complementarias: `/@(r|reserva)/**` y `!/@(r|reserva)/**`. Ninguna ruta casa con las dos.
-- **Caché:** `public, max-age=31536000, immutable` para `.js`, `.css`, `.woff` y `.woff2` (llevan hash en el nombre) y `no-cache` para todo lo demás, incluido `index.html` y las rutas de la aplicación, que Hosting sirve con ese fichero.
+- **Rutas reservadas `/__/**`:** ninguna regla las toca. Hosting sirve ahí el helper de `signInWithPopup` (`/__/auth/iframe`, `/__/auth/handler`, sus scripts) en `reservas-6d51b.firebaseapp.com`, y una CSP con `frame-ancestors 'none'`, un COOP o una caché `immutable` nuestros lo romperían o lo dejarían desfasado.
+- **Para todo lo demás:** `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy: same-origin-allow-popups` (con `same-origin` se rompe el popup de Google) y un `Permissions-Policy` sin cámara, micrófono, geolocalización ni pagos.
+- **Content-Security-Policy**, con `frame-ancestors 'none'` en todo menos en `/r/**` y `/reserva/**`, que sí se incrustan en webs ajenas (`frame-ancestors *`). Firebase casa las reglas de `headers` con la ruta que pide el navegador, antes del rewrite a `index.html`, y no documenta qué pasa cuando dos reglas dan la misma cabecera. Por eso las reglas que dan la misma cabecera no se solapan: la CSP va en `/@(r|reserva)/**` y en su complementaria `!/@(r|reserva|__)/**`, y `Cache-Control` en tres reglas, la última la negación de las otras y de `/__/**`. Ninguna ruta casa con dos.
+- **Caché:** `public, max-age=31536000, immutable` para `/*.js`, `/*.css` y `/media/*.woff|woff2` (llevan hash en el nombre; es la estructura que emite el build de Angular) y `no-cache` para todo lo demás, incluido `index.html` y las rutas de la aplicación, que Hosting sirve con ese fichero.
 - **El hash `'sha256-...'` de `script-src`** autoriza el único script en línea que genera el build de producción de Angular (activa la hoja de estilos principal). Si una actualización de Angular lo cambia, `npm run build` falla y escribe el hash nuevo que hay que poner en las dos reglas.
 - **`style-src 'unsafe-inline'`**: Angular inyecta los estilos de cada componente como etiquetas `<style>`, y el build mete el CSS crítico en línea. No hay otra forma sin nonces, que un sitio estático no puede dar.
 - **`script-src https://apis.google.com`**: el SDK de Firebase Auth carga ahí el cargador de Google (`gapi`) cuando se usa `signInWithPopup`. **`frame-src`** deja solo el helper de Firebase (`/__/auth/iframe` en `reservas-6d51b.firebaseapp.com`). La ventana de Google es un popup, no un iframe, y no pasa por la CSP de la página.
@@ -141,6 +142,11 @@ done
 - `/r/demo`, `/r/demo/` y `/reserva/ABC123`: **1 CSP**, `frame-ancestors *`, `Cache-Control: no-cache`.
 - Ninguna con `X-Frame-Options`.
 - Un fichero con hash, por ejemplo el `main-XXXX.js` que lista `frontend/dist/frontend/browser`: `curl -sI $BASE/main-XXXX.js | grep -i cache-control` da `public, max-age=31536000, immutable`.
+- **Rutas reservadas de Hosting** (las usa el login con Google): no deben llevar nada nuestro.
+  ```bash
+  curl -sI https://reservas-6d51b.firebaseapp.com/__/auth/iframe | grep -iE 'content-security|cross-origin-opener|cache-control|x-content-type|permissions-policy|referrer-policy'
+  ```
+  Si sale la CSP `default-src 'self'; ...`, `Cross-Origin-Opener-Policy: same-origin-allow-popups`, `Permissions-Policy` o `X-Content-Type-Options` nuestros, Hosting aplica las reglas también a `/__/**` pese al `source` negado: el login con Google fallará. Las cabeceras que ponga el propio Hosting en esa ruta no cuentan.
 
 Si alguna ruta sale con **2** CSP, o con ninguna, Hosting no está aplicando las reglas como se espera (por ejemplo, la negación `!` en `source`). Con 2 CSP el navegador aplica las dos y gana `frame-ancestors 'none'`: `/r/**` dejaría de incrustarse. En ese caso hay que rediseñar los `source` de `headers`; el test `frontend/src/environments/production.spec.ts` fija hoy el diseño de reglas complementarias.
 
