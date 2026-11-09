@@ -1,0 +1,652 @@
+/*
+ * Componentes comunes del sistema visual (maqueta v3).
+ *
+ * Solo selectores con clase (más estados y descendientes de una clase). Nada de `label {}`,
+ * `input {}`, `table {}` o `h1 {}` sueltos: romperían checkbox, radio y los <label> que envuelven un campo.
+ * Los CSS de página solo llevan disposición; el aspecto sale de aquí.
+ */
+
+/* ---------- Foco ---------- */
+
+/* Anillo azul para todo lo que se pueda enfocar con teclado: botones, pestañas, enlaces, checkbox... */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* ---------- Hoja ---------- */
+
+.sheet {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: var(--lift);
+  padding: 20px 22px;
+}
+
+/* Cabecera de una hoja: título a la izquierda y, si hay, un dato (contador, estado) a la derecha. */
+.sheet-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.sheet-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.sheet-desc {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Título serif dentro de una hoja ("Tu reserva", "Entra en tu panel"); la palabra en <em> va en cursiva azul. */
+.sheet-heading {
+  margin: 0 0 4px;
+  font-family: var(--serif);
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 38px;
+  letter-spacing: -0.015em;
+}
+
+.sheet-heading em {
+  color: var(--blue);
+}
+
+/* Texto solo para lectores de pantalla, o el control nativo que una tarjeta o un cuadrito sustituye a la vista. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Botones ---------- */
+
+.btn {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 0.08s,
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn.sm {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+/* Ocupa todo el ancho de su columna (formularios de la hoja). */
+.btn.block {
+  width: 100%;
+}
+
+.btn.ink {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn.ink:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--ink-hover);
+}
+
+.btn.blue {
+  background: var(--blue);
+  color: var(--paper);
+}
+
+.btn.blue:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--blue-deep);
+}
+
+.btn.line {
+  background: var(--paper);
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+
+.btn.line:hover:not(:disabled, [aria-disabled='true']) {
+  border-color: var(--ink-2);
+}
+
+.btn.quiet {
+  background: transparent;
+  border-color: var(--rule);
+  color: var(--ink-2);
+}
+
+.btn.quiet:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--wash);
+}
+
+.btn.danger {
+  background: var(--paper);
+  border-color: var(--bad-soft);
+  color: var(--bad);
+}
+
+.btn.danger:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--bad-wash);
+  border-color: var(--bad);
+}
+
+/* Cuadrado de icono. Necesita nombre accesible (`aria-label`). */
+.btn.sq {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: var(--paper);
+  border-color: var(--rule);
+  color: var(--ink-2);
+}
+
+.btn.sq:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--wash);
+}
+
+/* ---------- Segmentado ---------- */
+
+/* Hijos directos: botones, enlaces o etiquetas. La opción activa lleva `.on` o aria-pressed/aria-selected. */
+.seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--paper);
+}
+
+.seg > * {
+  padding: 6px 12px;
+  border: 0;
+  border-right: 1px solid var(--rule);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.seg > *:last-child {
+  border-right: 0;
+}
+
+.seg > .on,
+.seg > [aria-pressed='true'],
+.seg > [aria-selected='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.seg > *:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ---------- Campos ---------- */
+
+/* Etiqueta mono en mayúsculas que envuelve el control: <label class="field">Nombre <input class="input"></label>. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 16px;
+  color: var(--ink-2);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Rótulo de un grupo de controles (<legend>) o de un dato suelto: igual que .field, sin envolver ningún control. */
+.field-label {
+  display: block;
+  margin: 0 0 7px;
+  padding: 0;
+  color: var(--ink-2);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Nota de la etiqueta ("obligatorio"): vuelve a la tipografía de texto. */
+.field small {
+  color: var(--muted);
+  font: 400 12px/16px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* El control hereda de .field: se restablece la tipografía de texto. */
+.input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 14px/20px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Valores en mono (hora, teléfono, código): un poco más pequeños que el texto. */
+.input.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.input:focus,
+.input:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 4px var(--blue);
+}
+
+.input:disabled {
+  background: var(--wash);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* ---------- Estado: punto de color más texto mono ---------- */
+
+.dot-state {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--ink-2);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dot-state::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: currentColor;
+}
+
+.dot-state.live,
+.dot-state.conf {
+  color: var(--ok);
+}
+
+.dot-state.draft {
+  color: var(--muted);
+}
+
+.dot-state.pend {
+  color: var(--warn);
+}
+
+.dot-state.gone {
+  color: var(--bad);
+}
+
+/* Texto de "Cargando…" o de error en lugar del contenido. No es el .dot-state (punto de color más texto mono). */
+.state {
+  color: var(--muted);
+}
+
+/* ---------- Aviso en línea: caja con filete a la izquierda (error, confirmación, advertencia) ---------- */
+
+.callout {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--ink-2);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.callout.bad {
+  border-left-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 5%, var(--paper));
+}
+
+.callout.ok {
+  border-left-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 6%, var(--paper));
+}
+
+.callout.warn {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 7%, var(--paper));
+}
+
+/* Pregunta de borrar o desvincular dentro de una fila o una hoja ("¿Borrar…?" y sus botones). */
+.confirm-box {
+  padding: 10px 14px;
+  border-left: 2px solid var(--bad);
+  background: color-mix(in srgb, var(--bad) 5%, var(--paper));
+}
+
+.confirm-box p {
+  margin: 0 0 8px;
+}
+
+/* Fila de botones que se parte en varias líneas si no caben. */
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------- Textos ---------- */
+
+.kicker {
+  color: var(--muted);
+  font: 500 10.5px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eyebrow b {
+  color: var(--blue-deep);
+  font-weight: 500;
+}
+
+/* Título de página en serif; la palabra en cursiva azul va en <em>. */
+.page-title {
+  margin: 10px 0 6px;
+  font-family: var(--serif);
+  font-size: 44px;
+  font-weight: 400;
+  line-height: 46px;
+  letter-spacing: -0.015em;
+}
+
+.page-title em {
+  color: var(--blue);
+}
+
+.lead {
+  max-width: 560px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+.hint {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hint code {
+  color: var(--blue-deep);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* Corta el texto con puntos suspensivos. El texto completo va en `title`. En un hijo de flex/grid ya lleva min-width: 0. */
+.truncate {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Ficha de cifras: cifras serif separadas por filetes ---------- */
+
+.figures {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border-top: 1px solid var(--rule);
+}
+
+/* Variante sin filete superior ni tanto aire, para la cabecera de una pantalla. */
+.figures.inline {
+  border-top: 0;
+}
+
+.fig {
+  min-width: 0;
+  padding: 12px 16px 2px;
+  border-right: 1px solid var(--rule);
+}
+
+.fig:first-child {
+  padding-left: 0;
+}
+
+.fig:last-child {
+  border-right: 0;
+}
+
+.figures.inline .fig {
+  padding: 0 20px;
+}
+
+.figures.inline .fig:last-child {
+  padding-right: 0;
+}
+
+.fig .kicker {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.fig b {
+  display: block;
+  font-family: var(--serif);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 36px;
+}
+
+/* Valor de texto (p. ej. un modo) en lugar de una cifra. */
+.fig b.txt {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.fig .sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------- Plano enmarcado como un dibujo técnico ---------- */
+
+.drawing {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding: 14px;
+}
+
+/* Marcas de esquina: cuatro L de 14 px en las esquinas del marco, sin elementos extra en el marcado. */
+.drawing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--ink), var(--ink)) top left / 14px 1.5px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) top left / 1.5px 14px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) top right / 14px 1.5px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) top right / 1.5px 14px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom left / 14px 1.5px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom left / 1.5px 14px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom right / 14px 1.5px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom right / 1.5px 14px no-repeat;
+}
+
+/*
+ * Lienzo del editor: cuadrícula de fondo y 34 px de margen. El plano y lo que se superpone a él (p. ej. el overlay
+ * de tiradores, `position:absolute; inset:0`) van los dos dentro de `.canvas-stage__frame`, que no lleva padding,
+ * para que ocupen exactamente la misma caja y sus svg escalen igual. No pongas el plano directamente en `.canvas-stage`.
+ * (La clase `.stage` no es global: el editor actual la define en su propio CSS.)
+ */
+.canvas-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding: 34px;
+  background-color: var(--canvas-bg);
+  background-image:
+    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(var(--canvas-grid-fine) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid-fine) 1px, transparent 1px);
+  background-size:
+    96px 96px,
+    96px 96px,
+    24px 24px,
+    24px 24px;
+}
+
+/* Caja del plano dentro de `.canvas-stage`: ocupa todo el espacio, sin padding, y es la referencia del overlay. */
+.canvas-stage__frame {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* <app-plano> es un bloque dentro del contenedor flex y puede encoger. */
+.drawing app-plano,
+.canvas-stage__frame app-plano {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/*
+ * El plano ocupa el alto disponible. plano.component.css fija `.plano { width: 100%; height: auto }`
+ * y no se edita, así que aquí se fuerza con más especificidad. El viewBox lo centra y lo escala sin deformarlo.
+ */
+.drawing app-plano svg.plano,
+.canvas-stage__frame app-plano svg.plano {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Tabla de datos ---------- */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  padding: 10px;
+  border-bottom: 1px solid var(--rule-strong);
+  color: var(--muted);
+  font: 500 10.5px/1 var(--mono);
+  letter-spacing: 0.07em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.data-table td {
+  padding: 14px 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.data-table .mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+/* ---------- Entrada de los bloques ---------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Un bloque entra con un ligero ascenso. */
+.rise {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Los hijos directos entran escalonados (0, 0,06 y 0,12 s). */
+.rise-stagger > * {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.rise-stagger > *:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.rise-stagger > *:nth-child(n + 3) {
+  animation-delay: 0.12s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .rise-stagger > * {
+    animation: none;
+  }
+
+  .btn {
+    transition: none;
+  }
+}

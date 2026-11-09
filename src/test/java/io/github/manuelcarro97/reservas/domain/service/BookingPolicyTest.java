@@ -20,12 +20,17 @@ import io.github.manuelcarro97.reservas.domain.exception.DateTooFarException;
 import io.github.manuelcarro97.reservas.domain.exception.PartyTooLargeException;
 import io.github.manuelcarro97.reservas.domain.exception.RestaurantClosedException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftNotOpenException;
+import io.github.manuelcarro97.reservas.domain.model.BookingMode;
+import io.github.manuelcarro97.reservas.domain.model.PlanStatus;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
+import io.github.manuelcarro97.reservas.domain.model.RoomLayout;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
+import io.github.manuelcarro97.reservas.domain.model.Theme;
 
 class BookingPolicyTest {
 
-	private static final Restaurant RESTAURANT = new Restaurant(1L, "demo", "Demo", ZoneId.of("Europe/Madrid"), 2);
+	private static final Restaurant RESTAURANT = new Restaurant(1L, "demo", "Demo", ZoneId.of("Europe/Madrid"), 2,
+			"owner-a", PlanStatus.PUBLISHED, RoomLayout.defaultRoom(), Theme.AZUL, BookingMode.FREE_CHOICE);
 	private static final Clock NOON_MADRID = clockAt("2026-12-01T11:00:00Z");
 	// 2026-12-02 es miércoles
 	private static final LocalDate TOMORROW = LocalDate.of(2026, 12, 2);

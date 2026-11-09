@@ -1,0 +1,175 @@
+/* Disposición del marco: cabecera, contenido y pie. El aspecto común sale de styles/base.css. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* En un escritorio normal el marco mide lo que la ventana: el plano encoge o crece para ocupar el resto. */
+@media (min-width: 1024px) and (min-height: 800px) {
+  :host {
+    height: 100vh;
+  }
+
+  .admin-main {
+    overflow: auto;
+  }
+}
+
+.admin-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 22px;
+  min-height: 58px;
+  padding: 0 var(--page-gutter);
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  color: var(--ink);
+  font: 26px/1 var(--serif);
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.brand i {
+  color: var(--blue);
+  font-style: normal;
+}
+
+.brand small {
+  margin-left: 10px;
+}
+
+.vr {
+  width: 1px;
+  height: 24px;
+  background: var(--rule);
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  align-self: stretch;
+  margin-left: 6px;
+}
+
+.tabs a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--muted);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.tabs a:hover:not([aria-disabled='true']),
+.tabs a.on {
+  color: var(--ink);
+}
+
+.tabs a.on::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  bottom: -1px;
+  left: 14px;
+  height: 2px;
+  background: var(--blue);
+}
+
+.tabs a[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  color: var(--ink-2);
+}
+
+.badge {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: var(--bad);
+  color: var(--paper);
+  font: 600 10px/16px var(--mono);
+  text-align: center;
+}
+
+.ibtn {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ibtn:hover {
+  background: var(--wash);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  margin-left: 10px;
+  padding-left: 14px;
+  border-left: 1px solid var(--rule);
+}
+
+.admin-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 22px var(--page-gutter) 18px;
+}
+
+/* Estrecha: las pestañas bajan a su propia fila y las columnas de cada página se apilan. */
+@media (max-width: 1023px) {
+  .admin-header {
+    padding-top: 10px;
+    row-gap: 6px;
+  }
+
+  .tabs {
+    flex-basis: 100%;
+    order: 10;
+    height: 40px;
+    margin-left: 0;
+  }
+}

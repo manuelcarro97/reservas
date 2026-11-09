@@ -1,6 +1,7 @@
 package io.github.manuelcarro97.reservas.adapter.out.persistence;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.Set;
@@ -40,6 +41,9 @@ class ShiftEntity {
 	@Column(name = "days_of_week", columnDefinition = "smallint[]")
 	private short[] daysOfWeek;
 
+	@Column(name = "deleted_at")
+	private Instant deletedAt;
+
 	protected ShiftEntity() {
 	}
 
@@ -50,12 +54,17 @@ class ShiftEntity {
 		entity.name = shift.name();
 		entity.startTime = shift.start();
 		entity.endTime = shift.end();
-		entity.daysOfWeek = new short[shift.days().size()];
-		int index = 0;
-		for (DayOfWeek day : shift.days()) {
-			entity.daysOfWeek[index++] = (short) day.getValue();
-		}
+		entity.daysOfWeek = daysOf(shift.days());
 		return entity;
+	}
+
+	static short[] daysOf(Set<DayOfWeek> days) {
+		short[] values = new short[days.size()];
+		int index = 0;
+		for (DayOfWeek day : days) {
+			values[index++] = (short) day.getValue();
+		}
+		return values;
 	}
 
 	Shift toDomain() {

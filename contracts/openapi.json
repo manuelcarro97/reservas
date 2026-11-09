@@ -1,0 +1,2167 @@
+{
+  "components": {
+    "schemas": {
+      "AdminReservation": {
+        "properties": {
+          "arrivalTime": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "customerEmail": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerPhone": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "partySize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "shiftId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "CONFIRMED",
+              "CANCELLED",
+              "NO_SHOW"
+            ],
+            "type": "string"
+          },
+          "tableId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tableLabel": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AssignTableRequest": {
+        "properties": {
+          "tableId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tableId"
+        ],
+        "type": "object"
+      },
+      "CreateClosureRequest": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 0,
+            "pattern": "[^\\x00]*",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "type": "object"
+      },
+      "CreatePlanRequest": {
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 0,
+            "pattern": "[^\\x00]*",
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 80,
+            "minLength": 0,
+            "pattern": "[a-z0-9-]+",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "slug"
+        ],
+        "type": "object"
+      },
+      "CreateReservationRequest": {
+        "properties": {
+          "arrivalTime": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "customerEmail": {
+            "format": "email",
+            "maxLength": 254,
+            "minLength": 0,
+            "pattern": "[^\\x00]*",
+            "type": "string"
+          },
+          "customerName": {
+            "maxLength": 100,
+            "minLength": 0,
+            "pattern": "[^\\x00]*",
+            "type": "string"
+          },
+          "customerPhone": {
+            "maxLength": 30,
+            "minLength": 0,
+            "pattern": "[^\\x00]*",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "partySize": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "shiftId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "tableId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "arrivalTime",
+          "customerName",
+          "customerPhone",
+          "date",
+          "shiftId"
+        ],
+        "type": "object"
+      },
+      "CreateShiftRequest": {
+        "properties": {
+          "days": {
+            "items": {
+              "enum": [
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+                "SUNDAY"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "end": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 0,
+            "pattern": "[^\\x00]*",
+            "type": "string"
+          },
+          "start": {
+            "format": "time-local",
+            "type": "string"
+          }
+        },
+        "required": [
+          "days",
+          "end",
+          "name",
+          "start"
+        ],
+        "type": "object"
+      },
+      "Feed": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/FeedEvent"
+            },
+            "type": "array"
+          },
+          "now": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FeedEvent": {
+        "properties": {
+          "arrivalTime": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "partySize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "reservationId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "restaurantName": {
+            "type": "string"
+          },
+          "restaurantSlug": {
+            "type": "string"
+          },
+          "shiftName": {
+            "type": "string"
+          },
+          "tableLabel": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LayoutRequest": {
+        "properties": {
+          "room": {
+            "$ref": "#/components/schemas/RoomRequest"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/TableRequest"
+            },
+            "maxItems": 60,
+            "minItems": 0,
+            "type": "array"
+          }
+        },
+        "required": [
+          "room",
+          "tables"
+        ],
+        "type": "object"
+      },
+      "MeResponse": {
+        "properties": {
+          "demo": {
+            "type": "boolean"
+          },
+          "email": {
+            "type": "string"
+          },
+          "maxPlans": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanSummaryResponse"
+            },
+            "type": "array"
+          },
+          "telegramAvailable": {
+            "type": "boolean"
+          },
+          "telegramLinked": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "PlanResponse": {
+        "properties": {
+          "bookingMode": {
+            "enum": [
+              "FREE_CHOICE",
+              "ASSIGNED"
+            ],
+            "type": "string"
+          },
+          "cancellationDeadlineHours": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "room": {
+            "$ref": "#/components/schemas/RoomDto"
+          },
+          "shifts": {
+            "items": {
+              "$ref": "#/components/schemas/ShiftResponse"
+            },
+            "type": "array"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "PUBLISHED"
+            ],
+            "type": "string"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/TableDto"
+            },
+            "type": "array"
+          },
+          "theme": {
+            "enum": [
+              "AZUL",
+              "BOSQUE",
+              "TERRACOTA",
+              "NOCHE"
+            ],
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PlanSettingsRequest": {
+        "properties": {
+          "bookingMode": {
+            "enum": [
+              "FREE_CHOICE",
+              "ASSIGNED"
+            ],
+            "type": "string"
+          },
+          "cancellationDeadlineHours": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 0,
+            "pattern": "[^\\x00]*",
+            "type": "string"
+          },
+          "theme": {
+            "enum": [
+              "AZUL",
+              "BOSQUE",
+              "TERRACOTA",
+              "NOCHE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "bookingMode",
+          "name",
+          "theme"
+        ],
+        "type": "object"
+      },
+      "PlanSummaryResponse": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "PUBLISHED"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PublicOccupancyResponse": {
+        "properties": {
+          "occupied": {
+            "type": "boolean"
+          },
+          "tableId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PublicPlanResponse": {
+        "properties": {
+          "bookingMode": {
+            "enum": [
+              "FREE_CHOICE",
+              "ASSIGNED"
+            ],
+            "type": "string"
+          },
+          "cancellationDeadlineHours": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "room": {
+            "$ref": "#/components/schemas/RoomDto"
+          },
+          "shifts": {
+            "items": {
+              "$ref": "#/components/schemas/ShiftResponse"
+            },
+            "type": "array"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/TableDto"
+            },
+            "type": "array"
+          },
+          "theme": {
+            "enum": [
+              "AZUL",
+              "BOSQUE",
+              "TERRACOTA",
+              "NOCHE"
+            ],
+            "type": "string"
+          },
+          "timeZone": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RenameShiftRequest": {
+        "properties": {
+          "name": {
+            "maxLength": 60,
+            "minLength": 0,
+            "pattern": "[^\\x00]*",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "ReservationDetails": {
+        "properties": {
+          "arrivalTime": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "partySize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "restaurantName": {
+            "type": "string"
+          },
+          "shiftEnd": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "shiftId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "shiftName": {
+            "type": "string"
+          },
+          "shiftStart": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "CONFIRMED",
+              "CANCELLED",
+              "NO_SHOW"
+            ],
+            "type": "string"
+          },
+          "tableLabel": {
+            "type": "string"
+          },
+          "theme": {
+            "enum": [
+              "AZUL",
+              "BOSQUE",
+              "TERRACOTA",
+              "NOCHE"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RoomDto": {
+        "properties": {
+          "cutDepth": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "cutWidth": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "height": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "rotation": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "shape": {
+            "enum": [
+              "SQUARE",
+              "RECTANGLE",
+              "L",
+              "U",
+              "T"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RoomRequest": {
+        "properties": {
+          "cutDepth": {
+            "format": "int32",
+            "maximum": 4000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "cutWidth": {
+            "format": "int32",
+            "maximum": 4000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "height": {
+            "format": "int32",
+            "maximum": 4000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rotation": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "shape": {
+            "enum": [
+              "SQUARE",
+              "RECTANGLE",
+              "L",
+              "U",
+              "T"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "format": "int32",
+            "maximum": 4000,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "shape"
+        ],
+        "type": "object"
+      },
+      "ShiftAvailability": {
+        "properties": {
+          "arrivalTimes": {
+            "items": {
+              "format": "time-local",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shiftId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "start": {
+            "format": "time-local",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ShiftResponse": {
+        "properties": {
+          "days": {
+            "items": {
+              "enum": [
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+                "SUNDAY"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "end": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "start": {
+            "format": "time-local",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TableDto": {
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "rotation": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "seats": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "shape": {
+            "enum": [
+              "SQUARE",
+              "ROUND"
+            ],
+            "type": "string"
+          },
+          "x": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "y": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TableOccupancy": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "occupied": {
+            "type": "boolean"
+          },
+          "seats": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "tableId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "x": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "y": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TableRequest": {
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "label": {
+            "maxLength": 40,
+            "minLength": 0,
+            "pattern": "[^\\x00]*",
+            "type": "string"
+          },
+          "rotation": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "seats": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "shape": {
+            "enum": [
+              "SQUARE",
+              "ROUND"
+            ],
+            "type": "string"
+          },
+          "x": {
+            "format": "int32",
+            "maximum": 4000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "y": {
+            "format": "int32",
+            "maximum": 4000,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "shape"
+        ],
+        "type": "object"
+      },
+      "TableSuggestion": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "seats": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "tableId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TelegramLinkResponse": {
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TelegramStatusResponse": {
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "linkPending": {
+            "type": "boolean"
+          },
+          "linked": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateShiftRequest": {
+        "properties": {
+          "days": {
+            "items": {
+              "enum": [
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+                "SUNDAY"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "end": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "start": {
+            "format": "time-local",
+            "type": "string"
+          }
+        },
+        "required": [
+          "days",
+          "end",
+          "start"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "firebase": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Reservas de mesa sin overbooking",
+    "title": "Reservas API",
+    "version": "v1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/admin/account": {
+      "delete": {
+        "operationId": "deleteAccount",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-account-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/feed": {
+      "get": {
+        "operationId": "feed",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-feed-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/me": {
+      "get": {
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-account-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/reservations/{id}/cancel": {
+      "post": {
+        "operationId": "cancel_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetails"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/reservations/{id}/confirm": {
+      "post": {
+        "operationId": "confirm",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetails"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/reservations/{id}/no-show": {
+      "post": {
+        "operationId": "markNoShow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetails"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/reservations/{id}/suggestions": {
+      "get": {
+        "operationId": "suggestions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TableSuggestion"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/reservations/{id}/table": {
+      "put": {
+        "operationId": "assignTable",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetails"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants": {
+      "get": {
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlanSummaryResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-plan-controller"
+        ]
+      },
+      "post": {
+        "operationId": "create_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-plan-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}": {
+      "delete": {
+        "operationId": "deletePlan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-account-controller"
+        ]
+      },
+      "get": {
+        "operationId": "get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-plan-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "updateSettings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-plan-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}/closures": {
+      "get": {
+        "operationId": "closures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-shift-controller"
+        ]
+      },
+      "post": {
+        "operationId": "addClosure",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClosureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-shift-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}/closures/{date}": {
+      "delete": {
+        "operationId": "removeClosure",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-shift-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}/layout": {
+      "put": {
+        "operationId": "saveLayout",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-plan-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}/occupancy": {
+      "get": {
+        "operationId": "occupancy_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shiftId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TableOccupancy"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-restaurant-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}/publish": {
+      "post": {
+        "operationId": "publish",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-plan-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}/reservations": {
+      "get": {
+        "operationId": "pending",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminReservation"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}/shifts": {
+      "get": {
+        "operationId": "list_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShiftResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-shift-controller"
+        ]
+      },
+      "post": {
+        "operationId": "add",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShiftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftResponse"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-shift-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}/shifts/{id}": {
+      "delete": {
+        "operationId": "delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-shift-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "rename",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameShiftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-shift-controller"
+        ]
+      },
+      "put": {
+        "operationId": "reschedule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShiftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShiftResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-shift-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/telegram": {
+      "get": {
+        "operationId": "status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramStatusResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-telegram-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/telegram/link": {
+      "delete": {
+        "operationId": "unlink",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-telegram-controller"
+        ]
+      },
+      "post": {
+        "operationId": "link",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramLinkResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-telegram-controller"
+        ]
+      }
+    },
+    "/api/v1/reservations/{code}": {
+      "get": {
+        "operationId": "byCode",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetails"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "public-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/reservations/{code}/cancel": {
+      "post": {
+        "operationId": "cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetails"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "public-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/restaurants/{slug}": {
+      "get": {
+        "operationId": "plan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPlanResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "public-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/restaurants/{slug}/availability": {
+      "get": {
+        "operationId": "availability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "partySize",
+            "required": true,
+            "schema": {
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShiftAvailability"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "public-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/restaurants/{slug}/occupancy": {
+      "get": {
+        "operationId": "occupancy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shiftId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicOccupancyResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "public-reservation-controller"
+        ]
+      }
+    },
+    "/api/v1/restaurants/{slug}/reservations": {
+      "post": {
+        "operationId": "create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationDetails"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "public-reservation-controller"
+        ]
+      }
+    }
+  }
+}

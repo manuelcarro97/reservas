@@ -1,0 +1,45 @@
+/* Disposición de Cuenta: una columna estrecha. El aspecto común sale de styles/base.css. */
+:host {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+}
+
+.top {
+  margin-bottom: 18px;
+}
+
+.danger-zone {
+  margin-top: 22px;
+  border-color: var(--bad-soft);
+}
+
+.danger-zone h2 {
+  margin: 0 0 10px;
+  color: var(--bad);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.danger-zone p {
+  margin: 0 0 14px;
+}
+
+.error {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-left: 2px solid var(--bad);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.error p {
+  margin: 0;
+}
+
+.error ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+  font-family: var(--mono);
+}

@@ -1,6 +1,7 @@
 package io.github.manuelcarro97.reservas.adapter.in.web;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Min;
@@ -11,13 +12,15 @@ import jakarta.validation.constraints.Size;
 
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
 
-record CreateReservationRequest(@NotNull LocalDate date, @NotNull Long shiftId, @Min(1) int partySize,
-		@NotBlank @Size(max = 100) @Pattern(regexp = TextRules.NO_NUL) String customerName,
+record CreateReservationRequest(@NotNull LocalDate date, @NotNull Long shiftId, @NotNull LocalTime arrivalTime,
+		@Min(1) int partySize, @NotBlank @Size(max = 100) @Pattern(regexp = TextRules.NO_NUL) String customerName,
 		@NotBlank @Size(max = 30) @Pattern(regexp = TextRules.NO_NUL) String customerPhone,
-		@Email @Size(max = 254) @Pattern(regexp = TextRules.NO_NUL) String customerEmail) {
+		@Email @Size(max = 254) @Pattern(regexp = TextRules.NO_NUL) String customerEmail,
+		Long tableId) {
 
 	CreateReservationCommand toCommand() {
-		return new CreateReservationCommand(date, shiftId, partySize, customerName, customerPhone, customerEmail);
+		return new CreateReservationCommand(date, shiftId, partySize, customerName, customerPhone, customerEmail,
+				tableId, arrivalTime);
 	}
 
 }

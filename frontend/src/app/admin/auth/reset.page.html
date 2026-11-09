@@ -1,0 +1,23 @@
+<section class="sheet card rise">
+  <h1 class="sheet-heading">Recuperar <em>contraseña</em></h1>
+  <p class="sheet-desc">Te enviaremos un enlace para elegir una contraseña nueva.</p>
+  <form novalidate (submit)="onSubmit($event, email.value)">
+    <fieldset [disabled]="busy()">
+      <label class="field">
+        Email
+        <input #email class="input" type="email" name="email" autocomplete="username" />
+      </label>
+
+      @if (error(); as message) {
+        <p class="callout bad" role="alert">{{ message }}</p>
+      }
+      @if (sentMessage(); as message) {
+        <p class="callout ok" role="status">{{ message }}</p>
+      }
+
+      <button type="submit" class="btn ink block">Enviar enlace</button>
+    </fieldset>
+  </form>
+
+  <p class="hint foot"><a routerLink="/entrar">Volver a entrar</a></p>
+</section>

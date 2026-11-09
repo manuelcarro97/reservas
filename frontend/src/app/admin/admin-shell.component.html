@@ -1,0 +1,73 @@
+<header class="admin-header">
+  <a class="brand" routerLink="/panel">reservas<i>.</i><small class="kicker">panel</small></a>
+  <span class="vr" aria-hidden="true"></span>
+  <app-plan-switcher />
+  <nav class="tabs" aria-label="Secciones del panel">
+    <a
+      routerLink="/panel"
+      [queryParams]="plansTabQuery()"
+      routerLinkActive="on"
+      ariaCurrentWhenActive="page"
+      [routerLinkActiveOptions]="tabMatch"
+      >Planos</a
+    >
+    @if (planSlug(); as slug) {
+      <a
+        [routerLink]="['/panel', slug]"
+        routerLinkActive="on"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="tabMatch"
+        >Reservas</a
+      >
+      <a
+        [routerLink]="['/panel', slug, 'turnos']"
+        routerLinkActive="on"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="tabMatch"
+        >Turnos</a
+      >
+      <a
+        [routerLink]="['/panel', slug, 'ajustes']"
+        routerLinkActive="on"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="tabMatch"
+        >Configuración</a
+      >
+    } @else {
+      <!-- Sin plano no hay adónde ir: se pintan como enlaces desactivados, sin destino. -->
+      <a role="link" aria-disabled="true">Reservas</a>
+      <a role="link" aria-disabled="true">Turnos</a>
+      <a role="link" aria-disabled="true">Configuración</a>
+    }
+  </nav>
+  <span class="spacer"></span>
+  <div class="actions">
+    <!-- La campana es un indicador, no un botón: el contador lleva el texto para lectores de pantalla. -->
+    <span class="bell">
+      <app-icon name="bell" label="Avisos" />
+      @if (feed.pendingCount() > 0) {
+        <span class="badge"
+          ><span class="visually-hidden">Avisos sin ver: </span>{{ feed.pendingCount() }}</span
+        >
+      }
+    </span>
+    @if (feed.canAskPermission()) {
+      <button type="button" class="ibtn" (click)="feed.askPermission()">
+        Activar avisos del navegador
+      </button>
+    }
+    @let soundLabel = feed.muted() ? 'Activar sonido' : 'Silenciar';
+    <button type="button" class="ibtn" [attr.aria-label]="soundLabel" (click)="feed.toggleMute()">
+      <app-icon [name]="feed.muted() ? 'mute' : 'sound'" />{{ soundLabel }}
+    </button>
+    <div class="who">
+      <a class="ibtn" routerLink="/panel/cuenta"><app-icon name="user" />Cuenta</a>
+      <button type="button" class="ibtn" (click)="signOut()"><app-icon name="out" />Salir</button>
+    </div>
+  </div>
+</header>
+<main class="admin-main">
+  <router-outlet />
+</main>
+<app-site-footer />
+<app-toast />

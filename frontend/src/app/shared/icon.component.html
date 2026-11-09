@@ -1,0 +1,83 @@
+<svg
+  viewBox="0 0 24 24"
+  [attr.data-icon]="name()"
+  [attr.role]="label() ? 'img' : null"
+  [attr.aria-label]="label() || null"
+  [attr.aria-hidden]="label() ? null : 'true'"
+>
+  @switch (name()) {
+    @case ('bell') {
+      <path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
+    }
+    @case ('sound') {
+      <path d="M11 5 6 9H3v6h3l5 4z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+    }
+    @case ('mute') {
+      <path d="M11 5 6 9H3v6h3l5 4z" />
+      <path d="m16 9.5 5 5M21 9.5l-5 5" />
+    }
+    @case ('chev') {
+      <path d="m7 10 5 5 5-5" />
+    }
+    @case ('link') {
+      <path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1" />
+      <path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1" />
+    }
+    @case ('plus') {
+      <path d="M12 5v14M5 12h14" />
+    }
+    @case ('pen') {
+      <path d="M4 20h4L19 9l-4-4L4 16z" />
+      <path d="m13.5 6.5 4 4" />
+    }
+    @case ('cal') {
+      <rect x="3.5" y="5" width="17" height="15" rx="1.5" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    }
+    @case ('clock') {
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    }
+    @case ('gear') {
+      <circle cx="12" cy="12" r="3" />
+      <path
+        d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"
+      />
+    }
+    @case ('copy') {
+      <rect x="8" y="8" width="12" height="12" rx="1.5" />
+      <path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8" />
+    }
+    @case ('code') {
+      <path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" />
+    }
+    @case ('rot') {
+      <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+      <path d="M20 4v7h-7" />
+    }
+    @case ('save') {
+      <path d="M5 4h11l3 3v13H5z" />
+      <path d="M8 4v5h7V4M8 20v-6h8v6" />
+    }
+    @case ('arrow') {
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    }
+    @case ('send') {
+      <path d="m4 12 16-8-6 16-2-7z" />
+    }
+    @case ('trash') {
+      <path d="M4 7h16M10 7V4.5h4V7" />
+      <path d="M6 7l1 13h10l1-13M10 11v6M14 11v6" />
+    }
+    @case ('user') {
+      <circle cx="12" cy="8.5" r="3.5" />
+      <path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5" />
+    }
+    @case ('out') {
+      <path d="M9 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H9" />
+      <path d="M16 8l4 4-4 4M20 12H9" />
+    }
+  }
+</svg>

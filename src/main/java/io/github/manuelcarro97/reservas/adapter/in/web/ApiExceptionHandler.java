@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -22,13 +23,33 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(DomainException.class)
 	ProblemDetail handleDomain(DomainException exception) {
-		return problem(statusOf(exception.kind()), exception.getMessage(), exception.code());
+		ProblemDetail problem = problem(statusOf(exception.kind()), exception.getMessage(), exception.code());
+		exception.details().forEach(problem::setProperty);
+		return problem;
 	}
 
 	@ExceptionHandler(Exception.class)
 	ProblemDetail handleUnexpected(Exception exception) {
 		log.error("Unexpected error", exception);
 		return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error", "INTERNAL_ERROR");
+	}
+
+	/**
+	 * Un cuerpo que pasó del tope mientras se leía (ver {@link RequestSizeLimitFilter}) llega aquí envuelto por el
+	 * conversor JSON: se busca en la cadena de causas y se responde 413 en vez del 400 de un JSON ilegible.
+	 */
+	@Override
+	protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException exception,
+			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+		for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+			if (cause instanceof RequestBodyTooLargeException) {
+				// Directo y no por handleExceptionInternal, que fija el código INVALID_REQUEST de los 4xx.
+				ProblemDetail problem = problem(HttpStatus.CONTENT_TOO_LARGE, "The request body is too large",
+						"PAYLOAD_TOO_LARGE");
+				return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(problem);
+			}
+		}
+		return super.handleHttpMessageNotReadable(exception, headers, status, request);
 	}
 
 	@Override
@@ -41,7 +62,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 		return response;
 	}
 
-	private static ProblemDetail problem(HttpStatus status, String detail, String code) {
+	/** También lo usan los filtros, que responden fuera de este advice con la misma forma de error. */
+	static ProblemDetail problem(HttpStatus status, String detail, String code) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
 		problem.setProperty("code", code);
 		return problem;
@@ -53,6 +75,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 			case INVALID -> HttpStatus.BAD_REQUEST;
 			case UNPROCESSABLE -> HttpStatus.UNPROCESSABLE_CONTENT;
 			case CONFLICT -> HttpStatus.CONFLICT;
+			case FORBIDDEN -> HttpStatus.FORBIDDEN;
+			case TOO_MANY_REQUESTS -> HttpStatus.TOO_MANY_REQUESTS;
 		};
 	}
 

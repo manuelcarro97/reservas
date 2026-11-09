@@ -20,6 +20,7 @@ import jakarta.validation.constraints.Min;
 import io.github.manuelcarro97.reservas.application.port.in.CancelReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.GetAvailabilityUseCase;
+import io.github.manuelcarro97.reservas.application.port.in.GetPublicPlanUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.GetReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ReservationDetails;
 import io.github.manuelcarro97.reservas.application.port.in.ShiftAvailability;
@@ -29,16 +30,31 @@ import io.github.manuelcarro97.reservas.application.port.in.ShiftAvailability;
 class PublicReservationController {
 
 	private final GetAvailabilityUseCase availability;
+	private final GetPublicPlanUseCase publicPlan;
 	private final CreateReservationUseCase createReservation;
 	private final GetReservationUseCase getReservation;
 	private final CancelReservationUseCase cancelReservation;
 
-	PublicReservationController(GetAvailabilityUseCase availability, CreateReservationUseCase createReservation,
-			GetReservationUseCase getReservation, CancelReservationUseCase cancelReservation) {
+	PublicReservationController(GetAvailabilityUseCase availability, GetPublicPlanUseCase publicPlan,
+			CreateReservationUseCase createReservation, GetReservationUseCase getReservation,
+			CancelReservationUseCase cancelReservation) {
 		this.availability = availability;
+		this.publicPlan = publicPlan;
 		this.createReservation = createReservation;
 		this.getReservation = getReservation;
 		this.cancelReservation = cancelReservation;
+	}
+
+	@GetMapping("/restaurants/{slug}")
+	PublicPlanResponse plan(@PathVariable String slug) {
+		return PublicPlanResponse.from(publicPlan.plan(slug));
+	}
+
+	@GetMapping("/restaurants/{slug}/occupancy")
+	List<PublicOccupancyResponse> occupancy(@PathVariable String slug,
+			@RequestParam @SupportedDate @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+			@RequestParam long shiftId) {
+		return publicPlan.occupancy(slug, shiftId, date).stream().map(PublicOccupancyResponse::from).toList();
 	}
 
 	@GetMapping("/restaurants/{slug}/availability")

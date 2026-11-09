@@ -1,0 +1,228 @@
+@switch (store.status()) {
+  @case ('loading') {
+    <h1 class="state" role="status">Cargando…</h1>
+  }
+  @case ('unavailable') {
+    <h1 class="state" role="alert">Este plano no está disponible</h1>
+  }
+  @case ('error') {
+    <h1 class="state" role="alert">
+      No se pudo cargar el plano. Inténtalo de nuevo en unos minutos.
+    </h1>
+  }
+  @case ('ready') {
+    @if (store.reservation(); as reservation) {
+      <section class="sheet themed confirmation rise" aria-live="polite">
+        @if (embedded) {
+          <p class="kicker truncate" [attr.title]="store.plan()?.name">{{ store.plan()?.name }}</p>
+        }
+        <h1 class="sheet-heading">Reserva <em>registrada</em></h1>
+        <p class="sheet-desc">Tu código de reserva es</p>
+        <p class="code">{{ reservation.code }}</p>
+        <p class="hint">
+          Guárdalo: lo necesitas para consultar o cancelar tu reserva. El local la confirmará
+          pronto.
+        </p>
+        <a class="btn blue block" [routerLink]="['/reserva', reservation.code]">Ver mi reserva</a>
+      </section>
+    } @else {
+      <form
+        class="booking-form rise-stagger"
+        [attr.data-columns]="showsPlano() ? 2 : 1"
+        (submit)="onSubmit($event)"
+      >
+        @if (showsPlano()) {
+          <section class="sheet table-step">
+            <h2 class="sheet-title">Elige tu mesa</h2>
+            <div class="plano-note" role="status">
+              @if (store.shiftId() === null) {
+                <p class="hint">Elige un turno para ver las mesas libres.</p>
+              } @else if (store.occupancyFailed()) {
+                <p class="hint" role="alert">
+                  No se pudo cargar el plano de mesas. Elige el turno otra vez.
+                </p>
+              } @else if (store.occupied() === null) {
+                <p class="hint">Cargando mesas…</p>
+              }
+            </div>
+            <!-- Sin ocupación (sin turno o cargándola) el plano no sabe qué mesas hay libres: atenuado e inerte. -->
+            <div
+              class="drawing"
+              [class.waiting]="store.occupied() === null"
+              [attr.inert]="store.occupied() === null ? '' : null"
+            >
+              <app-plano
+                [room]="store.room()"
+                [tables]="store.tables()"
+                [theme]="store.theme()"
+                [states]="store.tableStates()"
+                [interactive]="store.occupied() !== null && !store.submitting()"
+                (tableSelected)="store.selectTable($event)"
+              />
+            </div>
+          </section>
+        }
+
+        <div class="sheet themed reserve-sheet">
+          @if (embedded) {
+            <p class="kicker truncate" [attr.title]="store.plan()?.name">
+              {{ store.plan()?.name }}
+            </p>
+          }
+          <h1 class="sheet-heading">Tu <em>reserva</em></h1>
+          <p class="sheet-desc">Sin registro. Te damos un código para consultarla o cancelarla.</p>
+
+          <fieldset class="body" [disabled]="store.submitting()">
+            <div class="row">
+              <label class="field">
+                Fecha
+                <input
+                  class="input mono"
+                  type="date"
+                  name="date"
+                  required
+                  [value]="store.date()"
+                  [min]="store.today()"
+                  [max]="store.maxDate()"
+                  (change)="onDateChange($event)"
+                />
+              </label>
+              <label class="field">
+                Personas
+                <select class="input" name="partySize" (change)="onPartySizeChange($event)">
+                  @for (size of partySizes(); track size) {
+                    <option [value]="size" [selected]="size === store.partySize()">
+                      {{ size }}
+                    </option>
+                  }
+                </select>
+              </label>
+            </div>
+
+            <fieldset class="group shifts">
+              <legend class="field-label">Turno</legend>
+              @if (store.shifts(); as shifts) {
+                @for (shift of shifts; track shift.shiftId) {
+                  <button
+                    type="button"
+                    class="shift"
+                    [class.chosen]="shift.shiftId === store.shiftId()"
+                    [attr.aria-pressed]="shift.shiftId === store.shiftId()"
+                    [disabled]="!shift.available"
+                    (click)="store.selectShift(shift.shiftId ?? 0)"
+                  >
+                    {{ shift.name }} · {{ shift.start?.slice(0, 5) }}
+                  </button>
+                } @empty {
+                  @if (!store.shiftsFailed()) {
+                    <p class="hint">Ese día no hay turnos.</p>
+                  }
+                }
+                @if (store.shiftsFailed()) {
+                  <p class="hint" role="alert">
+                    No se pudieron cargar los turnos. Prueba con otra fecha.
+                  </p>
+                }
+              } @else {
+                <p class="hint" role="status">Cargando turnos…</p>
+              }
+            </fieldset>
+
+            @if (store.shiftId() !== null && store.shifts() !== null) {
+              <fieldset class="group times">
+                <legend class="field-label">Hora de llegada</legend>
+                @for (time of store.arrivalTimes(); track time) {
+                  <button
+                    type="button"
+                    class="arrival"
+                    [class.chosen]="time === store.arrivalTime()"
+                    [attr.aria-pressed]="time === store.arrivalTime()"
+                    (click)="store.selectArrivalTime(time)"
+                  >
+                    {{ time }}
+                  </button>
+                }
+              </fieldset>
+            }
+
+            @if (showsPlano()) {
+              <div class="table-pick" aria-live="polite">
+                <span class="field-label">Mesa</span>
+                @if (store.selectedTable(); as table) {
+                  <div class="table-chosen">
+                    <span class="swatch"></span>Mesa {{ table.label }} · {{ table.seats }} plazas
+                  </div>
+                } @else if (store.occupied() !== null) {
+                  <p class="hint">
+                    Elige una mesa en el plano (las grises no están disponibles para tu grupo).
+                  </p>
+                }
+              </div>
+            }
+
+            <div class="choice-notice" role="status">
+              @if (store.choiceNotice(); as notice) {
+                <p class="callout warn">{{ notice }}</p>
+              }
+            </div>
+
+            <div class="row">
+              <label class="field">
+                Nombre
+                <input
+                  class="input"
+                  type="text"
+                  name="customerName"
+                  autocomplete="name"
+                  maxlength="100"
+                  required
+                  [value]="store.customerName()"
+                  (input)="onName($event)"
+                />
+              </label>
+              <label class="field">
+                Teléfono
+                <input
+                  class="input mono"
+                  type="tel"
+                  name="customerPhone"
+                  autocomplete="tel"
+                  maxlength="30"
+                  required
+                  [value]="store.customerPhone()"
+                  (input)="onPhone($event)"
+                />
+              </label>
+            </div>
+
+            @if (store.isDemo()) {
+              <p class="callout warn">
+                Esta es una demo pública: no uses tu nombre ni teléfono reales.
+              </p>
+            }
+
+            @if (store.error(); as message) {
+              <p class="callout bad" role="alert">{{ message }}</p>
+            }
+            <button
+              type="submit"
+              class="btn blue block"
+              [disabled]="!store.canSubmit()"
+              [attr.aria-describedby]="missingHint() ? 'missing-hint' : null"
+            >
+              Reservar
+            </button>
+            @if (missingHint(); as hint) {
+              <p class="hint" id="missing-hint">{{ hint }}</p>
+            }
+            <p class="hint privacy">
+              Usamos tu nombre y tu teléfono solo para gestionar esta reserva y contactar contigo si
+              hace falta. El local los ve en su panel y se anonimizan 30 días después de la fecha de
+              la reserva.
+            </p>
+          </fieldset>
+        </div>
+      </form>
+    }
+  }
+}

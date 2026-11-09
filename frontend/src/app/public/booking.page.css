@@ -1,0 +1,255 @@
+/* Disposición de la página pública de reservas. El aspecto común (hojas, botones, campos, avisos) sale de styles/base.css. */
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Es el h1 de la página en estos estados, pero se ve como texto corriente. */
+.state {
+  margin: 48px auto;
+  font: inherit;
+  text-align: center;
+}
+
+/* Filete del color de acento del tema del plano en las hojas principales. */
+.themed {
+  border-top: 3px solid var(--accent);
+}
+
+/* Sin plano que pintar (modo asignado): una sola columna centrada. */
+.booking-form {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 22px;
+  min-height: 0;
+}
+
+.booking-form[data-columns='1'] {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  align-content: start;
+  grid-template-rows: auto;
+}
+
+/* Con plano: el plano a la izquierda y "Tu reserva" a la derecha. */
+.booking-form[data-columns='2'] {
+  grid-template-columns: minmax(0, 1fr) 430px;
+}
+
+.table-step {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.table-step .sheet-title {
+  margin-bottom: 12px;
+}
+
+/* Nota sobre el plano ("Elige un turno…", "Cargando mesas…"): va entre el título y el dibujo. */
+.table-step .hint {
+  margin: 0 0 10px;
+}
+
+.table-step .drawing {
+  min-height: 260px;
+  transition: opacity 0.2s;
+}
+
+/* Sin ocupación no se sabe qué mesas hay libres: el plano se atenúa y no responde (lleva `inert`). */
+.table-step .drawing.waiting {
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-step .drawing {
+    transition: none;
+  }
+}
+
+/* Avisos de lo que se quitó al cambiar fecha o personas. El contenedor existe siempre (región viva) y, vacío, no ocupa. */
+.choice-notice:empty {
+  margin-bottom: -16px;
+}
+
+.reserve-sheet {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+.kicker {
+  margin: 0 0 6px;
+}
+
+.body {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* La separación la pone el gap del formulario, no el margen de .field. */
+.body .field {
+  margin-top: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.row > * {
+  min-width: 0;
+}
+
+/* Grupos de botones (turnos y horas de llegada). */
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.group legend {
+  margin-bottom: 7px;
+}
+
+.group .hint {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.shift,
+.arrival {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper);
+  color: var(--ink-2);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.shift:hover:not(:disabled, .chosen),
+.arrival:hover:not(:disabled, .chosen) {
+  border-color: var(--ink-2);
+}
+
+.shift:disabled,
+.arrival:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.shift {
+  flex: 1 1 130px;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.shift.chosen {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.arrival {
+  padding: 6px 10px;
+  border-radius: 3px;
+  font: 500 13px/1 var(--mono);
+}
+
+.arrival.chosen {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: var(--paper);
+}
+
+/* Mesa elegida en el plano: caja verde con su cuadrito de color. */
+.table-pick .field-label {
+  margin-bottom: 7px;
+}
+
+.table-pick .hint {
+  margin: 0;
+}
+
+.table-chosen {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--paper));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ok) 6%, var(--paper));
+  font-size: 13px;
+}
+
+.swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--ok);
+}
+
+.privacy {
+  margin: 0;
+}
+
+/* Reserva registrada: una sola columna centrada. */
+.confirmation {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.confirmation > * {
+  margin: 0;
+}
+
+.code {
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  background: var(--wash);
+  font: 500 26px/1.2 var(--mono);
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+}
+
+/* Estrecha: una columna (primero el plano) y la página hace scroll. */
+@media (max-width: 1023px) {
+  :host {
+    flex: none;
+  }
+
+  .booking-form[data-columns='2'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .table-step .drawing {
+    min-height: 320px;
+  }
+
+  .reserve-sheet {
+    overflow: visible;
+  }
+}

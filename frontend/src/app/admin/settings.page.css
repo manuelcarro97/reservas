@@ -1,0 +1,206 @@
+/* Disposición de Configuración. El aspecto común (hojas, botones, campos, estado) sale de styles/base.css. */
+:host {
+  display: block;
+}
+
+.top {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.heading {
+  min-width: 0;
+}
+
+/* Tres columnas: General, Enlace y web, y Telegram con Borrar plano apiladas. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  align-items: start;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sec-num {
+  margin-right: 8px;
+  color: var(--blue);
+  font: 400 15px/1 var(--serif);
+}
+
+.danger-zone {
+  border-color: var(--bad-soft);
+}
+
+.danger-zone .sec-num {
+  color: var(--bad);
+}
+
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.input.code {
+  font-family: var(--mono);
+  font-size: 13px;
+  resize: vertical;
+}
+
+/* Modo de reserva: dos tarjetas seleccionables. El radio nativo está oculto a la vista y la tarjeta es su etiqueta. */
+.modes {
+  margin-top: 16px;
+}
+
+.mode-cards {
+  display: grid;
+  gap: 8px;
+}
+
+.mode {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 11px 14px 11px 42px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.mode::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+}
+
+.mode:has(input:checked) {
+  border-color: var(--ink);
+  background: var(--wash);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.mode:has(input:checked)::before {
+  border-color: var(--ink);
+  background: radial-gradient(circle, var(--ink) 0 4px, transparent 4.5px);
+}
+
+.mode:has(input:focus-visible) {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.mode:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mode-name {
+  font-weight: 600;
+}
+
+.mode-help {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.fields > .hint {
+  margin-top: 7px;
+}
+
+/* Enlace y web */
+.public {
+  margin-bottom: 4px;
+}
+
+.url {
+  display: flex;
+  margin-bottom: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--wash);
+  color: var(--ink);
+  font: 13px/20px var(--mono);
+}
+
+.draft-note {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.copy-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.copy-status {
+  color: var(--ink-2);
+  font: 500 11px/1 var(--mono);
+  text-transform: uppercase;
+}
+
+/* Telegram y borrar el plano */
+.delete-form code {
+  color: var(--ink);
+  font: 500 13px/1 var(--mono);
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.btn.wide {
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* Menos de 1280 px: las tres columnas no caben cómodas. General y Enlace van juntos y las otras dos debajo. */
+@media (max-width: 1279px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .col {
+    flex-direction: row;
+    grid-column: 1 / -1;
+    align-items: flex-start;
+  }
+
+  .col > * {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* Estrecha: una sola columna y la página hace scroll. */
+@media (max-width: 1023px) {
+  .top {
+    flex-wrap: wrap;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .col {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

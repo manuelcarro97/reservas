@@ -1,0 +1,233 @@
+/* Disposición de Turnos; el aspecto común sale de styles/base.css. */
+:host {
+  display: block;
+}
+
+.top {
+  margin-bottom: 18px;
+}
+
+.arrivals {
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 22px;
+  align-items: start;
+}
+
+/* Turnos */
+.table-wrap {
+  overflow-x: auto;
+}
+
+/* Tabla automática: Nombre el 28 %, acciones lo justo. `max-width: 0` hace que el nombre largo se corte con «…». */
+.shift-table th,
+.shift-table td {
+  white-space: nowrap;
+}
+
+.shift-table th:first-child,
+.shift-table td:first-child {
+  width: 28%;
+  min-width: 120px;
+  max-width: 0;
+}
+
+.shift-table th:last-child {
+  width: 1%;
+}
+
+.shift strong {
+  display: block;
+}
+
+.shift-table .confirm-row td {
+  white-space: normal;
+}
+
+.shift.editing td {
+  background: var(--blue-tint);
+}
+
+.row-actions {
+  text-align: right;
+}
+
+/* Cuadritos de los días: en la tabla son la vista y en el formulario, el control. */
+.days {
+  display: flex;
+  gap: 3px;
+}
+
+.sq {
+  display: block;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--muted);
+  font: 500 11px/22px var(--mono);
+  text-align: center;
+}
+
+.sq.on,
+.day-pick:has(input:checked) .sq {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Nuevo turno */
+.shift-form {
+  margin-top: 20px;
+}
+
+.shift-form fieldset,
+.closure-form fieldset,
+.days-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.shift-form .kicker {
+  margin: 0 0 10px;
+}
+
+/* Rejilla de la maqueta; los mínimos evitan que horas y días se aplasten. */
+.form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(104px, 1fr)) minmax(186px, 2fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.form-row .field {
+  margin-top: 0;
+}
+
+.day-picks {
+  align-items: center;
+  min-height: 40px;
+}
+
+.day-pick {
+  position: relative;
+  flex: none;
+  cursor: pointer;
+}
+
+.day-pick:has(input:focus-visible) .sq {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.day-pick:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.shift-form .hint {
+  margin: 12px 0 0;
+}
+
+/* Días cerrados */
+.closure-form fieldset {
+  display: flex;
+  gap: 8px;
+}
+
+.closure-form .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.closures {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.closure {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* Hoja de calendario: mes en banda de tinta y día en serif. */
+.cal {
+  overflow: hidden;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.cal small {
+  display: block;
+  background: var(--ink);
+  color: var(--paper);
+  font: 500 9.5px/16px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cal b {
+  display: block;
+  font: 400 22px/28px var(--serif);
+}
+
+.when .hint {
+  display: block;
+  margin: 0;
+  font-family: var(--mono);
+}
+
+.reopen {
+  display: grid;
+  grid-column: 2 / -1;
+  gap: 8px;
+}
+
+.closed > .state {
+  margin: 14px 0 0;
+}
+
+/* De 1280 a 1439 px, los días cerrados ceden ancho a la tabla. */
+@media (max-width: 1439px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+/* Menos de 1280 px: una columna y la página hace scroll. */
+@media (max-width: 1279px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Estrecha: el formulario pasa a dos columnas. */
+@media (max-width: 1023px) {
+  .form-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .name-field,
+  .days-field,
+  .form-buttons {
+    grid-column: 1 / -1;
+  }
+}

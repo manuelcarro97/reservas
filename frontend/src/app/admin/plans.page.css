@@ -1,0 +1,281 @@
+/* Disposición de Mis planos. El aspecto común (hojas, botones, cifras, plano enmarcado) sale de styles/base.css. */
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.top {
+  flex: none;
+  margin-bottom: 18px;
+}
+
+.grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 22px;
+  min-height: 0;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* Plano destacado: crece con la ventana y el plano se lleva lo que sobra. */
+.featured {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.featured .drawing {
+  min-height: 200px;
+}
+
+.drawing .state {
+  margin: auto;
+}
+
+/* Con "Reintentar" debajo, mensaje y botón quedan juntos en el centro. */
+.drawing .state:has(+ .btn) {
+  margin: auto auto 8px;
+}
+
+.drawing .btn {
+  align-self: center;
+  margin-bottom: auto;
+}
+
+.plan-head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.plan-id {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-line {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.plan-name {
+  margin: 0;
+  font: 400 30px/32px var(--serif);
+}
+
+.link {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--muted);
+  font: 12.5px/1 var(--mono);
+}
+
+.figures {
+  flex: none;
+  margin-top: 14px;
+}
+
+/* Los nombres de los turnos pueden ser largos: en bloque para que el recorte con puntos suspensivos actúe. */
+.fig .sub.truncate {
+  display: block;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.copy-status {
+  color: var(--ok);
+  font: 500 11px/1 var(--mono);
+  text-transform: uppercase;
+}
+
+/* Otros planos */
+.others {
+  flex: none;
+}
+
+.others-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.others-title {
+  margin: 0;
+  font: 400 22px/1.2 var(--serif);
+}
+
+.mini {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mini .sheet {
+  min-width: 0;
+  padding: 14px 18px;
+}
+
+.mini-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mini-name {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mini p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.row-sb {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.row-sb a {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--blue-deep);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.free-slot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: 84px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+/* Crear un plano */
+.create-plan h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.create-plan fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.create-plan .btn {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.create-plan .centered {
+  text-align: center;
+}
+
+.aside-note {
+  padding: 4px 0 4px 14px;
+  border-left: 2px solid var(--blue);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.aside-note b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ink);
+  font: 400 20px/1.2 var(--serif);
+}
+
+.error {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--bad);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+/* Poca altura: la ficha y las tarjetas se compactan para dejar sitio al plano. */
+@media (min-width: 1024px) and (max-height: 899px) {
+  .lead,
+  .mini p {
+    display: none;
+  }
+
+  .fig b {
+    font-size: 28px;
+    line-height: 30px;
+  }
+}
+
+/* Estrecha: una columna y la página hace scroll. */
+@media (max-width: 1023px) {
+  :host {
+    flex: none;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .featured .drawing {
+    min-height: 320px;
+  }
+
+  .mini {
+    grid-template-columns: 1fr;
+  }
+}

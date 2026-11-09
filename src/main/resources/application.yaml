@@ -1,13 +1,51 @@
 server:
   port: ${PORT:8080}
+  # El límite por IP usa la dirección que resuelve el contenedor. Con none (por defecto) es la del socket. Detrás de un
+  # proxy, en despliegue, solo native y con los proxies internos del proveedor; nunca framework, que toma el valor más
+  # a la izquierda de X-Forwarded-For, y ese lo escribe el cliente.
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
+
+app:
+  firebase:
+    project-id: ${FIREBASE_PROJECT_ID:reservas-6d51b}
+    # Solo por variable de entorno, nunca en el repo. Sin ella, borrar una cuenta no borra su usuario de Firebase
+    # (solo queda en el log).
+    service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  telegram:
+    # Solo por variable de entorno, nunca en el repo. Sin token no hay Telegram: los avisos van al log.
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    bot-username: ${TELEGRAM_BOT_USERNAME:}
+  demo:
+    # La cuenta demo y su plano, restaurados al arrancar y cada noche. Apagado salvo el perfil demo o DEMO_ENABLED=true.
+    # El email y la contraseña solo por variable de entorno, nunca en el repo; sin ellos el plano se siembra pero la
+    # cuenta del proveedor de identidad no se toca. El uid es fijo: no cambia aunque alguien borre la cuenta del proveedor.
+    enabled: ${DEMO_ENABLED:false}
+    uid: ${DEMO_UID:demo-owner}
+    email: ${DEMO_EMAIL:}
+    password: ${DEMO_PASSWORD:}
 
 spring:
   application:
     name: reservas-api
+  mvc:
+    formcontent:
+      filter:
+        # La API es solo JSON. Este filtro de Spring Boot lee entero en memoria el cuerpo de un PUT, PATCH o DELETE con
+        # Content-Type application/x-www-form-urlencoded, y corre antes de la cadena de seguridad: se saltaría el tope de
+        # 64 KB de RequestSizeLimitFilter. No hay ningún endpoint que reciba formularios.
+        enabled: false
   flyway:
-    # Los datos de demo son opcionales: una base que los cargó debe arrancar también sin ese perfil.
+    # Una base que cargó el antiguo seed repetible de la demo (R__demo_restaurant, ya sustituido por el seeder en Java)
+    # debe seguir arrancando aunque esa migración ya no exista.
     ignore-migration-patterns: '*:future,repeatable:missing'
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+
+springdoc:
+  # Sin esto springdoc declara las respuestas como */* y el cliente Angular generado pide blob, así que el cuerpo (y el
+  # code de los errores) no llegaría como JSON. La API es solo JSON.
+  default-produces-media-type: application/json

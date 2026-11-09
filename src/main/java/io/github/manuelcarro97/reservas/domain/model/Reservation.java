@@ -3,9 +3,12 @@ package io.github.manuelcarro97.reservas.domain.model;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import io.github.manuelcarro97.reservas.domain.exception.CancellationDeadlinePassedException;
 import io.github.manuelcarro97.reservas.domain.exception.InvalidTransitionException;
+import io.github.manuelcarro97.reservas.domain.exception.TableRequiredToConfirmException;
+import io.github.manuelcarro97.reservas.domain.exception.TableTooSmallException;
 
 public class Reservation {
 
@@ -13,8 +16,10 @@ public class Reservation {
 	private final String code;
 	private final long restaurantId;
 	private final long shiftId;
-	private final long tableId;
+	private Long tableId;
 	private final LocalDate date;
+	/** Hora de llegada dentro del turno; nula en las reservas anteriores a que existiera. */
+	private final LocalTime arrivalTime;
 	private final int partySize;
 	private final String customerName;
 	private final String customerPhone;
@@ -22,16 +27,18 @@ public class Reservation {
 	private ReservationStatus status;
 	private final long version;
 	private final Instant createdAt;
+	private Instant cancelledByCustomerAt;
 
-	public Reservation(Long id, String code, long restaurantId, long shiftId, long tableId, LocalDate date,
-			int partySize, String customerName, String customerPhone, String customerEmail, ReservationStatus status,
-			long version, Instant createdAt) {
+	public Reservation(Long id, String code, long restaurantId, long shiftId, Long tableId, LocalDate date,
+			LocalTime arrivalTime, int partySize, String customerName, String customerPhone, String customerEmail,
+			ReservationStatus status, long version, Instant createdAt, Instant cancelledByCustomerAt) {
 		this.id = id;
 		this.code = code;
 		this.restaurantId = restaurantId;
 		this.shiftId = shiftId;
 		this.tableId = tableId;
 		this.date = date;
+		this.arrivalTime = arrivalTime;
 		this.partySize = partySize;
 		this.customerName = customerName;
 		this.customerPhone = customerPhone;
@@ -39,20 +46,34 @@ public class Reservation {
 		this.status = status;
 		this.version = version;
 		this.createdAt = createdAt;
+		this.cancelledByCustomerAt = cancelledByCustomerAt;
 	}
 
-	public static Reservation newPending(String code, long restaurantId, long shiftId, long tableId, LocalDate date,
-			int partySize, String customerName, String customerPhone, String customerEmail, Instant createdAt) {
-		return new Reservation(null, code, restaurantId, shiftId, tableId, date, partySize, customerName,
-				customerPhone, customerEmail, ReservationStatus.PENDING, 0, createdAt);
+	public static Reservation newPending(String code, long restaurantId, long shiftId, Long tableId, LocalDate date,
+			LocalTime arrivalTime, int partySize, String customerName, String customerPhone, String customerEmail,
+			Instant createdAt) {
+		return new Reservation(null, code, restaurantId, shiftId, tableId, date, arrivalTime, partySize,
+				customerName, customerPhone, customerEmail, ReservationStatus.PENDING, 0, createdAt, null);
 	}
 
 	public void confirm(Instant now, Instant shiftStart) {
 		requireStatus(ReservationStatus.PENDING);
+		if (tableId == null) {
+			throw new TableRequiredToConfirmException();
+		}
 		if (!now.isBefore(shiftStart)) {
 			throw new InvalidTransitionException(status, ReservationStatus.CONFIRMED);
 		}
 		status = ReservationStatus.CONFIRMED;
+	}
+
+	/** Asigna o cambia la mesa; el índice único de la base decide si está libre, aquí solo estado y plazas. */
+	public void assignTable(long newTableId, int tableSeats) {
+		requireStatus(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
+		if (tableSeats < partySize) {
+			throw new TableTooSmallException();
+		}
+		tableId = newTableId;
 	}
 
 	public void cancel() {
@@ -66,6 +87,7 @@ public class Reservation {
 			throw new CancellationDeadlinePassedException();
 		}
 		status = ReservationStatus.CANCELLED;
+		cancelledByCustomerAt = now;
 	}
 
 	public void markNoShow(Instant now, Instant shiftStart) {
@@ -101,12 +123,16 @@ public class Reservation {
 		return shiftId;
 	}
 
-	public long tableId() {
+	public Long tableId() {
 		return tableId;
 	}
 
 	public LocalDate date() {
 		return date;
+	}
+
+	public LocalTime arrivalTime() {
+		return arrivalTime;
 	}
 
 	public int partySize() {
@@ -135,6 +161,10 @@ public class Reservation {
 
 	public Instant createdAt() {
 		return createdAt;
+	}
+
+	public Instant cancelledByCustomerAt() {
+		return cancelledByCustomerAt;
 	}
 
 }

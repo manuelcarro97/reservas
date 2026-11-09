@@ -9,8 +9,8 @@ public class TableAssigner {
 
 	public List<DiningTable> candidates(List<DiningTable> free, int partySize) {
 		return free.stream()
-			.filter(table -> table.capacity() >= partySize)
-			.sorted(Comparator.comparingInt(DiningTable::capacity).thenComparing(DiningTable::id))
+			.filter(table -> table.seats() >= partySize)
+			.sorted(Comparator.comparingInt(DiningTable::seats).thenComparing(DiningTable::id))
 			.toList();
 	}
 

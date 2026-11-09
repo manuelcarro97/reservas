@@ -20,7 +20,7 @@ class SchemaIT extends PostgresIT {
 	void seed() {
 		jdbc.sql("INSERT INTO restaurant (slug, name, zone_id) VALUES ('demo', 'Demo', 'Europe/Madrid')").update();
 		jdbc.sql("""
-				INSERT INTO dining_table (restaurant_id, label, capacity, pos_x, pos_y)
+				INSERT INTO dining_table (restaurant_id, label, seats, x, y)
 				VALUES (1, 'M1', 4, 0, 0)
 				""").update();
 		jdbc.sql("""

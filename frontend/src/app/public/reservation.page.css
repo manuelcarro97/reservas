@@ -1,0 +1,78 @@
+/* Disposición de /reserva/:código: una hoja centrada. El aspecto común sale de styles/base.css. */
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Filete del color de acento del tema del plano. */
+.themed {
+  border-top: 3px solid var(--accent);
+}
+
+.card {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.state {
+  margin: 16px 0 4px;
+}
+
+.details {
+  display: grid;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.details > * {
+  margin: 0;
+}
+
+.code {
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  background: var(--wash);
+  font: 500 26px/1.2 var(--mono);
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 20px;
+}
+
+dt {
+  color: var(--muted);
+  font: 500 11px/20px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+dd {
+  margin: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.confirm {
+  display: grid;
+  gap: 10px;
+}
+
+.confirm p {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

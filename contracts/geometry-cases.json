@@ -1,0 +1,1241 @@
+{
+  "_comment": "Casos compartidos backend (RoomLayout, TableFootprint, LayoutValidator) y frontend. rects y polygon con giro del local ya aplicado; layouts.problems comparados como conjunto.",
+  "rooms": [
+    {
+      "name": "square rot0",
+      "room": {
+        "shape": "SQUARE",
+        "width": 800,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "rects": [
+        [0, 0, 800, 800]
+      ],
+      "polygon": [
+        [0, 0],
+        [800, 0],
+        [800, 800],
+        [0, 800]
+      ]
+    },
+    {
+      "name": "rectangle rot0",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 560,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "rects": [
+        [0, 0, 1200, 560]
+      ],
+      "polygon": [
+        [0, 0],
+        [1200, 0],
+        [1200, 560],
+        [0, 560]
+      ]
+    },
+    {
+      "name": "L rot0",
+      "room": {
+        "shape": "L",
+        "width": 1000,
+        "height": 900,
+        "cutWidth": 480,
+        "cutDepth": 480,
+        "rotation": 0
+      },
+      "rects": [
+        [0, 0, 1000, 420],
+        [0, 420, 520, 900]
+      ],
+      "polygon": [
+        [0, 0],
+        [1000, 0],
+        [1000, 420],
+        [520, 420],
+        [520, 900],
+        [0, 900]
+      ]
+    },
+    {
+      "name": "U rot0",
+      "room": {
+        "shape": "U",
+        "width": 1100,
+        "height": 820,
+        "cutWidth": 420,
+        "cutDepth": 440,
+        "rotation": 0
+      },
+      "rects": [
+        [0, 0, 1100, 380],
+        [0, 380, 340, 820],
+        [760, 380, 1100, 820]
+      ],
+      "polygon": [
+        [0, 0],
+        [1100, 0],
+        [1100, 820],
+        [760, 820],
+        [760, 380],
+        [340, 380],
+        [340, 820],
+        [0, 820]
+      ]
+    },
+    {
+      "name": "T rot0",
+      "room": {
+        "shape": "T",
+        "width": 1100,
+        "height": 900,
+        "cutWidth": 340,
+        "cutDepth": 520,
+        "rotation": 0
+      },
+      "rects": [
+        [0, 0, 1100, 380],
+        [380, 380, 720, 900]
+      ],
+      "polygon": [
+        [0, 0],
+        [1100, 0],
+        [1100, 380],
+        [720, 380],
+        [720, 900],
+        [380, 900],
+        [380, 380],
+        [0, 380]
+      ]
+    },
+    {
+      "name": "L rot90",
+      "room": {
+        "shape": "L",
+        "width": 1000,
+        "height": 900,
+        "cutWidth": 480,
+        "cutDepth": 480,
+        "rotation": 90
+      },
+      "rects": [
+        [480, 0, 900, 1000],
+        [0, 0, 480, 520]
+      ],
+      "polygon": [
+        [900, 0],
+        [900, 1000],
+        [480, 1000],
+        [480, 520],
+        [0, 520],
+        [0, 0]
+      ]
+    },
+    {
+      "name": "T rot90",
+      "room": {
+        "shape": "T",
+        "width": 1100,
+        "height": 900,
+        "cutWidth": 340,
+        "cutDepth": 520,
+        "rotation": 90
+      },
+      "rects": [
+        [520, 0, 900, 1100],
+        [0, 380, 520, 720]
+      ],
+      "polygon": [
+        [900, 0],
+        [900, 1100],
+        [520, 1100],
+        [520, 720],
+        [0, 720],
+        [0, 380],
+        [520, 380],
+        [520, 0]
+      ]
+    },
+    {
+      "name": "U rot90",
+      "room": {
+        "shape": "U",
+        "width": 1100,
+        "height": 820,
+        "cutWidth": 420,
+        "cutDepth": 440,
+        "rotation": 90
+      },
+      "rects": [
+        [440, 0, 820, 1100],
+        [0, 0, 440, 340],
+        [0, 760, 440, 1100]
+      ],
+      "polygon": [
+        [820, 0],
+        [820, 1100],
+        [0, 1100],
+        [0, 760],
+        [440, 760],
+        [440, 340],
+        [0, 340],
+        [0, 0]
+      ]
+    },
+    {
+      "name": "L rot180",
+      "room": {
+        "shape": "L",
+        "width": 1000,
+        "height": 900,
+        "cutWidth": 480,
+        "cutDepth": 480,
+        "rotation": 180
+      },
+      "rects": [
+        [0, 480, 1000, 900],
+        [480, 0, 1000, 480]
+      ],
+      "polygon": [
+        [1000, 900],
+        [0, 900],
+        [0, 480],
+        [480, 480],
+        [480, 0],
+        [1000, 0]
+      ]
+    },
+    {
+      "name": "T rot180",
+      "room": {
+        "shape": "T",
+        "width": 1100,
+        "height": 900,
+        "cutWidth": 340,
+        "cutDepth": 520,
+        "rotation": 180
+      },
+      "rects": [
+        [0, 520, 1100, 900],
+        [380, 0, 720, 520]
+      ],
+      "polygon": [
+        [1100, 900],
+        [0, 900],
+        [0, 520],
+        [380, 520],
+        [380, 0],
+        [720, 0],
+        [720, 520],
+        [1100, 520]
+      ]
+    },
+    {
+      "name": "U rot180",
+      "room": {
+        "shape": "U",
+        "width": 1100,
+        "height": 820,
+        "cutWidth": 420,
+        "cutDepth": 440,
+        "rotation": 180
+      },
+      "rects": [
+        [0, 440, 1100, 820],
+        [760, 0, 1100, 440],
+        [0, 0, 340, 440]
+      ],
+      "polygon": [
+        [1100, 820],
+        [0, 820],
+        [0, 0],
+        [340, 0],
+        [340, 440],
+        [760, 440],
+        [760, 0],
+        [1100, 0]
+      ]
+    },
+    {
+      "name": "L rot270",
+      "room": {
+        "shape": "L",
+        "width": 1000,
+        "height": 900,
+        "cutWidth": 480,
+        "cutDepth": 480,
+        "rotation": 270
+      },
+      "rects": [
+        [0, 0, 420, 1000],
+        [420, 480, 900, 1000]
+      ],
+      "polygon": [
+        [0, 1000],
+        [0, 0],
+        [420, 0],
+        [420, 480],
+        [900, 480],
+        [900, 1000]
+      ]
+    },
+    {
+      "name": "T rot270",
+      "room": {
+        "shape": "T",
+        "width": 1100,
+        "height": 900,
+        "cutWidth": 340,
+        "cutDepth": 520,
+        "rotation": 270
+      },
+      "rects": [
+        [0, 0, 380, 1100],
+        [380, 380, 900, 720]
+      ],
+      "polygon": [
+        [0, 1100],
+        [0, 0],
+        [380, 0],
+        [380, 380],
+        [900, 380],
+        [900, 720],
+        [380, 720],
+        [380, 1100]
+      ]
+    },
+    {
+      "name": "U rot270",
+      "room": {
+        "shape": "U",
+        "width": 1100,
+        "height": 820,
+        "cutWidth": 420,
+        "cutDepth": 440,
+        "rotation": 270
+      },
+      "rects": [
+        [0, 0, 380, 1100],
+        [380, 760, 820, 1100],
+        [380, 0, 820, 340]
+      ],
+      "polygon": [
+        [0, 1100],
+        [0, 0],
+        [820, 0],
+        [820, 340],
+        [380, 340],
+        [380, 760],
+        [820, 760],
+        [820, 1100]
+      ]
+    },
+    {
+      "name": "rectangle rot90",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 560,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 90
+      },
+      "rects": [
+        [0, 0, 560, 1200]
+      ],
+      "polygon": [
+        [560, 0],
+        [560, 1200],
+        [0, 1200],
+        [0, 0]
+      ]
+    }
+  ],
+  "footprints": [
+    {
+      "shape": "SQUARE",
+      "seats": 2,
+      "rotation": 0,
+      "x": 200,
+      "y": 200,
+      "rect": [131, 165, 269, 235]
+    },
+    {
+      "shape": "SQUARE",
+      "seats": 2,
+      "rotation": 90,
+      "x": 310,
+      "y": 250,
+      "rect": [275, 181, 345, 319]
+    },
+    {
+      "shape": "SQUARE",
+      "seats": 4,
+      "rotation": 0,
+      "x": 200,
+      "y": 200,
+      "rect": [126, 140, 274, 260]
+    },
+    {
+      "shape": "SQUARE",
+      "seats": 4,
+      "rotation": 90,
+      "x": 310,
+      "y": 250,
+      "rect": [250, 176, 370, 324]
+    },
+    {
+      "shape": "SQUARE",
+      "seats": 6,
+      "rotation": 0,
+      "x": 200,
+      "y": 200,
+      "rect": [126, 115, 274, 285]
+    },
+    {
+      "shape": "SQUARE",
+      "seats": 6,
+      "rotation": 90,
+      "x": 310,
+      "y": 250,
+      "rect": [225, 176, 395, 324]
+    },
+    {
+      "shape": "SQUARE",
+      "seats": 8,
+      "rotation": 0,
+      "x": 200,
+      "y": 200,
+      "rect": [126, 90, 274, 310]
+    },
+    {
+      "shape": "SQUARE",
+      "seats": 8,
+      "rotation": 90,
+      "x": 310,
+      "y": 250,
+      "rect": [200, 176, 420, 324]
+    },
+    {
+      "shape": "ROUND",
+      "seats": 2,
+      "rotation": 0,
+      "x": 200,
+      "y": 200,
+      "rect": [128, 128, 272, 272]
+    },
+    {
+      "shape": "ROUND",
+      "seats": 2,
+      "rotation": 90,
+      "x": 310,
+      "y": 250,
+      "rect": [238, 178, 382, 322]
+    },
+    {
+      "shape": "ROUND",
+      "seats": 4,
+      "rotation": 0,
+      "x": 200,
+      "y": 200,
+      "rect": [114, 114, 286, 286]
+    },
+    {
+      "shape": "ROUND",
+      "seats": 4,
+      "rotation": 90,
+      "x": 310,
+      "y": 250,
+      "rect": [224, 164, 396, 336]
+    },
+    {
+      "shape": "ROUND",
+      "seats": 6,
+      "rotation": 0,
+      "x": 200,
+      "y": 200,
+      "rect": [100, 100, 300, 300]
+    },
+    {
+      "shape": "ROUND",
+      "seats": 6,
+      "rotation": 90,
+      "x": 310,
+      "y": 250,
+      "rect": [210, 150, 410, 350]
+    },
+    {
+      "shape": "ROUND",
+      "seats": 8,
+      "rotation": 0,
+      "x": 200,
+      "y": 200,
+      "rect": [86, 86, 314, 314]
+    },
+    {
+      "shape": "ROUND",
+      "seats": 8,
+      "rotation": 90,
+      "x": 310,
+      "y": 250,
+      "rect": [196, 136, 424, 364]
+    }
+  ],
+  "layouts": [
+    {
+      "name": "valid",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 200,
+          "y": 200
+        },
+        {
+          "label": "Mesa 2",
+          "shape": "ROUND",
+          "seats": 6,
+          "rotation": 0,
+          "x": 600,
+          "y": 400
+        }
+      ],
+      "problems": []
+    },
+    {
+      "name": "overlap",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 200,
+          "y": 200
+        },
+        {
+          "label": "Mesa 2",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 300,
+          "y": 200
+        }
+      ],
+      "problems": [
+        {
+          "tableIndex": 0,
+          "code": "OVERLAP"
+        },
+        {
+          "tableIndex": 1,
+          "code": "OVERLAP"
+        }
+      ]
+    },
+    {
+      "name": "touching tables are allowed",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 200,
+          "y": 200
+        },
+        {
+          "label": "Mesa 2",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 200,
+          "y": 320
+        }
+      ],
+      "problems": []
+    },
+    {
+      "name": "table in the notch of the L is out of room",
+      "room": {
+        "shape": "L",
+        "width": 1000,
+        "height": 900,
+        "cutWidth": 480,
+        "cutDepth": 480,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "ROUND",
+          "seats": 4,
+          "rotation": 0,
+          "x": 800,
+          "y": 700
+        }
+      ],
+      "problems": [
+        {
+          "tableIndex": 0,
+          "code": "OUT_OF_ROOM"
+        }
+      ]
+    },
+    {
+      "name": "table too close to the wall",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 70,
+          "y": 200
+        }
+      ],
+      "problems": [
+        {
+          "tableIndex": 0,
+          "code": "OUT_OF_ROOM"
+        }
+      ]
+    },
+    {
+      "name": "table at the minimum distance from the wall",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 90,
+          "y": 200
+        }
+      ],
+      "problems": []
+    },
+    {
+      "name": "duplicate label",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 200,
+          "y": 200
+        },
+        {
+          "label": " Mesa 1 ",
+          "shape": "ROUND",
+          "seats": 6,
+          "rotation": 0,
+          "x": 600,
+          "y": 400
+        }
+      ],
+      "problems": [
+        {
+          "tableIndex": 0,
+          "code": "DUPLICATE_LABEL"
+        },
+        {
+          "tableIndex": 1,
+          "code": "DUPLICATE_LABEL"
+        }
+      ]
+    },
+    {
+      "name": "labels are case sensitive",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "mesa 1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 200,
+          "y": 200
+        },
+        {
+          "label": "Mesa 1",
+          "shape": "ROUND",
+          "seats": 6,
+          "rotation": 0,
+          "x": 600,
+          "y": 400
+        }
+      ],
+      "problems": []
+    },
+    {
+      "name": "blank and reserved labels",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "  ",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 200,
+          "y": 200
+        },
+        {
+          "label": "~tmp",
+          "shape": "ROUND",
+          "seats": 6,
+          "rotation": 0,
+          "x": 600,
+          "y": 400
+        }
+      ],
+      "problems": [
+        {
+          "tableIndex": 0,
+          "code": "BLANK_LABEL"
+        },
+        {
+          "tableIndex": 1,
+          "code": "BLANK_LABEL"
+        }
+      ]
+    },
+    {
+      "name": "invalid seats",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "SQUARE",
+          "seats": 3,
+          "rotation": 0,
+          "x": 200,
+          "y": 200
+        }
+      ],
+      "problems": [
+        {
+          "tableIndex": 0,
+          "code": "INVALID_SEATS"
+        }
+      ]
+    },
+    {
+      "name": "invalid rotation",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 45,
+          "x": 200,
+          "y": 200
+        }
+      ],
+      "problems": [
+        {
+          "tableIndex": 0,
+          "code": "INVALID_ROTATION"
+        }
+      ]
+    },
+    {
+      "name": "off grid",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "Mesa 1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 205,
+          "y": 200
+        }
+      ],
+      "problems": [
+        {
+          "tableIndex": 0,
+          "code": "OFF_GRID"
+        }
+      ]
+    },
+    {
+      "name": "invalid room",
+      "room": {
+        "shape": "L",
+        "width": 1000,
+        "height": 900,
+        "cutWidth": 100,
+        "cutDepth": 480,
+        "rotation": 0
+      },
+      "tables": [],
+      "problems": [
+        {
+          "tableIndex": null,
+          "code": "INVALID_ROOM"
+        }
+      ]
+    },
+    {
+      "name": "reference tables fit the square room",
+      "room": {
+        "shape": "SQUARE",
+        "width": 800,
+        "height": 800,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "M1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 170,
+          "y": 200
+        },
+        {
+          "label": "M2",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 400,
+          "y": 200
+        },
+        {
+          "label": "M3",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 630,
+          "y": 200
+        },
+        {
+          "label": "M4",
+          "shape": "ROUND",
+          "seats": 6,
+          "rotation": 0,
+          "x": 250,
+          "y": 560
+        },
+        {
+          "label": "M5",
+          "shape": "ROUND",
+          "seats": 4,
+          "rotation": 0,
+          "x": 560,
+          "y": 560
+        }
+      ],
+      "problems": []
+    },
+    {
+      "name": "reference tables fit the rectangle room",
+      "room": {
+        "shape": "RECTANGLE",
+        "width": 1200,
+        "height": 560,
+        "cutWidth": 0,
+        "cutDepth": 0,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "M1",
+          "shape": "SQUARE",
+          "seats": 2,
+          "rotation": 0,
+          "x": 130,
+          "y": 150
+        },
+        {
+          "label": "M2",
+          "shape": "SQUARE",
+          "seats": 2,
+          "rotation": 0,
+          "x": 300,
+          "y": 150
+        },
+        {
+          "label": "M3",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 500,
+          "y": 150
+        },
+        {
+          "label": "M4",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 720,
+          "y": 150
+        },
+        {
+          "label": "M5",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 940,
+          "y": 150
+        },
+        {
+          "label": "M6",
+          "shape": "ROUND",
+          "seats": 8,
+          "rotation": 0,
+          "x": 250,
+          "y": 390
+        },
+        {
+          "label": "M7",
+          "shape": "SQUARE",
+          "seats": 6,
+          "rotation": 90,
+          "x": 600,
+          "y": 410
+        },
+        {
+          "label": "M8",
+          "shape": "SQUARE",
+          "seats": 8,
+          "rotation": 90,
+          "x": 940,
+          "y": 410
+        }
+      ],
+      "problems": []
+    },
+    {
+      "name": "reference tables fit the L room",
+      "room": {
+        "shape": "L",
+        "width": 1000,
+        "height": 900,
+        "cutWidth": 480,
+        "cutDepth": 480,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "M1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 130,
+          "y": 200
+        },
+        {
+          "label": "M2",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 130,
+          "y": 420
+        },
+        {
+          "label": "M3",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 130,
+          "y": 640
+        },
+        {
+          "label": "M4",
+          "shape": "SQUARE",
+          "seats": 2,
+          "rotation": 0,
+          "x": 380,
+          "y": 180
+        },
+        {
+          "label": "M5",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 620,
+          "y": 130
+        },
+        {
+          "label": "M6",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 830,
+          "y": 130
+        },
+        {
+          "label": "M7",
+          "shape": "ROUND",
+          "seats": 4,
+          "rotation": 0,
+          "x": 730,
+          "y": 300
+        },
+        {
+          "label": "M8",
+          "shape": "ROUND",
+          "seats": 6,
+          "rotation": 0,
+          "x": 360,
+          "y": 560
+        },
+        {
+          "label": "M9",
+          "shape": "ROUND",
+          "seats": 2,
+          "rotation": 0,
+          "x": 360,
+          "y": 810
+        }
+      ],
+      "problems": []
+    },
+    {
+      "name": "reference tables fit the U room",
+      "room": {
+        "shape": "U",
+        "width": 1100,
+        "height": 820,
+        "cutWidth": 420,
+        "cutDepth": 440,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "M1",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 300,
+          "y": 130
+        },
+        {
+          "label": "M2",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 550,
+          "y": 130
+        },
+        {
+          "label": "M3",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 800,
+          "y": 130
+        },
+        {
+          "label": "M4",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 170,
+          "y": 500
+        },
+        {
+          "label": "M5",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 0,
+          "x": 170,
+          "y": 700
+        },
+        {
+          "label": "M6",
+          "shape": "ROUND",
+          "seats": 6,
+          "rotation": 0,
+          "x": 930,
+          "y": 520
+        },
+        {
+          "label": "M7",
+          "shape": "SQUARE",
+          "seats": 2,
+          "rotation": 0,
+          "x": 930,
+          "y": 740
+        }
+      ],
+      "problems": []
+    },
+    {
+      "name": "reference tables fit the T room",
+      "room": {
+        "shape": "T",
+        "width": 1100,
+        "height": 900,
+        "cutWidth": 340,
+        "cutDepth": 520,
+        "rotation": 0
+      },
+      "tables": [
+        {
+          "label": "M1",
+          "shape": "SQUARE",
+          "seats": 6,
+          "rotation": 90,
+          "x": 200,
+          "y": 130
+        },
+        {
+          "label": "M2",
+          "shape": "ROUND",
+          "seats": 8,
+          "rotation": 0,
+          "x": 550,
+          "y": 190
+        },
+        {
+          "label": "M3",
+          "shape": "SQUARE",
+          "seats": 6,
+          "rotation": 90,
+          "x": 900,
+          "y": 130
+        },
+        {
+          "label": "M4",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 200,
+          "y": 290
+        },
+        {
+          "label": "M5",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 900,
+          "y": 290
+        },
+        {
+          "label": "M6",
+          "shape": "ROUND",
+          "seats": 4,
+          "rotation": 0,
+          "x": 550,
+          "y": 520
+        },
+        {
+          "label": "M7",
+          "shape": "SQUARE",
+          "seats": 4,
+          "rotation": 90,
+          "x": 550,
+          "y": 700
+        },
+        {
+          "label": "M8",
+          "shape": "SQUARE",
+          "seats": 2,
+          "rotation": 0,
+          "x": 550,
+          "y": 840
+        }
+      ],
+      "problems": []
+    }
+  ]
+}

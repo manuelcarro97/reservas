@@ -1,0 +1,21 @@
+package io.github.manuelcarro97.reservas.domain.exception;
+
+import java.util.List;
+import java.util.Map;
+
+/** Cambiar o borrar el turno dejaría en el aire reservas activas futuras; {@code reservationCodes} son las afectadas. */
+public class ShiftHasReservationsException extends DomainException {
+
+	private final List<String> reservationCodes;
+
+	public ShiftHasReservationsException(List<String> reservationCodes) {
+		super("SHIFT_HAS_RESERVATIONS", ErrorKind.CONFLICT, "Active reservations exist on this shift");
+		this.reservationCodes = List.copyOf(reservationCodes);
+	}
+
+	@Override
+	public Map<String, Object> details() {
+		return Map.of("reservations", reservationCodes);
+	}
+
+}

@@ -2,6 +2,7 @@ package io.github.manuelcarro97.reservas.adapter.out.persistence;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -30,10 +31,13 @@ class ReservationEntity {
 	private long shiftId;
 
 	@Column(name = "table_id")
-	private long tableId;
+	private Long tableId;
 
 	@Column(name = "reservation_date")
 	private LocalDate date;
+
+	@Column(name = "arrival_time")
+	private LocalTime arrivalTime;
 
 	@Column(name = "party_size")
 	private int partySize;
@@ -56,6 +60,9 @@ class ReservationEntity {
 	@Column(name = "created_at")
 	private Instant createdAt;
 
+	@Column(name = "cancelled_by_customer_at")
+	private Instant cancelledByCustomerAt;
+
 	protected ReservationEntity() {
 	}
 
@@ -67,6 +74,7 @@ class ReservationEntity {
 		entity.shiftId = reservation.shiftId();
 		entity.tableId = reservation.tableId();
 		entity.date = reservation.date();
+		entity.arrivalTime = reservation.arrivalTime();
 		entity.partySize = reservation.partySize();
 		entity.customerName = reservation.customerName();
 		entity.customerPhone = reservation.customerPhone();
@@ -74,12 +82,13 @@ class ReservationEntity {
 		entity.status = reservation.status();
 		entity.version = reservation.version();
 		entity.createdAt = reservation.createdAt();
+		entity.cancelledByCustomerAt = reservation.cancelledByCustomerAt();
 		return entity;
 	}
 
 	Reservation toDomain() {
-		return new Reservation(id, code, restaurantId, shiftId, tableId, date, partySize, customerName, customerPhone,
-				customerEmail, status, version, createdAt);
+		return new Reservation(id, code, restaurantId, shiftId, tableId, date, arrivalTime, partySize, customerName,
+				customerPhone, customerEmail, status, version, createdAt, cancelledByCustomerAt);
 	}
 
 }

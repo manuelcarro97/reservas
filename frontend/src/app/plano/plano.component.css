@@ -1,0 +1,134 @@
+/* Mismo dibujo que la referencia visual aprobada; los colores del tema llegan como variables desde la plantilla. */
+:host {
+  display: block;
+}
+
+.plano {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.wall-stone {
+  fill: none;
+  stroke: var(--stone);
+  stroke-width: 34;
+}
+
+.wall-band {
+  fill: none;
+  stroke: var(--band);
+  stroke-width: 44;
+}
+
+.wall-line {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 12;
+}
+
+/* La mesa libre usa el relleno y el filtro de madera que pone la plantilla (atributos); el resto de estados los anulan. */
+.top {
+  stroke: var(--topStroke);
+  stroke-width: 2.5;
+}
+
+.t.selected .top {
+  fill: var(--sel);
+  filter: none;
+  stroke: #17613f;
+  stroke-width: 6;
+}
+
+.t.pending .top {
+  fill: var(--pending);
+  filter: none;
+}
+
+.t.taken .top {
+  fill: var(--taken);
+  filter: none;
+}
+
+/* Mesa con un problema de plano (editor): roja y con borde grueso para que no dependa solo del color. */
+.t.invalid .top {
+  fill: var(--taken);
+  filter: none;
+  stroke: #8f1f17;
+  stroke-width: 6;
+}
+
+.t.blocked .top {
+  fill: #5f6b7a;
+  filter: none;
+  stroke-dasharray: 10 8;
+}
+
+.t.pending .seat,
+.t.taken .seat,
+.t.blocked .seat {
+  filter: grayscale(1);
+  opacity: 0.65;
+}
+
+.seat-box {
+  stroke: var(--seatInk);
+  stroke-width: 1.5;
+}
+
+.seat-back {
+  fill: none;
+  stroke: var(--seatInk);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.shadow {
+  filter: drop-shadow(3px 6px 5px rgba(0, 0, 0, 0.5));
+}
+
+.badge {
+  fill: var(--badge);
+  opacity: 0.88;
+}
+
+.tag {
+  fill: #fff;
+  font:
+    600 22px 'DM Sans',
+    system-ui,
+    sans-serif;
+  text-anchor: middle;
+  dominant-baseline: central;
+  user-select: none;
+}
+
+[data-interactive] .t:not(.blocked) {
+  cursor: pointer;
+}
+
+/* Foco de teclado propio: contorno claro sobre el tablero (el del navegador sobre un <g> dibuja su caja). */
+.t:focus,
+.t:focus-visible {
+  outline: none;
+}
+
+.t:focus-visible .top {
+  stroke: #fff;
+  stroke-width: 8;
+}
+
+/* En el editor, la pared que se arrastra puede salir del encuadre congelado: se sigue viendo. */
+:host(.editing) .plano {
+  overflow: visible;
+}
+
+/* En el editor las mesas se arrastran: el gesto táctil no debe desplazar la página ni seleccionar texto. */
+:host(.editing) .t {
+  touch-action: none;
+  user-select: none;
+}
+
+:host(.editing) [data-interactive] .t {
+  cursor: grab;
+}

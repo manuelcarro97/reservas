@@ -3,6 +3,7 @@ package io.github.manuelcarro97.reservas.adapter.in.web;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
+import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
 import io.github.manuelcarro97.reservas.support.PostgresIT;
@@ -33,22 +35,27 @@ class PublicApiIT extends PostgresIT {
 	private MockMvc mvc;
 
 	private Shift shift;
+	private DiningTable table;
 
 	@BeforeEach
 	void seed() {
 		Restaurant restaurant = givenRestaurant("demo");
 		shift = givenDinnerShift(restaurant);
-		givenTable(restaurant, "M2", 2);
+		table = givenTable(restaurant, "M2", 2);
 	}
 
 	private String body(int partySize) {
 		return """
-				{"date":"%s","shiftId":%d,"partySize":%d,"customerName":"Ana","customerPhone":"600000000"}
-				""".formatted(DATE, shift.id(), partySize);
+				{"date":"%s","shiftId":%d,"arrivalTime":"20:30","partySize":%d,"customerName":"Ana","customerPhone":"600000000","tableId":%d}
+				""".formatted(DATE, shift.id(), partySize, table.id());
 	}
 
 	private ResultActions postReservation(String json) throws Exception {
 		return mvc.perform(post(RESERVATIONS).contentType(MediaType.APPLICATION_JSON).content(json));
+	}
+
+	private ResultActions postReservation(String json, MediaType accept) throws Exception {
+		return mvc.perform(post(RESERVATIONS).contentType(MediaType.APPLICATION_JSON).accept(accept).content(json));
 	}
 
 	private String createReservation() throws Exception {
@@ -62,6 +69,67 @@ class PublicApiIT extends PostgresIT {
 			.andExpect(jsonPath("$.code").isNotEmpty())
 			.andExpect(jsonPath("$.status").value("PENDING"))
 			.andExpect(jsonPath("$.tableLabel").value("M2"));
+	}
+
+	@Test
+	void createReturnsTheArrivalTime() throws Exception {
+		postReservation(body(2)).andExpect(status().isCreated())
+			.andExpect(jsonPath("$.arrivalTime").value(startsWith("20:30")));
+	}
+
+	@Test
+	void getByCodeIncludesTheArrivalTime() throws Exception {
+		String code = createReservation();
+
+		mvc.perform(get("/api/v1/reservations/" + code))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.arrivalTime").value(startsWith("20:30")));
+	}
+
+	@Test
+	void missingArrivalTimeReturns400() throws Exception {
+		postReservation(body(2).replace("\"arrivalTime\":\"20:30\",", "")).andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+	}
+
+	@Test
+	void arrivalTimeOffTheGridReturns422() throws Exception {
+		postReservation(body(2).replace("20:30", "20:15")).andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.code").value("INVALID_ARRIVAL_TIME"));
+	}
+
+	@Test
+	void arrivalTimeInTheLastHourOfTheShiftReturns422() throws Exception {
+		// Cena 20:00-22:00: la última hora de llegada es las 21:00.
+		postReservation(body(2).replace("20:30", "21:30")).andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.code").value("INVALID_ARRIVAL_TIME"));
+	}
+
+	@Test
+	void arrivalTimeStillGuardsTheSlot() throws Exception {
+		createReservation();
+
+		postReservation(body(2).replace("20:30", "21:00")).andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("TABLE_TAKEN"));
+	}
+
+	@Test
+	void availabilityListsTheArrivalTimesOfEachShift() throws Exception {
+		mvc.perform(get("/api/v1/restaurants/demo/availability").param("date", DATE).param("partySize", "2"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].arrivalTimes", hasSize(3)))
+			.andExpect(jsonPath("$[0].arrivalTimes[0]").value(startsWith("20:00")))
+			.andExpect(jsonPath("$[0].arrivalTimes[2]").value(startsWith("21:00")));
+	}
+
+	@Test
+	void availabilityOffersNoArrivalTimesForAShiftThatCannotBeBooked() throws Exception {
+		createReservation();
+
+		mvc.perform(get("/api/v1/restaurants/demo/availability").param("date", DATE).param("partySize", "2"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].available").value(false))
+			.andExpect(jsonPath("$[0].arrivalTimes", hasSize(0)));
 	}
 
 	@Test
@@ -84,12 +152,29 @@ class PublicApiIT extends PostgresIT {
 	}
 
 	@Test
+	void getByCodeIncludesPlanAndShiftDetails() throws Exception {
+		String code = createReservation();
+
+		mvc.perform(get("/api/v1/reservations/" + code))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.restaurantName").value("demo"))
+			.andExpect(jsonPath("$.slug").value("demo"))
+			.andExpect(jsonPath("$.theme").value("AZUL"))
+			.andExpect(jsonPath("$.shiftName").value("Cena"))
+			.andExpect(jsonPath("$.shiftStart").value(startsWith("20:00")))
+			.andExpect(jsonPath("$.shiftEnd").value(startsWith("22:00")))
+			.andExpect(content().string(not(containsString("owner-a"))));
+	}
+
+	@Test
 	void cancelReturnsCancelledReservation() throws Exception {
 		String code = createReservation();
 
 		mvc.perform(post("/api/v1/reservations/" + code + "/cancel"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.status").value("CANCELLED"));
+			.andExpect(jsonPath("$.status").value("CANCELLED"))
+			.andExpect(jsonPath("$.shiftName").value("Cena"))
+			.andExpect(jsonPath("$.slug").value("demo"));
 	}
 
 	@Test
@@ -150,7 +235,7 @@ class PublicApiIT extends PostgresIT {
 	@Test
 	void missingCustomerNameReturns400() throws Exception {
 		postReservation("""
-				{"date":"%s","shiftId":%d,"partySize":2,"customerPhone":"600000000"}
+				{"date":"%s","shiftId":%d,"arrivalTime":"20:30","partySize":2,"customerPhone":"600000000"}
 				""".formatted(DATE, shift.id()))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
@@ -187,11 +272,47 @@ class PublicApiIT extends PostgresIT {
 	}
 
 	@Test
-	void noTableReturns409NoTableAvailable() throws Exception {
+	void takenTableReturns409TableTaken() throws Exception {
 		createReservation();
 
 		postReservation(body(2)).andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("NO_TABLE_AVAILABLE"));
+			.andExpect(jsonPath("$.code").value("TABLE_TAKEN"));
+	}
+
+	@Test
+	void missingTableInFreeChoiceReturns422TableRequired() throws Exception {
+		postReservation("""
+				{"date":"%s","shiftId":%d,"arrivalTime":"20:30","partySize":2,"customerName":"Ana","customerPhone":"600000000"}
+				""".formatted(DATE, shift.id()))
+			.andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.code").value("TABLE_REQUIRED"));
+	}
+
+	/** El cliente Angular pide `Accept: application/json`: los errores de dominio deben seguir llegando con su `code`. */
+	@Test
+	void takenTableAcceptingJsonReturns409WithCode() throws Exception {
+		createReservation();
+
+		postReservation(body(2), MediaType.APPLICATION_JSON).andExpect(status().isConflict())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.code").value("TABLE_TAKEN"));
+	}
+
+	@Test
+	void missingTableAcceptingJsonReturns422WithCode() throws Exception {
+		postReservation("""
+				{"date":"%s","shiftId":%d,"arrivalTime":"20:30","partySize":2,"customerName":"Ana","customerPhone":"600000000"}
+				""".formatted(DATE, shift.id()), MediaType.APPLICATION_JSON)
+			.andExpect(status().isUnprocessableContent())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.code").value("TABLE_REQUIRED"));
+	}
+
+	@Test
+	void unknownTableReturns404TableNotFound() throws Exception {
+		postReservation(body(2).replace("\"tableId\":" + table.id(), "\"tableId\":999999"))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("TABLE_NOT_FOUND"));
 	}
 
 	@Test

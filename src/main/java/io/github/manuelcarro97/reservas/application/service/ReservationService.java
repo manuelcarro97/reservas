@@ -3,14 +3,22 @@ package io.github.manuelcarro97.reservas.application.service;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import io.github.manuelcarro97.reservas.application.port.in.AdminReservation;
+import io.github.manuelcarro97.reservas.application.port.in.AnonymizeReservationsUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.CancelReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationCommand;
 import io.github.manuelcarro97.reservas.application.port.in.CreateReservationUseCase;
@@ -18,6 +26,7 @@ import io.github.manuelcarro97.reservas.application.port.in.ExpirePendingReserva
 import io.github.manuelcarro97.reservas.application.port.in.GetReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ManageReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ReservationDetails;
+import io.github.manuelcarro97.reservas.application.port.in.TableSuggestion;
 import io.github.manuelcarro97.reservas.application.port.out.ReservationRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.RestaurantRepositoryPort;
 import io.github.manuelcarro97.reservas.application.port.out.ShiftRepositoryPort;
@@ -26,108 +35,283 @@ import io.github.manuelcarro97.reservas.domain.exception.NoTableAvailableExcepti
 import io.github.manuelcarro97.reservas.domain.exception.ReservationNotFoundException;
 import io.github.manuelcarro97.reservas.domain.exception.RestaurantNotFoundException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftNotFoundException;
+import io.github.manuelcarro97.reservas.domain.exception.TableNotAllowedException;
+import io.github.manuelcarro97.reservas.domain.exception.TableNotFoundException;
+import io.github.manuelcarro97.reservas.domain.exception.TableRequiredException;
+import io.github.manuelcarro97.reservas.domain.exception.TableTakenException;
+import io.github.manuelcarro97.reservas.domain.exception.TableTooSmallException;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
+import io.github.manuelcarro97.reservas.domain.model.PlanStatus;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.ReservationCode;
+import io.github.manuelcarro97.reservas.domain.model.ReservationStatus;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
+import io.github.manuelcarro97.reservas.domain.service.ArrivalPolicy;
 import io.github.manuelcarro97.reservas.domain.service.BookingPolicy;
+import io.github.manuelcarro97.reservas.domain.service.SeatingCapacity;
 import io.github.manuelcarro97.reservas.domain.service.TableAssigner;
 
 @Service
 class ReservationService implements CreateReservationUseCase, GetReservationUseCase, CancelReservationUseCase,
-		ManageReservationUseCase, ExpirePendingReservationsUseCase {
+		ManageReservationUseCase, ExpirePendingReservationsUseCase, AnonymizeReservationsUseCase {
+
+	private static final int MAX_SUGGESTIONS = 5;
+	private static final int ANONYMIZE_AFTER_DAYS = 30;
+	// "Hoy" para la privacidad es el de Madrid, sea cual sea la zona del plano o la del reloj.
+	private static final ZoneId ANONYMIZATION_ZONE = ZoneId.of("Europe/Madrid");
 
 	private final RestaurantRepositoryPort restaurants;
 	private final ShiftRepositoryPort shifts;
 	private final TableRepositoryPort tables;
 	private final ReservationRepositoryPort reservations;
 	private final Clock clock;
+	private final ReservationEvents events;
+	private final DemoAccount demoAccount;
 	private final BookingPolicy bookingPolicy = new BookingPolicy();
+	private final SeatingCapacity seatingCapacity = new SeatingCapacity();
 	private final TableAssigner tableAssigner = new TableAssigner();
+	private final ArrivalPolicy arrivalPolicy = new ArrivalPolicy();
 
 	ReservationService(RestaurantRepositoryPort restaurants, ShiftRepositoryPort shifts, TableRepositoryPort tables,
-			ReservationRepositoryPort reservations, Clock clock) {
+			ReservationRepositoryPort reservations, Clock clock, ReservationEvents events,
+			DemoAccount demoAccount) {
 		this.restaurants = restaurants;
 		this.shifts = shifts;
 		this.tables = tables;
 		this.reservations = reservations;
 		this.clock = clock;
+		this.events = events;
+		this.demoAccount = demoAccount;
 	}
 
-	// Sin @Transactional: cada tryInsert confirma por sí mismo, y perder una mesa debe pasar a la siguiente.
+	/**
+	 * Todo el alta va bajo el bloqueo del plano: la regla de capacidad del modo asignado y la carrera con guardar el
+	 * plano o editar turnos son atómicas. El {@code ON CONFLICT} de {@code tryInsert} sigue siendo la garantía dura
+	 * contra el doble reparto de una mesa.
+	 */
 	@Override
+	@Transactional
 	public Reservation create(String slug, CreateReservationCommand command) {
-		Restaurant restaurant = restaurants.findBySlug(slug).orElseThrow(RestaurantNotFoundException::new);
-		Shift shift = shifts.findById(restaurant.id(), command.shiftId()).orElseThrow(ShiftNotFoundException::new);
+		// La lectura sin bloqueo solo da el id; el estado que vale es el de la fila ya bloqueada.
+		long restaurantId = RestaurantAccess.published(restaurants, slug).id();
+		Restaurant restaurant = restaurants.lock(restaurantId);
+		if (restaurant.status() != PlanStatus.PUBLISHED) {
+			throw new RestaurantNotFoundException();
+		}
+		// findAll y no findById: un turno oculto (borrado lógico) no admite reservas nuevas.
+		Shift shift = shifts.findAll(restaurant.id())
+			.stream()
+			.filter(candidate -> candidate.id() == command.shiftId())
+			.findFirst()
+			.orElseThrow(ShiftNotFoundException::new);
 		bookingPolicy.requireWithinWindow(restaurant, command.date(), clock);
 		bookingPolicy.validate(restaurant, shift, command.date(), command.partySize(),
 				restaurants.maxCapacity(restaurant.id()), restaurants.isClosed(restaurant.id(), command.date()), clock);
+		// Después de validate: un turno ya empezado se rechaza allí, así que aquí solo llega una hora de un turno futuro.
+		arrivalPolicy.requireValid(shift, command.arrivalTime(), command.date(), restaurant.zone(), clock.instant());
 
 		List<DiningTable> free = tables.findFree(restaurant.id(), shift.id(), command.date());
-		for (DiningTable table : tableAssigner.candidates(free, command.partySize())) {
-			Optional<Reservation> inserted = reservations.tryInsert(pendingReservation(restaurant, table, command));
-			if (inserted.isPresent()) {
-				return inserted.get();
-			}
+		List<Integer> unassignedParties = reservations.findActiveFor(restaurant.id(), shift.id(), command.date())
+			.stream()
+			.filter(reservation -> reservation.tableId() == null)
+			.map(Reservation::partySize)
+			.toList();
+		Reservation created = switch (restaurant.bookingMode()) {
+			case FREE_CHOICE -> createOnChosenTable(restaurant, free, unassignedParties, command);
+			case ASSIGNED -> createWithoutTable(restaurant, free, unassignedParties, command);
+		};
+		// El listener lo envía al confirmarse la transacción: un rollback (409, 422) no avisa.
+		events.newReservation(restaurant, shift.name(), tableLabel(created), created);
+		return created;
+	}
+
+	private Reservation createOnChosenTable(Restaurant restaurant, List<DiningTable> free,
+			List<Integer> unassignedParties, CreateReservationCommand command) {
+		if (command.tableId() == null) {
+			throw new TableRequiredException();
 		}
-		throw new NoTableAvailableException();
+		// findAll y no findById: este solo trae las mesas vivas del plano, y findById también las borradas y ajenas.
+		DiningTable table = tables.findAll(restaurant.id())
+			.stream()
+			.filter(candidate -> candidate.id().equals(command.tableId()))
+			.findFirst()
+			.orElseThrow(TableNotFoundException::new);
+		if (table.seats() < command.partySize()) {
+			throw new TableTooSmallException();
+		}
+		if (free.stream().noneMatch(candidate -> candidate.id().equals(table.id()))) {
+			throw new TableTakenException();
+		}
+		// Un resto de cambio de modo (reserva sin mesa) sigue necesitando la suya: la elegida no puede quitársela.
+		boolean leavesRoomForUnassigned = unassignedParties.isEmpty()
+				|| seatingCapacity.canSeatAll(seatsOfOthers(free, table), unassignedParties);
+		if (!leavesRoomForUnassigned) {
+			throw new NoTableAvailableException();
+		}
+		return reservations.tryInsert(pendingReservation(restaurant, table.id(), command))
+			.orElseThrow(TableTakenException::new);
+	}
+
+	private Reservation createWithoutTable(Restaurant restaurant, List<DiningTable> free,
+			List<Integer> unassignedParties, CreateReservationCommand command) {
+		if (command.tableId() != null) {
+			throw new TableNotAllowedException();
+		}
+		List<Integer> parties = new ArrayList<>(unassignedParties);
+		parties.add(command.partySize());
+		List<Integer> freeSeats = free.stream().map(DiningTable::seats).toList();
+		if (!seatingCapacity.canSeatAll(freeSeats, parties)) {
+			throw new NoTableAvailableException();
+		}
+		// Sin mesa no hay clave en el índice único, así que el insert no puede chocar.
+		return reservations.tryInsert(pendingReservation(restaurant, null, command))
+			.orElseThrow(NoTableAvailableException::new);
+	}
+
+	private static List<Integer> seatsOfOthers(List<DiningTable> free, DiningTable chosen) {
+		return free.stream().filter(candidate -> !candidate.id().equals(chosen.id())).map(DiningTable::seats).toList();
 	}
 
 	@Override
 	public ReservationDetails byCode(String code) {
-		return details(findByCode(code));
+		Reservation reservation = findByCode(code);
+		// Las reservas de un plano borrado se anonimizaron y ya no se consultan: igual que una que no existe. Un plano en
+		// borrador sí sigue visible.
+		return details(reservation, visiblePlanOf(reservation));
 	}
 
+	/** Transaccional: el aviso al dueño sale con la confirmación de la transacción. */
 	@Override
+	@Transactional
 	public ReservationDetails cancelByCode(String code) {
 		Reservation reservation = findByCode(code);
-		Restaurant restaurant = restaurantOf(reservation);
-		reservation.cancelByCustomer(clock.instant(), shiftStart(reservation, restaurant),
+		Restaurant restaurant = visiblePlanOf(reservation);
+		Shift shift = shifts.findById(restaurant.id(), reservation.shiftId()).orElseThrow(ShiftNotFoundException::new);
+		reservation.cancelByCustomer(clock.instant(), shift.startsAt(reservation.date(), restaurant.zone()),
 				restaurant.cancellationDeadlineHours());
-		return details(reservations.update(reservation));
+		Reservation cancelled = reservations.update(reservation);
+		events.cancelledByCustomer(restaurant, shift.name(), tableLabel(cancelled), cancelled);
+		return details(cancelled, restaurant, shift);
 	}
 
 	@Override
-	public List<AdminReservation> listByDate(String slug, LocalDate date) {
-		Restaurant restaurant = restaurants.findBySlug(slug).orElseThrow(RestaurantNotFoundException::new);
-		Map<Long, String> labels = tables.findAll(restaurant.id())
+	public List<AdminReservation> list(String ownerUid, String slug, LocalDate date) {
+		Restaurant restaurant = RestaurantAccess.owned(restaurants, slug, ownerUid);
+		return adminViews(reservations.findByDate(restaurant.id(), date), ownerUid);
+	}
+
+	@Override
+	public List<AdminReservation> pending(String ownerUid, String slug) {
+		Restaurant restaurant = RestaurantAccess.owned(restaurants, slug, ownerUid);
+		LocalDate today = LocalDate.ofInstant(clock.instant(), restaurant.zone());
+		// Un turno oculto (borrado lógico) sigue teniendo hora para ordenar las reservas que ya tenía.
+		Map<Long, LocalTime> shiftStarts = new HashMap<>();
+		List<Reservation> pending = reservations.findActiveFrom(restaurant.id(), today)
 			.stream()
-			.collect(Collectors.toMap(DiningTable::id, DiningTable::label));
-		return reservations.findByDate(restaurant.id(), date)
-			.stream()
-			.map(reservation -> adminView(reservation, labels.get(reservation.tableId())))
+			.filter(reservation -> reservation.status() == ReservationStatus.PENDING)
 			.toList();
+		pending.forEach(reservation -> shiftStarts.computeIfAbsent(reservation.shiftId(),
+				shiftId -> shifts.findById(restaurant.id(), shiftId).orElseThrow(ShiftNotFoundException::new).start()));
+		return adminViews(pending.stream()
+			.sorted(Comparator.comparing(Reservation::date)
+				.thenComparing(reservation -> shiftStarts.get(reservation.shiftId()))
+				.thenComparing(Reservation::id))
+			.toList(), ownerUid);
 	}
 
 	@Override
-	public ReservationDetails confirm(long id) {
-		Reservation reservation = findById(id);
+	public ReservationDetails confirm(String ownerUid, long id) {
+		Reservation reservation = ownedReservation(id, ownerUid);
 		reservation.confirm(clock.instant(), shiftStart(reservation, restaurantOf(reservation)));
 		return details(reservations.update(reservation));
 	}
 
 	@Override
-	public ReservationDetails cancel(long id) {
-		Reservation reservation = findById(id);
+	public ReservationDetails cancel(String ownerUid, long id) {
+		Reservation reservation = ownedReservation(id, ownerUid);
 		reservation.cancel();
 		return details(reservations.update(reservation));
 	}
 
 	@Override
-	public ReservationDetails markNoShow(long id) {
-		Reservation reservation = findById(id);
+	public ReservationDetails markNoShow(String ownerUid, long id) {
+		Reservation reservation = ownedReservation(id, ownerUid);
 		reservation.markNoShow(clock.instant(), shiftStart(reservation, restaurantOf(reservation)));
 		return details(reservations.update(reservation));
 	}
 
-	private Reservation findById(long id) {
-		return reservations.findById(id).orElseThrow(ReservationNotFoundException::new);
+	/**
+	 * Todo bajo el bloqueo del plano, como el alta de reservas. El estado y las plazas se comprueban aquí; que la mesa
+	 * esté libre lo decide solo el índice único al hacer el UPDATE, que lanza TableTakenException si otra reserva
+	 * activa la tiene en esa fecha y turno.
+	 */
+	@Override
+	@Transactional
+	public ReservationDetails assignTable(String ownerUid, long reservationId, long tableId) {
+		// La lectura sin bloqueo solo da el plano a bloquear; el @Version de la reserva detecta si cambió mientras tanto.
+		Reservation reservation = ownedReservation(reservationId, ownerUid);
+		Restaurant restaurant = lockOwnedBy(reservation, ownerUid);
+		// findAll y no findById: este solo trae las mesas vivas del plano, y findById también las borradas y ajenas.
+		DiningTable table = tables.findAll(restaurant.id())
+			.stream()
+			.filter(candidate -> candidate.id().equals(tableId))
+			.findFirst()
+			.orElseThrow(TableNotFoundException::new);
+		reservation.assignTable(table.id(), table.seats());
+		return details(reservations.update(reservation));
+	}
+
+	@Override
+	public List<TableSuggestion> suggestions(String ownerUid, long reservationId) {
+		Reservation reservation = ownedReservation(reservationId, ownerUid);
+		List<DiningTable> free = tables.findFree(reservation.restaurantId(), reservation.shiftId(),
+				reservation.date());
+		return tableAssigner.candidates(free, reservation.partySize())
+			.stream()
+			.limit(MAX_SUGGESTIONS)
+			.map(table -> new TableSuggestion(table.id(), table.label(), table.seats()))
+			.toList();
+	}
+
+	/** Bloquea el plano de la reserva y revalida el dueño con la fila bloqueada, que puede haber cambiado. */
+	private Restaurant lockOwnedBy(Reservation reservation, String ownerUid) {
+		Restaurant locked;
+		try {
+			locked = restaurants.lock(reservation.restaurantId());
+		}
+		catch (RestaurantNotFoundException deleted) {
+			throw new ReservationNotFoundException();
+		}
+		if (!locked.isOwnedBy(ownerUid)) {
+			throw new ReservationNotFoundException();
+		}
+		return locked;
+	}
+
+	/** Reserva de un plano del dueño; la de un plano ajeno o borrado da el mismo error que una que no existe. */
+	private Reservation ownedReservation(long id, String ownerUid) {
+		Reservation reservation = reservations.findById(id).orElseThrow(ReservationNotFoundException::new);
+		restaurants.findById(reservation.restaurantId())
+			.filter(restaurant -> restaurant.isOwnedBy(ownerUid))
+			.orElseThrow(ReservationNotFoundException::new);
+		return reservation;
 	}
 
 	@Override
 	public int expire() {
 		return reservations.cancelPendingStartedBefore(clock.instant());
+	}
+
+	@Override
+	public int anonymizeOld() {
+		LocalDate cutoff = LocalDate.ofInstant(clock.instant(), ANONYMIZATION_ZONE).minusDays(ANONYMIZE_AFTER_DAYS);
+		return reservations.anonymizeBefore(cutoff);
+	}
+
+	/** El plano de una reserva consultada por su código; borrado, da el mismo error que un código que no existe. */
+	private Restaurant visiblePlanOf(Reservation reservation) {
+		return restaurants.findById(reservation.restaurantId()).orElseThrow(ReservationNotFoundException::new);
 	}
 
 	private Restaurant restaurantOf(Reservation reservation) {
@@ -140,14 +324,42 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 		return shift.startsAt(reservation.date(), restaurant.zone());
 	}
 
-	private AdminReservation adminView(Reservation reservation, String tableLabel) {
+	/**
+	 * Las etiquetas salen también de mesas borradas: una reserva no pierde la suya porque se quite la mesa.
+	 * <p>
+	 * En el panel de la cuenta demo (público: sus credenciales están en el README) el teléfono y el email de quien
+	 * reservó en el plano público se enmascaran; solo se ven completas las reservas sembradas, con teléfonos ficticios
+	 * (ver {@link DemoSeeder#isSamplePhone}). El nombre se mantiene.
+	 */
+	private List<AdminReservation> adminViews(List<Reservation> found, String ownerUid) {
+		boolean demoPanel = demoAccount.isDemo(ownerUid);
+		Set<Long> tableIds = found.stream()
+			.map(Reservation::tableId)
+			.filter(Objects::nonNull)
+			.collect(Collectors.toSet());
+		Map<Long, String> labels = tables.findAllById(tableIds)
+			.stream()
+			.collect(Collectors.toMap(DiningTable::id, DiningTable::label));
+		return found.stream()
+			.map(reservation -> adminView(reservation, labels.get(reservation.tableId()), demoPanel))
+			.toList();
+	}
+
+	private static AdminReservation adminView(Reservation reservation, String tableLabel, boolean demoPanel) {
+		boolean masked = demoPanel && !DemoSeeder.isSamplePhone(reservation.customerPhone());
+		// El seeder no guarda email: en la demo ningún email legítimo hay que enseñar.
+		String phone = masked ? ContactMask.phone(reservation.customerPhone()) : reservation.customerPhone();
+		String email = demoPanel ? null : reservation.customerEmail();
 		return new AdminReservation(reservation.id(), reservation.code(), reservation.status(), reservation.date(),
-				reservation.shiftId(), reservation.partySize(), tableLabel, reservation.customerName(),
-				reservation.customerPhone(), reservation.customerEmail());
+				reservation.arrivalTime(), reservation.shiftId(), reservation.partySize(), reservation.tableId(), tableLabel,
+				reservation.customerName(), phone, email, reservation.createdAt());
 	}
 
 	private String tableLabel(Reservation reservation) {
-		return tables.findById(reservation.tableId()).map(DiningTable::label).orElseThrow();
+		if (reservation.tableId() == null) {
+			return null;
+		}
+		return tables.findById(reservation.tableId()).map(DiningTable::label).orElse(null);
 	}
 
 	private Reservation findByCode(String code) {
@@ -155,14 +367,25 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 	}
 
 	private ReservationDetails details(Reservation reservation) {
-		return new ReservationDetails(reservation.code(), reservation.status(), reservation.date(),
-				reservation.shiftId(), reservation.partySize(), tableLabel(reservation));
+		return details(reservation, visiblePlanOf(reservation));
 	}
 
-	private Reservation pendingReservation(Restaurant restaurant, DiningTable table, CreateReservationCommand command) {
-		return Reservation.newPending(ReservationCode.generate(), restaurant.id(), command.shiftId(), table.id(),
-				command.date(), command.partySize(), command.customerName(), command.customerPhone(),
-				command.customerEmail(), clock.instant());
+	private ReservationDetails details(Reservation reservation, Restaurant restaurant) {
+		// findById y no findAll: el turno puede estar oculto (borrado lógico) y la reserva lo sigue mostrando.
+		Shift shift = shifts.findById(restaurant.id(), reservation.shiftId()).orElseThrow(ShiftNotFoundException::new);
+		return details(reservation, restaurant, shift);
+	}
+
+	private ReservationDetails details(Reservation reservation, Restaurant restaurant, Shift shift) {
+		return new ReservationDetails(reservation.code(), reservation.status(), reservation.date(),
+				reservation.arrivalTime(), reservation.shiftId(), reservation.partySize(), tableLabel(reservation),
+				restaurant.name(), restaurant.slug(), restaurant.theme(), shift.name(), shift.start(), shift.end());
+	}
+
+	private Reservation pendingReservation(Restaurant restaurant, Long tableId, CreateReservationCommand command) {
+		return Reservation.newPending(ReservationCode.generate(restaurant.slug()), restaurant.id(), command.shiftId(),
+				tableId, command.date(), command.arrivalTime(), command.partySize(), command.customerName(),
+				command.customerPhone(), command.customerEmail(), clock.instant());
 	}
 
 }

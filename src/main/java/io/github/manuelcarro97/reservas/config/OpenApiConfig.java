@@ -15,8 +15,8 @@ class OpenApiConfig {
 	OpenAPI reservasOpenApi() {
 		return new OpenAPI()
 			.info(new Info().title("Reservas API").version("v1").description("Reservas de mesa sin overbooking"))
-			.components(new Components().addSecuritySchemes("basicAuth",
-					new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("basic")));
+			.components(new Components().addSecuritySchemes("firebase",
+					new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")));
 	}
 
 }

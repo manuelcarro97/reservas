@@ -1,0 +1,57 @@
+<section class="sheet card rise">
+  <h1 class="sheet-heading">Entra en tu <em>panel</em></h1>
+  <p class="sheet-desc">Gestiona tus planos y tus reservas.</p>
+  @if (signOutFailed()) {
+    <p class="callout bad" role="alert">
+      No se pudo cerrar la sesión: sigues dentro. Entra en el panel y vuelve a pulsar Salir.
+    </p>
+  }
+  <form novalidate (submit)="onSubmit($event, email.value, password.value)">
+    <fieldset [disabled]="busy()">
+      <label class="field">
+        Email
+        <input #email class="input" type="email" name="email" autocomplete="username" />
+      </label>
+      <div class="field">
+        <span class="field-head">
+          <label class="field-label" for="login-password">Contraseña</label>
+          <a class="side-link" routerLink="/recuperar">¿La olvidaste?</a>
+        </span>
+        <input
+          #password
+          id="login-password"
+          class="input"
+          type="password"
+          name="password"
+          autocomplete="current-password"
+        />
+      </div>
+
+      @if (error(); as message) {
+        <p class="callout bad" role="alert">{{ message }}</p>
+      }
+
+      <button type="submit" class="btn ink block">Entrar</button>
+      <p class="or" aria-hidden="true">O</p>
+      <button type="button" class="btn line block google" (click)="signInWithGoogle()">
+        Entrar con Google
+      </button>
+    </fieldset>
+  </form>
+
+  <p class="hint foot">¿Sin cuenta? <a routerLink="/registro">Crea una gratis</a></p>
+
+  @if (demo; as account) {
+    <div class="demo">
+      <div class="demo-text">
+        <span class="kicker">Prueba la demo</span>
+        <p>
+          Cuenta demo: <code>{{ account.email }}</code> / <code>{{ account.password }}</code>
+        </p>
+      </div>
+      <button type="button" class="btn line sm" (click)="fillDemo(email, password, account)">
+        Rellenar
+      </button>
+    </div>
+  }
+</section>

@@ -1,0 +1,251 @@
+<div class="top">
+  <div class="eyebrow">
+    Panel
+    @if (store.status() === 'ready') {
+      <span>/</span> <b>{{ store.plans().length }} de {{ store.maxPlans() }} planos</b>
+    }
+  </div>
+  <h1 class="page-title">Mis <em>planos</em></h1>
+  <p class="lead">
+    Dibuja tu sala, publícala y recibe reservas en tu enlace o incrustadas en tu web.
+  </p>
+</div>
+
+@switch (store.status()) {
+  @case ('loading') {
+    <p class="state" role="status">Cargando…</p>
+  }
+  @case ('error') {
+    <p class="state" role="alert">No se pudieron cargar tus planos. Inténtalo de nuevo.</p>
+    <div><button type="button" class="btn line" (click)="store.retry()">Reintentar</button></div>
+  }
+  @case ('ready') {
+    <div class="grid">
+      <div class="col">
+        @if (featured(); as plan) {
+          <section class="sheet featured" [attr.data-plan]="plan.slug">
+            <div class="plan-head">
+              <div class="plan-id">
+                <div class="plan-line">
+                  <h2 class="plan-name truncate" [attr.title]="plan.name">{{ plan.name }}</h2>
+                  <span
+                    class="dot-state"
+                    [class.live]="plan.status === 'PUBLISHED'"
+                    [class.draft]="plan.status === 'DRAFT'"
+                    >{{ plan.status ? statusLabels[plan.status] : '' }}</span
+                  >
+                </div>
+                <div class="link">
+                  <app-icon name="link" />
+                  <span class="truncate">{{ publicHost }}/r/{{ plan.slug }}</span>
+                </div>
+              </div>
+              @if (figures(); as f) {
+                <span class="kicker">Tema · {{ f.theme }}</span>
+              }
+            </div>
+
+            <div class="drawing">
+              @if (drawing(); as d) {
+                <app-plano [room]="d.room" [tables]="d.tables" [theme]="d.theme" />
+              } @else if (featuredDetail()?.state === 'error') {
+                <p class="state">No se pudo cargar el plano.</p>
+                <button type="button" class="btn line sm" (click)="retryDetail(plan.slug)">
+                  <app-icon name="rot" />Reintentar
+                </button>
+              } @else {
+                <p class="state" role="status">Cargando el plano…</p>
+              }
+            </div>
+
+            @if (figures(); as f) {
+              <div class="figures">
+                <div class="fig">
+                  <span class="kicker">Mesas</span><b>{{ f.tables }}</b
+                  ><span class="sub">en la sala</span>
+                </div>
+                <div class="fig">
+                  <span class="kicker">Capacidad</span><b>{{ f.seats }}</b
+                  ><span class="sub">comensales a la vez</span>
+                </div>
+                <div class="fig">
+                  <span class="kicker">Turnos</span><b>{{ f.shifts }}</b
+                  ><span class="sub truncate" [attr.title]="f.shiftNames">{{ f.shiftNames }}</span>
+                </div>
+                <div class="fig">
+                  <span class="kicker">Modo</span><b class="txt">{{ f.mode }}</b>
+                  @if (f.cancellation) {
+                    <span class="sub">{{ f.cancellation }}</span>
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="actions">
+              <a class="btn ink" [routerLink]="['/panel', plan.slug, 'plano']"
+                ><app-icon name="pen" />Plano interactivo</a
+              >
+              <a class="btn quiet" [routerLink]="['/panel', plan.slug]"
+                ><app-icon name="cal" />Reservas</a
+              >
+              <a class="btn quiet" [routerLink]="['/panel', plan.slug, 'turnos']"
+                ><app-icon name="clock" />Turnos</a
+              >
+              <span class="spacer"></span>
+              @switch (featuredCopy()) {
+                @case ('copied') {
+                  <span class="copy-status" role="status">Copiado</span>
+                }
+                @case ('manual') {
+                  <span class="copy-status" role="status">Copia el enlace a mano</span>
+                }
+              }
+              <a
+                class="btn sq"
+                title="Configuración"
+                aria-label="Configuración"
+                [routerLink]="['/panel', plan.slug, 'ajustes']"
+                ><app-icon name="gear"
+              /></a>
+              @if (plan.status === 'PUBLISHED') {
+                <button
+                  type="button"
+                  class="btn sq"
+                  title="Copiar enlace"
+                  aria-label="Copiar enlace"
+                  (click)="copyLink(plan)"
+                >
+                  <app-icon name="copy" />
+                </button>
+              }
+              <a
+                class="btn sq"
+                title="Código para tu web"
+                aria-label="Código para tu web"
+                [routerLink]="['/panel', plan.slug, 'ajustes']"
+                ><app-icon name="code"
+              /></a>
+            </div>
+          </section>
+        } @else {
+          <div class="sheet empty-state">
+            <p>Todavía no tienes ningún plano.</p>
+            <p class="hint">Dibuja tu sala con el formulario y publícala cuando esté lista.</p>
+          </div>
+        }
+
+        @if (others().length > 0 || freeSlots() > 0) {
+          <div class="others">
+            <div class="others-head">
+              <h3 class="others-title">Otros planos</h3>
+              <span class="kicker"
+                >{{ store.plans().length }} de {{ store.maxPlans() }} usados</span
+              >
+            </div>
+            <ul class="mini">
+              @for (other of others(); track other.plan.slug) {
+                <li class="sheet" [attr.data-plan]="other.plan.slug">
+                  <div class="mini-head">
+                    <h4 class="mini-name truncate" [attr.title]="other.plan.name">
+                      {{ other.plan.name }}
+                    </h4>
+                    <span
+                      class="dot-state"
+                      [class.live]="other.plan.status === 'PUBLISHED'"
+                      [class.draft]="other.plan.status === 'DRAFT'"
+                      >{{ other.plan.status ? statusLabels[other.plan.status] : '' }}</span
+                    >
+                  </div>
+                  @if (other.plan.status === 'DRAFT') {
+                    <p>Sin publicar: aún no acepta reservas.</p>
+                  }
+                  <div class="row-sb">
+                    <span>{{ other.summary }}</span>
+                    <a
+                      [routerLink]="['/panel']"
+                      [queryParams]="{ plano: other.plan.slug }"
+                      [attr.aria-label]="'Abrir ' + other.plan.name"
+                      >Abrir <app-icon name="arrow"
+                    /></a>
+                  </div>
+                </li>
+              }
+              @if (freeSlots() > 0) {
+                <li class="free-slot">
+                  <app-icon name="plus" />
+                  {{
+                    freeSlots() === 1
+                      ? 'Te queda 1 plano libre'
+                      : 'Te quedan ' + freeSlots() + ' planos libres'
+                  }}
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+
+      <aside class="col">
+        @if (createError(); as message) {
+          <p class="error" role="alert">{{ message }}</p>
+        }
+
+        @if (store.demo()) {
+          <p class="state">
+            Esta es la cuenta de demostración: puedes mirar todo, pero es de solo lectura.
+          </p>
+        } @else if (store.canCreatePlan()) {
+          <form class="sheet create-plan" novalidate (submit)="create($event)">
+            <h3>Crear un plano nuevo</h3>
+            <fieldset [disabled]="creating()">
+              <label class="field">
+                Nombre del local
+                <input
+                  class="input"
+                  type="text"
+                  name="name"
+                  maxlength="120"
+                  autocomplete="off"
+                  [value]="name()"
+                  (input)="onName($event)"
+                />
+              </label>
+              <label class="field">
+                Enlace
+                <input
+                  class="input"
+                  type="text"
+                  name="slug"
+                  maxlength="80"
+                  autocomplete="off"
+                  spellcheck="false"
+                  [value]="slug()"
+                  (input)="onSlug($event)"
+                />
+              </label>
+              <p class="hint">
+                Tus clientes reservarán en <code>/r/{{ slug() || 'enlace' }}</code>
+              </p>
+              <button type="submit" class="btn ink">
+                Continuar al editor de sala<app-icon name="arrow" />
+              </button>
+              <p class="hint centered">Elegirás la forma de la sala y colocarás las mesas.</p>
+            </fieldset>
+          </form>
+        } @else {
+          <p class="state">
+            Has llegado al máximo de {{ store.maxPlans() }} planos. Borra uno desde su Configuración
+            si quieres crear otro.
+          </p>
+        }
+
+        @if (store.plans().length > 0) {
+          <div class="aside-note">
+            <b>¿Lo quieres en tu web?</b>En Configuración tienes el código para incrustar tu página
+            de reservas sin cabecera.
+          </div>
+        }
+      </aside>
+    </div>
+  }
+}

@@ -1,0 +1,34 @@
+<section class="sheet card rise">
+  <h1 class="sheet-heading">Crear <em>cuenta</em></h1>
+  <form novalidate (submit)="onSubmit($event, email.value, password.value)">
+    <fieldset [disabled]="busy()">
+      <label class="field">
+        Email
+        <input #email class="input" type="email" name="email" autocomplete="username" />
+      </label>
+      <label class="field">
+        Contraseña
+        <input
+          #password
+          class="input"
+          type="password"
+          name="password"
+          autocomplete="new-password"
+        />
+        <small>Mínimo 6 caracteres.</small>
+      </label>
+
+      @if (error(); as message) {
+        <p class="callout bad" role="alert">{{ message }}</p>
+      }
+
+      <button type="submit" class="btn ink block">Crear cuenta</button>
+      <p class="or" aria-hidden="true">O</p>
+      <button type="button" class="btn line block google" (click)="signInWithGoogle()">
+        Continuar con Google
+      </button>
+    </fieldset>
+  </form>
+
+  <p class="hint foot"><a routerLink="/entrar">Ya tengo cuenta</a></p>
+</section>

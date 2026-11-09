@@ -5,6 +5,6 @@ import java.util.List;
 
 public interface GetOccupancyUseCase {
 
-	List<TableOccupancy> occupancy(String slug, long shiftId, LocalDate date);
+	List<TableOccupancy> occupancy(String ownerUid, String slug, long shiftId, LocalDate date);
 
 }
