@@ -12,10 +12,16 @@ function internationalDigits(phone: string): string {
 
 /**
  * Si hay un número real al que escribir. La cuenta demo enmascara los teléfonos de los visitantes (`•••78`): ahí no
- * hay enlace, y la acción se hace igual.
+ * hay enlace, y la acción se hace igual. Tampoco hay enlace si, quitado el `00` internacional, empieza por 0: ningún
+ * prefijo de país ni móvil lo hace (los teléfonos de muestra de la demo son `000 000 00N`).
  */
 export function canWhatsapp(phone: string): boolean {
-  return !phone.includes('•') && phone.replace(/\D/g, '').length >= MIN_DIGITS;
+  const digits = phone.replace(/\D/g, '');
+  return (
+    !phone.includes('•') &&
+    digits.length >= MIN_DIGITS &&
+    !digits.replace(/^00/, '').startsWith('0')
+  );
 }
 
 /** Enlace `wa.me` con el texto ya escrito. El envío lo hace el dueño desde su móvil. */

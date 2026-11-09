@@ -38,6 +38,18 @@ describe('whatsapp', () => {
     expect(canWhatsapp('')).toBe(false);
   });
 
+  it('canWhatsappRejectsNumbersThatStartWithZeroAfterThePrefix', () => {
+    // Los teléfonos de muestra de la demo: nueve cifras, pero ningún número real empieza por 0.
+    expect(canWhatsapp('000 000 001')).toBe(false);
+    expect(canWhatsapp('000000006')).toBe(false);
+    expect(canWhatsapp('012 345 678')).toBe(false);
+    // El `00` de las llamadas internacionales no cuenta.
+    expect(canWhatsapp('0034 612 345 678')).toBe(true);
+    expect(canWhatsapp('0044 7700 900123')).toBe(true);
+    expect(canWhatsapp('+34 612 345 678')).toBe(true);
+    expect(canWhatsapp('+44 7700 900123')).toBe(true);
+  });
+
   it('messagesCarryNameDateShiftArrivalAndCode', () => {
     const info = {
       customerName: 'Ana',
