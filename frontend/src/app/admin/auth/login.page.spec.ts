@@ -166,6 +166,9 @@ describe('LoginPage demo box', () => {
     await open(DEMO);
 
     expect(page.textContent).toContain('Cuenta demo');
+    expect(page.textContent).toContain(
+      'La primera carga puede tardar hasta 2 minutos: la demo usa un servidor gratuito que se apaga tras un rato sin uso.',
+    );
     expect(page.textContent).toContain(DEMO.email);
     expect(page.textContent).toContain(DEMO.password);
     expect(fillButton()?.type).toBe('button');

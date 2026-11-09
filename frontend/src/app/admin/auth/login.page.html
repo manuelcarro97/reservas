@@ -48,6 +48,10 @@
         <p>
           Cuenta demo: <code>{{ account.email }}</code> / <code>{{ account.password }}</code>
         </p>
+        <p class="hint">
+          La primera carga puede tardar hasta 2 minutos: la demo usa un servidor gratuito que se
+          apaga tras un rato sin uso.
+        </p>
       </div>
       <button type="button" class="btn line sm" (click)="fillDemo(email, password, account)">
         Rellenar

@@ -56,7 +56,7 @@ jdbc:postgresql://<host>/<base-de-datos>?sslmode=verify-full&sslfactory=org.post
    - Pulsa **Win+V** y elige **Borrar todo** en el historial del portapapeles.
    - Borra el JSON descargado **sin pasar por la papelera**: selecciónalo y pulsa **Shift+Supr**.
 3. **No crees la cuenta demo a mano en Authentication.** La API la crea sola al arrancar, con el uid fijo `demo-owner`, el email de `DEMO_EMAIL` y la contraseña de `DEMO_PASSWORD`, y la restaura cada noche a las 4:00 (Madrid). Si ya existe un usuario con ese email y otro uid, falla la cuenta (el log de Render muestra `Demo account provisioning failed` con un código de email ya existente), aunque el plano de la demo se restaura igualmente; así sigue fallando cada noche hasta que lo arregles. Si ya lo creaste, bórralo en Authentication, Usuarios.
-4. Comprueba en Authentication, Sign-in method, que **Google** y **Correo electrónico/contraseña** están activados. En Authentication, Settings, Authorized domains, `reservas-6d51b.web.app` y `reservas-6d51b.firebaseapp.com` ya vienen autorizados; `reservas-api.onrender.com` no hace falta, porque Firebase Auth solo corre en el frontend.
+4. Comprueba en Authentication, Sign-in method, que **Google** y **Correo electrónico/contraseña** están activados. En Authentication, Settings, Authorized domains, `reservas-6d51b.web.app` y `reservas-6d51b.firebaseapp.com` ya vienen autorizados; `reservas-api-0vml.onrender.com` no hace falta, porque Firebase Auth solo corre en el frontend.
 5. Si la clave de API de la web (la de `frontend/src/environments/environment.ts`) tiene restricción de referrers HTTP, añade en Google Cloud Console, APIs y servicios, Credenciales, esa clave de navegador:
    - `https://reservas-6d51b.web.app/*`
    - `https://reservas-6d51b.firebaseapp.com/*`: el helper de `signInWithPopup` (`/__/auth/iframe`) corre en ese dominio y llama a Firebase con la misma clave.
@@ -82,10 +82,10 @@ jdbc:postgresql://<host>/<base-de-datos>?sslmode=verify-full&sslfactory=org.post
 
    Render solo pregunta estas variables al crear el Blueprint. Una secreta nueva que añadas después va a mano, en el panel del servicio, Environment.
 3. Despliega. La primera vez construye la imagen con Maven y tarda varios minutos.
-4. Cuando termine, copia la URL pública del servicio. Debe ser `https://reservas-api.onrender.com`. Si Render la dio con otro sufijo porque el nombre estaba cogido, cámbiala en dos sitios (hay un test, `frontend/src/environments/production.spec.ts`, que comprueba que coinciden):
+4. Cuando termine, copia la URL pública del servicio. Debe ser `https://reservas-api-0vml.onrender.com`. Si Render la dio con otro sufijo porque el nombre estaba cogido, cámbiala en dos sitios (hay un test, `frontend/src/environments/production.spec.ts`, que comprueba que coinciden):
    - `apiBaseUrl` de `frontend/src/environments/environment.ts`
    - el `connect-src` de las dos reglas de Content-Security-Policy de `firebase.json`
-5. Abre `https://reservas-api.onrender.com/actuator/health`: debe responder `{"status":"UP"}`.
+5. Abre `https://reservas-api-0vml.onrender.com/actuator/health`: debe responder `{"status":"UP"}`.
 6. En los logs de Render busca el arranque (`Started ReservasApiApplication`) y las migraciones de Flyway. Comprueba que **no** aparece ninguno de estos mensajes, porque la API arranca igualmente aunque Firebase falle y la demo se vería rota sin avisar:
    - `Firebase identity provider is disabled`: `FIREBASE_SERVICE_ACCOUNT_JSON` no es una cuenta de servicio utilizable (suele ser el JSON cortado o partido en varias líneas).
    - `Identity provider not configured`: la API usa el sustituto que solo escribe en el log; la cuenta demo no se crea ni se borran usuarios de Firebase.
@@ -111,7 +111,7 @@ Hay dos dudas sin comprobar, y las dos acaban igual (el cupo deja de ser por per
 Ninguna permite falsear la IP (el valor que escribe el cliente queda a la izquierda del real y no se lee), pero hay que comprobar cuál es la IP que ve la API. La API no la registra, así que se pide a Tomcat que la escriba. Comprobación, en este orden:
 
 1. En Render, servicio `reservas-api`, Environment, añade **temporalmente** `LOGGING_LEVEL_ORG_APACHE_CATALINA_VALVES=DEBUG` y guarda (Render reinicia el servicio).
-2. Haz una petición cualquiera, por ejemplo abre `https://reservas-api.onrender.com/actuator/health`, y anota tu IP pública (en Git Bash: `curl -s ifconfig.me`; en IPv6 saldrá la dirección IPv6).
+2. Haz una petición cualquiera, por ejemplo abre `https://reservas-api-0vml.onrender.com/actuator/health`, y anota tu IP pública (en Git Bash: `curl -s ifconfig.me`; en IPv6 saldrá la dirección IPv6).
 3. En los logs de Render busca la línea de `RemoteIpValve` de esa petición: `Incoming request /actuator/health with originalRemoteAddr ... will be seen as newRemoteAddr=...` (o, si Tomcat no trata la petición como venida de un proxy interno, `Skip RemoteIpValve ... originalRemoteAddr ...`). Compara `newRemoteAddr` con tu IP:
    - **Es tu IP**: todo bien. Quita la variable del paso 1.
    - **Es una IP privada** (`10.x`, `100.64.x`...), la del balanceador: caso grave, cupo global. Tomcat no ha aceptado el proxy o no ha encontrado la cabecera. Mira `originalRemoteAddr` y aplica la **opción A** con el rango al que pertenece esa IP.
@@ -184,14 +184,14 @@ Si alguna ruta sale con **2** CSP, o con ninguna, Hosting no está aplicando las
 **CORS** de la API: la respuesta debe llevar `access-control-allow-origin: https://reservas-6d51b.web.app`:
 
 ```bash
-curl -s -o /dev/null -D - -H "Origin: https://reservas-6d51b.web.app" https://reservas-api.onrender.com/api/v1/restaurants/demo | grep -i access-control-allow-origin
+curl -s -o /dev/null -D - -H "Origin: https://reservas-6d51b.web.app" https://reservas-api-0vml.onrender.com/api/v1/restaurants/demo | grep -i access-control-allow-origin
 ```
 
 Es un `GET` a propósito: `curl -I` manda `HEAD`, que la configuración de CORS de la API no admite, y daría un falso fallo.
 
 **En el navegador** (con las herramientas de desarrollo abiertas, pestaña Console):
 
-1. Abre `https://reservas-api.onrender.com/actuator/health` y espera a `UP`. Así la API está despierta.
+1. Abre `https://reservas-api-0vml.onrender.com/actuator/health` y espera a `UP`. Así la API está despierta.
 2. Abre `https://reservas-6d51b.web.app/entrar`: la página sale con sus estilos y sin errores de "Content Security Policy" en la consola.
 3. **Entrar con Google**: se abre el popup, eliges cuenta y vuelves al panel. Si la consola muestra una violación de CSP con un host nuevo (`apis.google.com` ya está), añade ese host a `script-src`, `connect-src` o `frame-src` en las **dos** reglas de `firebase.json`, y ajusta `frontend/src/environments/production.spec.ts`.
 4. **Entrar con correo y contraseña**: en `/entrar`, con `DEMO_EMAIL` y `DEMO_PASSWORD`, debe llevar al panel y mostrar el plano de la demo. Si falla, mira los logs de Render (sección 3, paso 6): la cuenta la crea la API.

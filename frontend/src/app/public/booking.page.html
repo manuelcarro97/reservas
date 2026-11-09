@@ -1,6 +1,10 @@
 @switch (store.status()) {
   @case ('loading') {
     <h1 class="state" role="status">Cargando…</h1>
+    <p class="hint slow-start">
+      La primera carga puede tardar hasta 2 minutos: la demo usa un servidor gratuito que se apaga
+      tras un rato sin uso.
+    </p>
   }
   @case ('unavailable') {
     <h1 class="state" role="alert">Este plano no está disponible</h1>
@@ -197,7 +201,9 @@
 
             @if (store.isDemo()) {
               <p class="callout warn">
-                Esta es una demo pública: no uses tu nombre ni teléfono reales.
+                Esta es una demo pública: no uses tu nombre ni teléfono reales. La primera carga
+                puede tardar hasta 2 minutos: la demo usa un servidor gratuito que se apaga tras un
+                rato sin uso.
               </p>
             }
 
