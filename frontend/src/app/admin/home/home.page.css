@@ -3,10 +3,91 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  gap: 16px;
   min-height: 0;
 }
 
 .top {
   flex: none;
-  margin-bottom: 18px;
+}
+
+.page-title {
+  margin-top: 8px;
+}
+
+/* Cifras de hoy: una franja de cinco con el aire de la maqueta. */
+.today {
+  flex: none;
+  padding: 0;
+}
+
+.today .figures {
+  border-top: 0;
+}
+
+.today .fig {
+  padding: 14px 20px 12px;
+}
+
+.fig b small {
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.fig.warn b {
+  color: var(--warn);
+}
+
+.part-error {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 20px;
+}
+
+.part-error p {
+  margin: 0;
+}
+
+/* Las tres tarjetas del centro reparten el alto que sobra: solo la lista de pendientes se desplaza por dentro. */
+.grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.grid > .sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Título serif de la maqueta de Inicio. */
+.sheet-head {
+  flex: none;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.sheet-title {
+  font: 400 24px/28px var(--serif);
+}
+
+.week-sheet {
+  flex: none;
+  padding-bottom: 16px;
+}
+
+/* Estrecha: las tarjetas se apilan y la página puede desplazarse. */
+@media (max-width: 1023px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .today .figures {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

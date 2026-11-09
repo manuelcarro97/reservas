@@ -1,0 +1,96 @@
+/* Disposición de la tarjeta "Tu plano". El aspecto común (hoja, cifras, plano enmarcado, botones) sale de styles/base.css. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Título serif de la maqueta de Inicio. */
+.sheet-head {
+  flex: none;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.sheet-title {
+  font: 400 24px/28px var(--serif);
+}
+
+.plan-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+/* Cifras en 2 × 2 en lugar de la fila de siempre. */
+.figures.two {
+  grid-auto-flow: row;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+  border-top: 1px solid var(--rule);
+}
+
+.figures.two .fig {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.figures.two .fig:nth-child(2n) {
+  border-right: 0;
+}
+
+.figures.two .fig b {
+  font-size: 28px;
+  line-height: 30px;
+}
+
+.figures.two .fig b.txt {
+  font-size: 14px;
+  line-height: 30px;
+}
+
+.fig .sub {
+  display: block;
+}
+
+.plan-foot {
+  display: flex;
+  flex: none;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.link-box {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 5px 5px 5px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--wash);
+}
+
+.mono {
+  color: var(--ink-2);
+  font: 12px var(--mono);
+}
+
+.copy-status {
+  color: var(--ok);
+  font: 500 11px/1 var(--mono);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.buttons {
+  flex: none;
+  flex-wrap: nowrap;
+  gap: 6px;
+}

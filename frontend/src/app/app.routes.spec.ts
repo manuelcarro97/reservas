@@ -209,8 +209,24 @@ describe('routes', () => {
         expect(host.textContent).toContain('Kafé / Turnos');
         expect(host.textContent).toContain('Días cerrados');
       } else if (href === '/panel/kafe/inicio') {
-        // El esqueleto de Inicio no pide nada a la API: la cabecera ya trae el nombre del plano.
+        // Inicio pide el plano y, con su zona horaria, las reservas de hoy, los pendientes y los cierres.
         await flushPromises();
+        backend
+          .expectOne((request) => request.url.endsWith('/api/v1/admin/restaurants/kafe'))
+          .flush({
+            slug: 'kafe',
+            name: 'Kafé',
+            status: 'DRAFT',
+            timeZone: 'Europe/Madrid',
+            tables: [],
+            shifts: [],
+          });
+        await harness.fixture.whenStable();
+        await flushPromises();
+        backend
+          .match((request) => request.url.includes('/api/v1/admin/restaurants/kafe/'))
+          .forEach((request) => request.flush([]));
+        await harness.fixture.whenStable();
         harness.detectChanges();
         expect(host.querySelector('app-home-page .eyebrow b')?.textContent).toBe('Kafé');
         expect(host.querySelector('app-home-page h1')?.textContent).toContain('Hoy');

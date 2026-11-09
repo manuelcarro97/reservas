@@ -1,0 +1,53 @@
+<div class="sheet-head">
+  <h2 class="sheet-title">Tu plano</h2>
+  <span class="dot-state" [class.live]="published()" [class.draft]="!published()">{{
+    plan().status ? statusLabels[plan().status!] : ''
+  }}</span>
+</div>
+
+<div class="plan-body">
+  @let d = drawing();
+  <div class="drawing">
+    <app-plano [room]="d.room" [tables]="d.tables" [theme]="d.theme" />
+  </div>
+  @let f = figures();
+  <div class="figures two">
+    <div class="fig">
+      <span class="kicker">Mesas</span><b>{{ f.tables }}</b>
+    </div>
+    <div class="fig">
+      <span class="kicker">Capacidad</span><b>{{ f.seats }}</b
+      ><span class="sub">comensales</span>
+    </div>
+    <div class="fig">
+      <span class="kicker">Turnos</span><b>{{ f.shifts }}</b
+      ><span class="sub truncate" [attr.title]="f.shiftNames">{{ f.shiftNames }}</span>
+    </div>
+    <div class="fig">
+      <span class="kicker">Modo</span><b class="txt">{{ f.mode }}</b>
+    </div>
+  </div>
+</div>
+
+<div class="plan-foot">
+  @if (published()) {
+    <div class="link-box">
+      <span class="mono truncate" [attr.title]="publicUrl()">{{ publicHost() }}</span>
+      @switch (copyStatus()) {
+        @case ('copied') {
+          <span class="copy-status" role="status">Copiado</span>
+        }
+        @case ('manual') {
+          <span class="copy-status" role="status">Copia el enlace a mano</span>
+        }
+      }
+      <button type="button" class="btn line sm" (click)="copyLink()">Copiar</button>
+    </div>
+  }
+  <div class="buttons">
+    <a class="btn ink sm" [routerLink]="['/panel', plan().slug, 'plano']">Editar plano</a>
+    @if (published()) {
+      <a class="btn line sm" [routerLink]="['/r', plan().slug]">Ver página pública</a>
+    }
+  </div>
+</div>
