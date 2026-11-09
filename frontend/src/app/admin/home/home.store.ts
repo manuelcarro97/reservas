@@ -8,7 +8,7 @@ import { AdminPlanControllerService } from '../../core/api/services/admin-plan-c
 import { AdminReservationControllerService } from '../../core/api/services/admin-reservation-controller.service';
 import { AdminShiftControllerService } from '../../core/api/services/admin-shift-controller.service';
 import { NOW, addDays, timeIn, todayIn } from '../../core/time';
-import { adminErrorMessage } from '../admin-errors';
+import { PUBLISH_FAILED_MESSAGE, adminErrorMessage } from '../admin-errors';
 import { MeStore } from '../me.store';
 import { PendingReservationsService } from '../reservations/pending-reservations.service';
 import { ActionHost, ReservationActions } from '../reservations/reservation-actions';
@@ -22,8 +22,6 @@ export type HomePart = 'today' | 'pending' | 'closures' | 'week';
 
 /** Lo que cuenta como fallo: `next` (reservas del próximo turno, si no es hoy) se muestra junto a las de hoy. */
 type FailureKey = HomePart | 'next';
-
-const PUBLISH_FAILED = 'No se pudo publicar el plano. Inténtalo de nuevo.';
 
 /** Días de la semana: de lunes a domingo. */
 const WEEK_DAYS = 7;
@@ -230,7 +228,7 @@ export class HomeStore implements ActionHost {
         error: (error: HttpErrorResponse) => {
           if (view === this.view) {
             this.publishing.set(false);
-            this.publishError.set(adminErrorMessage(error, PUBLISH_FAILED));
+            this.publishError.set(adminErrorMessage(error, PUBLISH_FAILED_MESSAGE));
           }
         },
       }),

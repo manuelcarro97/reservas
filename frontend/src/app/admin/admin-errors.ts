@@ -36,6 +36,9 @@ const MESSAGES: Record<string, string> = {
 /** Texto del 429 de las acciones del panel (reservas, turnos, días cerrados, ajustes). */
 export const RATE_LIMITED_ACTIONS_MESSAGE = 'Demasiadas acciones seguidas, espera un momento';
 
+/** Texto genérico si publicar el plano falla sin un código conocido (editor e Inicio). */
+export const PUBLISH_FAILED_MESSAGE = 'No se pudo publicar el plano. Inténtalo de nuevo.';
+
 /**
  * Mensaje en español de un error de la API del panel. Primero el `code` (hay dos 429 distintos: `RATE_LIMITED` y
  * `PLAN_CREATION_LIMIT`); si no es un código conocido, `fallback`.

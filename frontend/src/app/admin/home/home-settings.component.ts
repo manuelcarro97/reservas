@@ -2,13 +2,11 @@ import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PlanResponse } from '../../core/api/models/plan-response';
+import { BOOKING_WINDOW_DAYS } from '../../core/booking-policy';
 import { calendarLeaf, longDateParts } from '../../core/time';
 import { embedSnippet } from '../embed-snippet';
 import { MeStore } from '../me.store';
 import { BOOKING_MODE_LABELS } from '../plan-status';
-
-/** Días de antelación con que se puede reservar: dato fijo del sistema (`BookingPolicy`), no se edita. */
-const BOOKING_WINDOW_DAYS = 90;
 
 /** Estado de la lectura de los cierres, para no decir "ninguno" mientras llega o si falló. */
 export type ClosureStatus = 'loading' | 'failed' | 'ready';

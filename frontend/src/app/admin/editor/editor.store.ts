@@ -22,7 +22,12 @@ import {
 } from '../../plano/geometry';
 import { PlanoTable } from '../../plano/plano.component';
 import { ThemeKey } from '../../plano/themes';
-import { adminErrorMessage, blockingReservations, layoutProblems } from '../admin-errors';
+import {
+  PUBLISH_FAILED_MESSAGE,
+  adminErrorMessage,
+  blockingReservations,
+  layoutProblems,
+} from '../admin-errors';
 import { sameRoom, sameTables } from './layout-compare';
 import { Handle, WallMove, moveHandleBy, moveHandleTo } from './room-handles';
 
@@ -61,7 +66,6 @@ const DEFAULT_CANCELLATION_HOURS = 2;
 
 const SAVE_FAILED = 'No se pudo guardar el plano. Inténtalo de nuevo.';
 const THEME_FAILED = 'El plano se guardó, pero el tema no se pudo cambiar.';
-const PUBLISH_FAILED = 'No se pudo publicar el plano. Inténtalo de nuevo.';
 
 /**
  * Nombre para la mesa siguiente: el mayor número entero entre los nombres más uno (o "1"). Solo cuentan los nombres
@@ -497,7 +501,7 @@ export class EditorStore {
       this.load(await firstValueFrom(this.api.publish({ slug: this.slug() })));
       return true;
     } catch (error) {
-      this.publishErrorState.set(this.messageOf(error, PUBLISH_FAILED));
+      this.publishErrorState.set(this.messageOf(error, PUBLISH_FAILED_MESSAGE));
       return false;
     } finally {
       this.publishingState.set(false);
