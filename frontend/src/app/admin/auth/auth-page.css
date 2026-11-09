@@ -1,105 +1,119 @@
+/* Disposición de entrar, registro y recuperar: una hoja centrada. El aspecto común sale de styles/base.css. */
 :host {
-  display: block;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
 }
 
 .card {
-  max-width: 24rem;
-  margin: 2rem auto;
-  padding: 1.5rem;
-  border: 1px solid #e3e7ec;
-  border-radius: 10px;
-  background: #fff;
+  width: 100%;
+  max-width: 440px;
+  padding: 34px 32px;
 }
 
-h1 {
-  margin: 0 0 1rem;
-  font-size: 1.4rem;
+/* Sin descripción debajo (registro), el formulario respira igualmente. */
+.sheet-heading + form {
+  margin-top: 14px;
 }
 
 fieldset {
-  display: grid;
-  gap: 1rem;
+  display: block;
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-label {
-  display: grid;
-  gap: 0.25rem;
-  font-weight: 600;
+.callout {
+  margin-top: 16px;
 }
 
-input {
-  padding: 0.5rem;
-  border: 1px solid #c4ccd6;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 400;
+.btn.block {
+  margin-top: 20px;
 }
 
-.hint {
-  margin: 0;
-  color: #5b6877;
-  font-size: 0.9rem;
-  font-weight: 400;
-}
-
-.button,
-.google {
-  padding: 0.6rem 1.4rem;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.button {
-  border: 0;
-  background: #2457a6;
-  color: #fff;
-}
-
-.google {
-  border: 1px solid #c4ccd6;
-  background: #fff;
-  color: inherit;
-}
-
-.button:disabled,
-.google:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.or {
-  margin: 0;
-  text-align: center;
-  color: #5b6877;
-}
-
-.error,
-.notice {
-  margin: 0;
-  padding: 0.6rem 0.8rem;
-  border-radius: 6px;
-}
-
-.error {
-  background: #fde8e6;
-  color: #8e1d14;
-}
-
-.notice {
-  background: #e4f4ea;
-  color: #14532d;
-}
-
-.links {
+/* Contraseña: la etiqueta y, a su derecha, el enlace de recuperar. */
+.field-head {
   display: flex;
-  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 0.5rem;
-  margin: 1rem 0 0;
+}
+
+.field-head .field-label {
+  margin: 0;
+}
+
+.side-link {
+  color: var(--blue-deep);
+  font: 400 12px/16px var(--sans);
+  letter-spacing: 0;
+  text-decoration: none;
+  text-transform: none;
+}
+
+.side-link:hover {
+  text-decoration: underline;
+}
+
+/* Separador "O" entre Entrar y Entrar con Google. */
+.or {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 16px 0;
+  color: var(--muted);
+  font: 500 10.5px/1 var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.or::before,
+.or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+.or + .btn.block {
+  margin-top: 0;
+}
+
+.foot {
+  margin: 16px 0 0;
+  text-align: center;
+}
+
+.foot a {
+  color: var(--blue-deep);
+}
+
+/* Cuenta de la demo pública: recuadro con su botón Rellenar. */
+.demo {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 4px;
+  background: var(--wash);
+}
+
+.demo-text {
+  min-width: 0;
+}
+
+.demo-text p {
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.demo-text code {
+  color: var(--ink);
+  font: 500 12px/16px var(--mono);
 }

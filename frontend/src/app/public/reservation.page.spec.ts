@@ -120,8 +120,30 @@ describe('ReservationPage', () => {
     await open();
 
     const host = page.querySelector<HTMLElement>('app-reservation-page')!;
-    expect(host.style.getPropertyValue('--page')).toBe(THEMES.NOCHE.page);
     expect(host.style.getPropertyValue('--accent')).toBe(THEMES.NOCHE.cushA);
+  });
+
+  it('shellHeaderShowsTheVenueName', async () => {
+    await open();
+
+    expect(page.querySelector('header')?.textContent).toContain('Kafé');
+    expect(page.querySelector('header')?.textContent).not.toContain('reservas.');
+  });
+
+  it('shellHeaderKeepsTheBrandWhenTheReservationIsNotFound', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(`/reserva/${CODE}`);
+    page = harness.routeNativeElement as HTMLElement;
+    expectApi(CODE, 'GET').flush({}, { status: 404, statusText: 'Not Found' });
+    await settle();
+
+    expect(page.querySelector('header')?.textContent).toContain('reservas.');
+  });
+
+  it('footerAppearsOnlyOnce', async () => {
+    await open();
+
+    expect(page.querySelectorAll('footer').length).toBe(1);
   });
 
   it('unknownThemeFallsBackToAzul', async () => {
@@ -131,7 +153,7 @@ describe('ReservationPage', () => {
     });
 
     const host = page.querySelector<HTMLElement>('app-reservation-page')!;
-    expect(host.style.getPropertyValue('--page')).toBe(THEMES.AZUL.page);
+    expect(host.style.getPropertyValue('--accent')).toBe(THEMES.AZUL.cushA);
     expect(page.textContent).toContain(CODE);
   });
 

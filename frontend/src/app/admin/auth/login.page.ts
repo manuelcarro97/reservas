@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { DEMO_ACCOUNT, DemoAccount } from '../../core/config';
 import { PanelExit } from '../panel-exit.service';
 import { AuthForm } from './auth-form';
 
@@ -15,10 +16,23 @@ export class LoginPage extends AuthForm {
   /** Salir del panel llegó hasta aquí pero no pudo cerrar la sesión: se avisa una vez, mientras esta página esté. */
   protected readonly signOutFailed = inject(PanelExit).signOutFailed;
 
+  /** Cuenta de la demo pública (`environment.demoAccount`); sin ella no hay recuadro de demo. */
+  protected readonly demo = inject(DEMO_ACCOUNT);
+
   constructor() {
     super();
     const signOutFailed = this.signOutFailed;
     inject(DestroyRef).onDestroy(() => signOutFailed.set(false));
+  }
+
+  /** Copia la cuenta demo en los campos. No envía el formulario: entrar sigue siendo el botón Entrar. */
+  protected fillDemo(
+    email: HTMLInputElement,
+    password: HTMLInputElement,
+    account: DemoAccount,
+  ): void {
+    email.value = account.email;
+    password.value = account.password;
   }
 
   protected async onSubmit(event: Event, email: string, password: string): Promise<void> {

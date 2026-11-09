@@ -9,17 +9,29 @@ import { RouterLink } from '@angular/router';
   selector: 'app-not-found-page',
   imports: [RouterLink],
   template: `
-    <section class="not-found">
-      <h1>Página no encontrada</h1>
-      <p>La dirección que has escrito no existe.</p>
-      <p><a routerLink="/entrar">Ir a la entrada del panel</a></p>
+    <section class="sheet not-found rise">
+      <p class="kicker">Error 404</p>
+      <h1 class="sheet-heading">Página no <em>encontrada</em></h1>
+      <p class="sheet-desc">La dirección que has escrito no existe.</p>
+      <a class="btn ink" routerLink="/entrar">Ir a la entrada del panel</a>
     </section>
   `,
   styles: `
+    :host {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+    }
+
     .not-found {
-      margin: 3rem auto;
-      max-width: 32rem;
-      text-align: center;
+      width: 100%;
+      max-width: 440px;
+      padding: 34px 32px;
+    }
+
+    .kicker {
+      margin: 0 0 10px;
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

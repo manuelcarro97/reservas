@@ -4,6 +4,7 @@ import {
   Component,
   DestroyRef,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -15,7 +16,7 @@ import { ReservationDetails } from '../core/api/models/reservation-details';
 import { PublicReservationControllerService } from '../core/api/services/public-reservation-controller.service';
 import { THEMES, knownTheme } from '../plano/themes';
 import { errorCode, rateLimitedMessage } from '../core/api-errors';
-import { PoweredByComponent } from './powered-by.component';
+import { PublicTitle } from './public-title.service';
 
 type LookupStatus = 'loading' | 'ready' | 'not-found' | 'error';
 
@@ -29,6 +30,13 @@ const STATUS_LABELS: Record<NonNullable<ReservationDetails['status']>, string> =
   NO_SHOW: 'No presentada',
 };
 
+const STATUS_CLASSES: Record<NonNullable<ReservationDetails['status']>, string> = {
+  PENDING: 'pend',
+  CONFIRMED: 'conf',
+  CANCELLED: 'gone',
+  NO_SHOW: 'gone',
+};
+
 const DEADLINE_PASSED_MESSAGE =
   'Ya ha pasado el plazo para cancelar esta reserva. Si no vas a poder ir, avisa al local.';
 const NOT_CANCELLABLE_MESSAGE = 'Esta reserva ya no se puede cancelar.';
@@ -37,16 +45,12 @@ const GENERIC_CANCEL_ERROR = 'No se pudo cancelar la reserva. Inténtalo de nuev
 /** Página pública `/reserva/:code`: el cliente consulta su reserva con el código y puede cancelarla. */
 @Component({
   selector: 'app-reservation-page',
-  imports: [PoweredByComponent, RouterLink],
+  imports: [RouterLink],
   templateUrl: './reservation.page.html',
   styleUrl: './reservation.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // El tema del plano solo aporta su color de acento (el filete de la hoja); el resto sigue los tokens del sistema.
   host: {
-    '[style.--page]': 'colors().page',
-    '[style.--sheet]': 'colors().sheet',
-    '[style.--ink]': 'colors().ink',
-    '[style.--muted]': 'colors().muted',
-    '[style.--line-ui]': 'colors().lineUi',
     '[style.--accent]': 'colors().cushA',
   },
 })
@@ -89,6 +93,12 @@ export class ReservationPage {
     return status ? STATUS_LABELS[status] : '';
   });
 
+  /** Color del punto de estado (`.dot-state`): confirmada, pendiente o terminada sin ir. */
+  protected readonly statusClass = computed(() => {
+    const status = this.reservation()?.status;
+    return status ? STATUS_CLASSES[status] : '';
+  });
+
   /** `YYYY-MM-DD` como fecha de calendario: en UTC para que la zona del navegador no la mueva de día. */
   protected readonly dateLabel = computed(() => {
     const date = this.reservation()?.date;
@@ -129,7 +139,14 @@ export class ReservationPage {
         this.status.set(result.status);
       });
 
-    inject(DestroyRef).onDestroy(() => this.cancelRequest?.unsubscribe());
+    // La cabecera del marco público muestra el nombre del local mientras esta página esté abierta.
+    const title = inject(PublicTitle);
+    effect(() => title.name.set(this.reservation()?.restaurantName ?? null));
+
+    inject(DestroyRef).onDestroy(() => {
+      this.cancelRequest?.unsubscribe();
+      title.name.set(null);
+    });
   }
 
   protected askConfirmation(): void {

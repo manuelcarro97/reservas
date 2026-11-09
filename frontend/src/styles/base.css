@@ -46,6 +46,20 @@
   font-size: 13px;
 }
 
+/* Título serif dentro de una hoja ("Tu reserva", "Entra en tu panel"); la palabra en <em> va en cursiva azul. */
+.sheet-heading {
+  margin: 0 0 4px;
+  font-family: var(--serif);
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 38px;
+  letter-spacing: -0.015em;
+}
+
+.sheet-heading em {
+  color: var(--blue);
+}
+
 /* Texto solo para lectores de pantalla, o el control nativo que una tarjeta o un cuadrito sustituye a la vista. */
 .visually-hidden {
   position: absolute;
@@ -91,6 +105,11 @@
 .btn.sm {
   padding: 5px 10px;
   font-size: 13px;
+}
+
+/* Ocupa todo el ancho de su columna (formularios de la hoja). */
+.btn.block {
+  width: 100%;
 }
 
 .btn.ink {
@@ -296,6 +315,33 @@
   color: var(--bad);
 }
 
+/* ---------- Aviso en línea: caja con filete a la izquierda (error, confirmación, advertencia) ---------- */
+
+.callout {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--ink-2);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.callout.bad {
+  border-left-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 5%, var(--paper));
+}
+
+.callout.ok {
+  border-left-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 6%, var(--paper));
+}
+
+.callout.warn {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 7%, var(--paper));
+}
+
 /* ---------- Textos ---------- */
 
 .kicker {
@@ -468,8 +514,10 @@
   padding: 34px;
   background-color: #fbfcff;
   background-image:
-    linear-gradient(#e9eef8 1px, transparent 1px), linear-gradient(90deg, #e9eef8 1px, transparent 1px),
-    linear-gradient(#f2f5fb 1px, transparent 1px), linear-gradient(90deg, #f2f5fb 1px, transparent 1px);
+    linear-gradient(#e9eef8 1px, transparent 1px),
+    linear-gradient(90deg, #e9eef8 1px, transparent 1px),
+    linear-gradient(#f2f5fb 1px, transparent 1px),
+    linear-gradient(90deg, #f2f5fb 1px, transparent 1px);
   background-size:
     96px 96px,
     96px 96px,

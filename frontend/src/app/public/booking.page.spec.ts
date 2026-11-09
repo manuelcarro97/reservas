@@ -4,6 +4,7 @@ import {
   TestRequest,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -61,6 +62,9 @@ const RESERVATION = {
   status: 'PENDING',
 };
 
+@Component({ template: '' })
+class OtherPage {}
+
 describe('BookingPage', () => {
   let http: HttpTestingController;
   let harness: RouterTestingHarness;
@@ -76,7 +80,10 @@ describe('BookingPage', () => {
           {
             path: '',
             component: ShellComponent,
-            children: [{ path: 'r/:slug', component: BookingPage }],
+            children: [
+              { path: 'r/:slug', component: BookingPage },
+              { path: 'otra', component: OtherPage },
+            ],
           },
         ]),
       ],
@@ -186,7 +193,7 @@ describe('BookingPage', () => {
     await open('/r/kafe');
 
     const host = page.querySelector<HTMLElement>('app-booking-page')!;
-    expect(host.style.getPropertyValue('--page')).toBe(THEMES.NOCHE.page);
+    expect(host.style.getPropertyValue('--accent')).toBe(THEMES.NOCHE.cushA);
     expect(page.textContent).toContain('Kafé');
     expect(page.querySelectorAll('g.t').length).toBe(0);
     const availability = await flushShifts();
@@ -201,7 +208,7 @@ describe('BookingPage', () => {
     await chooseShift('Comida');
 
     const host = page.querySelector<HTMLElement>('app-booking-page')!;
-    expect(host.style.getPropertyValue('--page')).toBe(THEMES.AZUL.page);
+    expect(host.style.getPropertyValue('--accent')).toBe(THEMES.AZUL.cushA);
     expect(page.querySelectorAll('g.t').length).toBe(3);
   });
 
@@ -722,5 +729,83 @@ describe('BookingPage', () => {
     expect(request.request.params.get('date')).toBe(tomorrow);
     expect(page.querySelectorAll('g.t').length).toBe(0);
     expect(submitButton().disabled).toBe(true);
+  });
+
+  function columns(): string | null | undefined {
+    return page.querySelector('form')?.getAttribute('data-columns');
+  }
+
+  it('assignedModeIsSingleColumn', async () => {
+    await open('/r/kafe', { ...PLAN, bookingMode: 'ASSIGNED' });
+    await flushShifts();
+    expect(columns()).toBe('1');
+
+    await chooseShift('Comida', []);
+    await chooseArrival('13:30');
+
+    expect(columns()).toBe('1');
+    expect(page.querySelector('.table-step')).toBeNull();
+  });
+
+  it('freeChoiceIsSingleColumnUntilAShiftIsChosenAndThenShowsThePlanoBesideTheForm', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    expect(columns()).toBe('1');
+    expect(page.querySelector('.table-step')).toBeNull();
+
+    await chooseShift('Comida');
+
+    expect(columns()).toBe('2');
+    expect(page.querySelector('.table-step app-plano')).not.toBeNull();
+  });
+
+  it('planoSitsOutsideTheFieldsetSoLockingTheFormKeepsItVisible', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+
+    expect(page.querySelector('fieldset.body .table-step')).toBeNull();
+    expect(page.querySelector('form > .table-step app-plano')).not.toBeNull();
+  });
+
+  it('shellHeaderShowsTheVenueName', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+
+    expect(page.querySelector('header')?.textContent).toContain('Kafé');
+    expect(page.querySelector('header')?.textContent).not.toContain('reservas.');
+  });
+
+  it('headerGoesBackToTheBrandWhenLeavingThePage', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+
+    await harness.navigateByUrl('/otra');
+    harness.detectChanges();
+
+    expect(page.querySelector('header')?.textContent).toContain('reservas.');
+    expect(page.querySelector('header')?.textContent).not.toContain('Kafé');
+  });
+
+  it('footerAppearsOnlyOnce', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+
+    expect(page.querySelectorAll('footer').length).toBe(1);
+  });
+
+  it('bookingPageHasExactlyOneFooterAndNoHeaderInEmbed', async () => {
+    await open('/r/kafe?embed=1');
+    await flushShifts();
+
+    expect(page.querySelector('header')).toBeNull();
+    expect(page.querySelectorAll('footer').length).toBe(1);
+  });
+
+  it('embedKeepsTheVenueNameSinceThereIsNoHeader', async () => {
+    await open('/r/kafe?embed=1');
+    await flushShifts();
+
+    expect(page.textContent).toContain('Kafé');
   });
 });

@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { FakeAuthSdk, provideFakeAuthSdk } from '../../core/auth/testing/fake-auth-sdk';
+import { DEMO_ACCOUNT, DemoAccount } from '../../core/config';
 import { PanelExit } from '../panel-exit.service';
 import { LoginPage } from './login.page';
 
@@ -129,5 +130,64 @@ describe('LoginPage', () => {
 
     expect(links).toContain('/registro');
     expect(links).toContain('/recuperar');
+  });
+});
+
+describe('LoginPage demo box', () => {
+  const DEMO = { email: 'demo@example.com', password: 'clave-de-prueba' };
+  let sdk: FakeAuthSdk;
+  let harness: RouterTestingHarness;
+  let page: HTMLElement;
+
+  async function open(demo: DemoAccount | null): Promise<void> {
+    sdk = new FakeAuthSdk();
+    TestBed.configureTestingModule({
+      providers: [
+        provideFakeAuthSdk(sdk),
+        { provide: DEMO_ACCOUNT, useValue: demo },
+        provideRouter([
+          { path: 'entrar', component: LoginPage },
+          { path: 'panel', component: PanelStub },
+        ]),
+      ],
+    });
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/entrar');
+    page = harness.routeNativeElement as HTMLElement;
+  }
+
+  function fillButton(): HTMLButtonElement | undefined {
+    return Array.from(page.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.trim() === 'Rellenar',
+    );
+  }
+
+  it('demoBoxFillsTheForm', async () => {
+    await open(DEMO);
+
+    expect(page.textContent).toContain('Cuenta demo');
+    expect(page.textContent).toContain(DEMO.email);
+    expect(page.textContent).toContain(DEMO.password);
+    expect(fillButton()?.type).toBe('button');
+
+    fillButton()!.click();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(page.querySelector<HTMLInputElement>('input[name="email"]')!.value).toBe(DEMO.email);
+    expect(page.querySelector<HTMLInputElement>('input[name="password"]')!.value).toBe(
+      DEMO.password,
+    );
+    // Rellenar no envía nada: entrar sigue siendo cosa del botón Entrar.
+    expect(sdk.callsTo('signInWithEmail')).toEqual([]);
+    expect(TestBed.inject(Router).url).toBe('/entrar');
+  });
+
+  it('demoBoxHiddenWithoutConfig', async () => {
+    await open(null);
+
+    expect(fillButton()).toBeUndefined();
+    expect(page.textContent).not.toContain('Cuenta demo');
+    expect(page.textContent).not.toContain('Prueba la demo');
   });
 });

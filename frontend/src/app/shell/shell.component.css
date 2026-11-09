@@ -1,23 +1,73 @@
+/* Disposición del marco público: cabecera, contenido y pie. El aspecto común sale de styles/base.css. */
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
 }
 
-.shell-header {
-  display: flex;
-  align-items: center;
-  padding: 0.75rem 1.5rem;
-  border-bottom: 1px solid #e3e7ec;
-  background: #fff;
+/* En un escritorio normal el marco mide lo que la ventana: la página pública cabe sin scroll y el pie queda a la vista. */
+@media (min-width: 1024px) and (min-height: 800px) {
+  :host {
+    height: 100vh;
+  }
+
+  .shell-main {
+    overflow: auto;
+  }
 }
 
-.brand {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: inherit;
+.shell-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: none;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 0 var(--page-gutter);
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.brand,
+.venue {
+  min-width: 0;
+  color: var(--ink);
+  font: 28px/1 var(--serif);
+  letter-spacing: -0.01em;
   text-decoration: none;
 }
 
+.brand i {
+  color: var(--blue);
+  font-style: normal;
+}
+
 .shell-main {
-  padding: 1.5rem;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 22px var(--page-gutter) 18px;
+}
+
+/* Dentro de un iframe de la web del restaurante: sin aire de sobra, para que quepa en poca altura. */
+.shell-main.embedded {
+  padding: 14px 16px 10px;
+}
+
+/* Estrecha: la cabecera pierde margen y la página hace scroll. */
+@media (max-width: 1023px) {
+  .shell-header {
+    padding: 0 16px;
+  }
+
+  .shell-main {
+    padding: 16px;
+  }
 }

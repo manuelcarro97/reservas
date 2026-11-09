@@ -1,8 +1,14 @@
 @if (!embedded) {
   <header class="shell-header">
-    <a class="brand" routerLink="/">Reservas</a>
+    @if (venueName(); as name) {
+      <span class="venue truncate" [attr.title]="name">{{ name }}</span>
+      <span class="kicker">Sin registro</span>
+    } @else {
+      <a class="brand" routerLink="/">reservas<i>.</i></a>
+    }
   </header>
 }
-<main class="shell-main">
+<main class="shell-main" [class.embedded]="embedded">
   <router-outlet />
 </main>
+<app-site-footer />

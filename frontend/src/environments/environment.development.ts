@@ -1,5 +1,8 @@
+import type { Environment } from './environment.model';
+
 // Configuración web de Firebase: no es secreta (identifica el proyecto, no da acceso). Sin Analytics a propósito.
-export const environment = {
+// `demoAccount` (email y contraseña de la cuenta demo) se añade al desplegar, no se guarda aquí.
+export const environment: Environment = {
   apiBaseUrl: 'http://localhost:8080',
   firebase: {
     apiKey: 'AIzaSyDxB69zClco-MBaPtwCUUtMkTrdDHWPpCE',
