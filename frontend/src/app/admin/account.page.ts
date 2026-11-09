@@ -1,12 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AdminAccountControllerService } from '../core/api/services/admin-account-controller.service';
 import { errorCode } from '../core/api-errors';
 import { AuthService } from '../core/auth/auth.service';
 import { adminErrorMessage, blockingReservations } from './admin-errors';
 import { MeStore } from './me.store';
+import { PanelExit } from './panel-exit.service';
 
 /** Qué sale mal al borrar la cuenta, con los códigos de las reservas que lo impiden si es el caso. */
 interface DeleteFailure {
@@ -25,7 +25,7 @@ export class AccountPage {
   protected readonly store = inject(MeStore);
   private readonly api = inject(AdminAccountControllerService);
   private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
+  private readonly exit = inject(PanelExit);
   private request: Subscription | undefined;
 
   protected readonly confirming = signal(false);
@@ -76,6 +76,7 @@ export class AccountPage {
     } catch {
       // Sin cuenta, el token ya no vale: la siguiente petición dará 401 y el interceptor limpiará la sesión.
     }
-    await this.router.navigateByUrl('/entrar');
+    // Con el panel abierto, el cierre de sesión también lo ve el marco del panel: ambos comparten esta salida.
+    await this.exit.toLogin();
   }
 }

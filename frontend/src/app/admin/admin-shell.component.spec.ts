@@ -10,9 +10,11 @@ import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ApiConfiguration } from '../core/api/api-configuration';
 import { MeResponse } from '../core/api/models/me-response';
+import { AuthService } from '../core/auth/auth.service';
 import { FakeAuthSdk, flushPromises, provideFakeAuthSdk } from '../core/auth/testing/fake-auth-sdk';
 import { AccountPage } from './account.page';
 import { AdminShellComponent } from './admin-shell.component';
+import { ConfirmsLeaving, leaveEditorGuard } from './editor/leave-editor.guard';
 import { PlansPage } from './plans.page';
 
 @Component({ template: '<p>entrar</p>' })
@@ -21,8 +23,21 @@ class LoginStub {}
 @Component({ template: '<p>reservas</p>' })
 class ReservationsStub {}
 
+/** El editor real pregunta si hay cambios sin guardar; aquí el dueño contesta `leaveAnswer`. */
 @Component({ template: '<p>plano</p>' })
-class EditorStub {}
+class EditorStub implements ConfirmsLeaving {
+  static unsaved = false;
+  static leaveAnswer = true;
+  static asked = 0;
+
+  confirmLeave(): boolean {
+    if (!EditorStub.unsaved) {
+      return true;
+    }
+    EditorStub.asked++;
+    return EditorStub.leaveAnswer;
+  }
+}
 
 const ME: MeResponse = {
   email: 'dueno@example.com',
@@ -41,11 +56,12 @@ describe('AdminShellComponent', () => {
   let sdk: FakeAuthSdk;
   let harness: RouterTestingHarness;
   let host: HTMLElement;
-  let refuseNextLeave: boolean;
 
   beforeEach(async () => {
     sdk = new FakeAuthSdk();
-    refuseNextLeave = false;
+    EditorStub.unsaved = false;
+    EditorStub.leaveAnswer = true;
+    EditorStub.asked = 0;
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -59,18 +75,7 @@ describe('AdminShellComponent', () => {
               { path: '', component: PlansPage },
               { path: 'cuenta', component: AccountPage },
               { path: ':slug', component: ReservationsStub },
-              {
-                path: ':slug/plano',
-                component: EditorStub,
-                // Como `leaveEditorGuard` con cambios sin guardar: el dueño puede decidir quedarse.
-                canDeactivate: [
-                  () => {
-                    const stay = refuseNextLeave;
-                    refuseNextLeave = false;
-                    return !stay;
-                  },
-                ],
-              },
+              { path: ':slug/plano', component: EditorStub, canDeactivate: [leaveEditorGuard] },
             ],
           },
           { path: 'entrar', component: LoginStub },
@@ -84,8 +89,7 @@ describe('AdminShellComponent', () => {
   });
 
   afterEach(() => {
-    // Las consultas de avisos que se cancelan al cerrar la sesión o el panel no son un descuido.
-    http.verify({ ignoreCancelled: true });
+    http.verify();
   });
 
   async function settle(): Promise<void> {
@@ -251,7 +255,22 @@ describe('AdminShellComponent', () => {
 
     expect(TestBed.inject(Router).url).toBe('/entrar');
     expect(host.querySelector('li.plan')).toBeNull();
-    expect(host.querySelector('header')).toBeNull();
+  });
+
+  it('aSessionLostRightAfterOpeningThePanelStillLeaves', async () => {
+    // El guard solo deja entrar con sesión: al crearse el shell el dueño ya está.
+    TestBed.inject(AuthService);
+    await flushPromises();
+    sdk.emit({ uid: 'uid-a', email: 'uid-a@example.com' });
+    await harness.navigateByUrl('/panel');
+
+    sdk.emit(null);
+    expectMe().flush(ME);
+    await settle();
+    await flushPromises();
+
+    expect(TestBed.inject(Router).url).toBe('/entrar');
+    feedRequests();
   });
 
   it('anotherOwnerSignedInElsewhereSendsThePanelToLoginInsteadOfShowingTheirData', async () => {
@@ -264,11 +283,32 @@ describe('AdminShellComponent', () => {
 
     expect(TestBed.inject(Router).url).toBe('/entrar');
     // Ni los planos de A ni los avisos de B se pintan: el panel entero se retira y el feed de B no sigue.
-    expect(host.querySelector('li.plan')).toBeNull();
-    expect(host.querySelector('app-toast')).toBeNull();
-    const [feedOfB] = feedRequests();
-    expect(feedOfB?.cancelled ?? true).toBe(true);
+    expect(host.textContent).not.toContain('Kafé');
+    const feedOfB = feedRequests();
+    expect(feedOfB).toHaveLength(1);
+    expect(feedOfB[0].cancelled).toBe(true);
   });
+
+  for (const [name, next] of [
+    ['null', null],
+    ['anotherUid', { uid: 'uid-b', email: 'otro@example.com' }],
+  ] as const) {
+    it(`aSessionChangeTo_${name}_LeavesTheEditorWithoutAskingAboutUnsavedChanges`, async () => {
+      await open('/panel/tapas/plano');
+      await signIn('uid-a');
+      EditorStub.unsaved = true;
+      // Aunque la respuesta fuera "me quedo", un cambio de sesión no pregunta.
+      EditorStub.leaveAnswer = false;
+
+      sdk.emit(next);
+      await settle();
+      await flushPromises();
+
+      expect(TestBed.inject(Router).url).toBe('/entrar');
+      expect(EditorStub.asked).toBe(0);
+      feedRequests();
+    });
+  }
 
   it('renewingTheTokenOfTheSameOwnerKeepsThePanelOpen', async () => {
     await open('/panel');
@@ -303,26 +343,62 @@ describe('AdminShellComponent', () => {
     expect(TestBed.inject(Router).url).toBe('/entrar');
   });
 
-  it('signOutStillLeavesAfterAPageRefusedToBeLeftTheFirstTime', async () => {
+  it('signOutByHandStillAsksAboutUnsavedChangesAndCanBeRetried', async () => {
     await open('/panel/tapas/plano');
     await signIn('uid-a');
+    // Como el SDK real: al salir avisa de que ya no hay sesión antes de que acabe `signOut`.
+    sdk.signOut = () => {
+      sdk.emit(null);
+      return Promise.resolve();
+    };
     const signOutButton = () =>
       Array.from(host.querySelectorAll<HTMLButtonElement>('header button')).find((button) =>
         button.textContent?.includes('Salir'),
       )!;
+    EditorStub.unsaved = true;
 
-    // El dueño sale, la página (el editor con cambios sin guardar) le pregunta y se queda.
-    refuseNextLeave = true;
+    // El dueño sale, el editor le pregunta por los cambios y se queda.
+    EditorStub.leaveAnswer = false;
     signOutButton().click();
     await settle();
     await flushPromises();
+    expect(EditorStub.asked).toBe(1);
     expect(TestBed.inject(Router).url).toBe('/panel/tapas/plano');
 
-    // Salir otra vez no puede reutilizar la navegación que ya terminó en `false`.
+    // Salir otra vez no reutiliza la navegación que ya terminó en `false`: pregunta de nuevo y ahora sale.
+    EditorStub.leaveAnswer = true;
     signOutButton().click();
     await settle();
     await flushPromises();
 
+    expect(EditorStub.asked).toBe(2);
+    expect(TestBed.inject(Router).url).toBe('/entrar');
+  });
+
+  it('deletingTheAccountNavigatesToLoginOnlyOnce', async () => {
+    await open('/panel/cuenta');
+    await signIn('uid-a');
+    sdk.signOut = () => {
+      sdk.emit(null);
+      return Promise.resolve();
+    };
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
+    const press = async (label: string) => {
+      Array.from(host.querySelectorAll<HTMLButtonElement>('main button'))
+        .find((button) => button.textContent?.includes(label))!
+        .click();
+      await settle();
+    };
+
+    await press('Borrar mi cuenta');
+    await press('Sí, borrar mi cuenta');
+    http
+      .expectOne((request) => request.method === 'DELETE' && request.url.endsWith('/admin/account'))
+      .flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    await flushPromises();
+
+    expect(navigate.mock.calls.filter(([url]) => url === '/entrar')).toHaveLength(1);
     expect(TestBed.inject(Router).url).toBe('/entrar');
   });
 
