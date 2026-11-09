@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { NON_EMBEDDABLE_LINK_TARGET } from '../core/frame';
 import { PublicTitle } from '../public/public-title.service';
 import { ShellComponent } from './shell.component';
 
@@ -86,6 +87,19 @@ describe('ShellComponent', () => {
 
     expect(header(harness)?.querySelector('img')).toBeNull();
     expect(header(harness)?.textContent).toContain('<img src=x onerror=alert(1)>');
+  });
+
+  it('brandOpensInTheSameWindowOutsideAnIframe', async () => {
+    const harness = await start('/');
+
+    expect(header(harness)?.querySelector('a.brand')?.getAttribute('target')).toBe('_self');
+  });
+
+  it('brandLeavesTheIframeBecauseItsTargetCannotBeEmbedded', async () => {
+    TestBed.overrideProvider(NON_EMBEDDABLE_LINK_TARGET, { useValue: '_top' });
+    const harness = await start('/');
+
+    expect(header(harness)?.querySelector('a.brand')?.getAttribute('target')).toBe('_top');
   });
 
   it('footerShownOnceWithTheAuthorLink', async () => {

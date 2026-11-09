@@ -4,7 +4,7 @@
       <span class="venue truncate" [attr.title]="name">{{ name }}</span>
       <span class="kicker">Sin registro</span>
     } @else {
-      <a class="brand" routerLink="/">reservas<i>.</i></a>
+      <a class="brand" routerLink="/" [target]="brandTarget">reservas<i>.</i></a>
     }
   </header>
 }

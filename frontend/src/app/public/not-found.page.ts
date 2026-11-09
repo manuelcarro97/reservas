@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NON_EMBEDDABLE_LINK_TARGET } from '../core/frame';
 
 /**
  * Cualquier dirección que no existe. Es pública y no importa nada del panel: no descarga Firebase. La portada de
@@ -13,7 +14,7 @@ import { RouterLink } from '@angular/router';
       <p class="kicker">Error 404</p>
       <h1 class="sheet-heading">Página no <em>encontrada</em></h1>
       <p class="sheet-desc">La dirección que has escrito no existe.</p>
-      <a class="btn ink" routerLink="/entrar">Ir a la entrada del panel</a>
+      <a class="btn ink" routerLink="/entrar" [target]="loginTarget">Ir a la entrada del panel</a>
     </section>
   `,
   styles: `
@@ -36,4 +37,7 @@ import { RouterLink } from '@angular/router';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class NotFoundPage {}
+export class NotFoundPage {
+  /** `/entrar` no se puede incrustar: dentro de un iframe (la 404 de `/r/…` sí se ve ahí) el enlace sale de él. */
+  protected readonly loginTarget = inject(NON_EMBEDDABLE_LINK_TARGET);
+}
