@@ -8,6 +8,7 @@ import { tableName } from '../../plano/table-name';
 import { STATE_COLORS } from '../../plano/themes';
 import { FeedService } from '../notifications/feed.service';
 import { dayFigures } from './day-figures';
+import { ReservationActions } from './reservation-actions';
 import { ReservationsStore } from './reservations.store';
 
 type Status = NonNullable<AdminReservation['status']>;
@@ -36,7 +37,7 @@ const STATUS_DOT: Record<Status, string> = {
 @Component({
   selector: 'app-reservations-page',
   imports: [PlanoComponent, RouterLink],
-  providers: [ReservationsStore],
+  providers: [ReservationsStore, ReservationActions],
   templateUrl: './reservations.page.html',
   styleUrl: './reservations.page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
