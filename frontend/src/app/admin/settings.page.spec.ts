@@ -565,6 +565,30 @@ describe('SettingsPage', () => {
       expect(button('Borrar el plano')!.disabled).toBe(true);
     });
 
+    it('deletePlanWarnsAboutAnonymization', async () => {
+      await openDeleteForm();
+
+      expect(page.querySelector('.danger-zone')?.textContent).toContain('se anonimizarán');
+    });
+
+    it('deletePlanAlreadyGoneShowsMessageAndReloads', async () => {
+      await openDeleteForm();
+
+      type('confirmSlug', 'kafe');
+      await click('Borrar el plano');
+      expectApi('DELETE', 'restaurants/kafe').flush(problem({ code: 'RESTAURANT_NOT_FOUND' }), {
+        status: 404,
+        statusText: 'Not Found',
+      });
+      await settle();
+      // Se borró desde otra pestaña: los datos del dueño se piden de nuevo para poner al día la cabecera y la lista.
+      expectApi('GET', 'me').flush(meWith({ plans: [] }));
+      await settle();
+
+      expect(alertText()).toContain('Ese plano ya no existe.');
+      expect(TestBed.inject(MeStore).plans()).toEqual([]);
+    });
+
     it('deletePlanShowsOtherErrors', async () => {
       await openDeleteForm();
 

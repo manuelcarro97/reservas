@@ -360,6 +360,10 @@ export class SettingsPage {
     try {
       await firstValueFrom(this.accountApi.deletePlan({ slug }));
     } catch (error) {
+      if (error instanceof HttpErrorResponse && errorCode(error) === 'RESTAURANT_NOT_FOUND') {
+        // Ya no existe (borrado desde otra pestaña): la cabecera y la lista de planos se ponen al día.
+        this.store.refresh();
+      }
       if (slug === this.slug) {
         // Se vacía el campo: tras cancelar las reservas hay que volver a escribir el enlace.
         this.confirmSlug.set('');
