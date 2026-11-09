@@ -94,8 +94,13 @@ export class BookingStore {
   readonly occupied = signal<ReadonlySet<number> | null>(null);
   readonly occupancyFailed = signal(false);
   readonly tableId = signal<number | null>(null);
-  /** Por qué se quitó lo elegido al cambiar fecha o personas (turno, mesa); `null` si no se quitó nada. */
-  readonly choiceNotice = signal<string | null>(null);
+  /** Por qué se quitó cada cosa elegida al cambiar fecha o personas. Cada aviso se va al elegir de nuevo esa cosa. */
+  private readonly choiceNotices = signal<Partial<Record<'shift' | 'hour' | 'table', string>>>({});
+  /** Los avisos de arriba juntos, o `null` si no se quitó nada. */
+  readonly choiceNotice = computed(() => {
+    const notices = Object.values(this.choiceNotices());
+    return notices.length === 0 ? null : notices.join(' ');
+  });
 
   readonly customerName = signal('');
   readonly customerPhone = signal('');
@@ -296,11 +301,11 @@ export class BookingStore {
     // Pulsar el mismo turno para reintentar la ocupación no borra la hora elegida; cambiar de turno sí.
     if (this.shiftId() !== shiftId) {
       this.arrivalTime.set(null);
+      this.choiceNotices.set({});
     }
     this.shiftId.set(shiftId);
     this.tableId.set(null);
     this.error.set(null);
-    this.choiceNotice.set(null);
     this.requestOccupancy();
   }
 
@@ -310,6 +315,7 @@ export class BookingStore {
     }
     this.arrivalTime.set(time);
     this.error.set(null);
+    this.clearNotice('hour');
   }
 
   selectTable(tableId: number): void {
@@ -324,7 +330,7 @@ export class BookingStore {
     }
     this.tableId.set(tableId);
     this.error.set(null);
-    this.choiceNotice.set(null);
+    this.clearNotice('table');
   }
 
   submit(): void {
@@ -429,8 +435,16 @@ export class BookingStore {
     this.occupied.set(null);
     this.occupancyFailed.set(false);
     this.tableId.set(null);
-    this.choiceNotice.set(null);
+    this.choiceNotices.set({});
     this.occupancyRequests.next(null);
+  }
+
+  private setNotice(kind: 'shift' | 'hour' | 'table', text: string): void {
+    this.choiceNotices.update((notices) => ({ ...notices, [kind]: text }));
+  }
+
+  private clearNotice(kind: 'shift' | 'hour' | 'table'): void {
+    this.choiceNotices.update(({ [kind]: _removed, ...rest }) => rest);
   }
 
   /** Vuelve a pedir los turnos de la fecha y las personas actuales y descarta todo lo elegido (flujos de error). */
@@ -452,7 +466,7 @@ export class BookingStore {
     this.occupied.set(null);
     this.occupancyFailed.set(false);
     this.occupancyRequests.next(null);
-    this.choiceNotice.set(null);
+    this.choiceNotices.set({});
     this.error.set(null);
     this.availabilityRequests.next({ date: this.date(), partySize: this.partySize() });
   }
@@ -469,7 +483,8 @@ export class BookingStore {
     if (failed || !shift?.available) {
       this.clearChoices();
       if (!failed) {
-        this.choiceNotice.set(
+        this.setNotice(
+          'shift',
           this.lastChange === 'date'
             ? 'Ese turno ya no está disponible para esa fecha.'
             : `Ese turno ya no está disponible para ${peopleText(this.partySize())}.`,
@@ -481,6 +496,7 @@ export class BookingStore {
     const arrivalTime = this.arrivalTime();
     if (arrivalTime !== null && !arrivalTimes.includes(arrivalTime)) {
       this.arrivalTime.set(null);
+      this.setNotice('hour', `La hora ${arrivalTime} ya no está disponible. Elige otra.`);
     }
     this.requestOccupancy();
   }
@@ -494,11 +510,12 @@ export class BookingStore {
     const table = this.selectedTable();
     const name = table ? tableName(table.label) : 'Mesa';
     if (table && table.seats < this.partySize()) {
-      this.choiceNotice.set(
+      this.setNotice(
+        'table',
         `La ${name} es pequeña para ${peopleText(this.partySize())}. Elige otra.`,
       );
     } else if (!table || occupied.has(tableId)) {
-      this.choiceNotice.set(`La ${name} ya no está libre. Elige otra.`);
+      this.setNotice('table', `La ${name} ya no está libre. Elige otra.`);
     } else {
       return;
     }

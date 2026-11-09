@@ -93,7 +93,12 @@ describe('BookingPage', () => {
   });
 
   afterEach(() => {
-    http.verify();
+    // Si `verify` falla, el módulo de test se reinicia igualmente: así el fallo no arrastra a los tests siguientes.
+    try {
+      http.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
   });
 
   async function settle(): Promise<void> {
@@ -386,6 +391,7 @@ describe('BookingPage', () => {
     expect(
       arrivalButtons().every((button) => button.getAttribute('aria-pressed') === 'false'),
     ).toBe(true);
+    expect(page.textContent).toContain('La hora 13:30 ya no está disponible. Elige otra.');
   });
 
   for (const code of ['ARRIVAL_TIME_PAST', 'INVALID_ARRIVAL_TIME']) {
@@ -775,6 +781,10 @@ describe('BookingPage', () => {
     return page.querySelector('form')?.getAttribute('data-columns');
   }
 
+  function drawing(): HTMLElement {
+    return page.querySelector<HTMLElement>('.table-step .drawing')!;
+  }
+
   it('planoShowsFromTheStartInFreeChoice', async () => {
     await open('/r/kafe');
     expect(columns()).toBe('2');
@@ -783,9 +793,11 @@ describe('BookingPage', () => {
 
     expect(columns()).toBe('2');
     expect(page.querySelectorAll('.table-step app-plano g.t').length).toBe(3);
-    // Sin turno no hay ocupación: el plano se pinta sin estados y no se puede pulsar.
+    // Sin turno no hay ocupación: el plano se pinta sin estados, atenuado, inerte y no se puede pulsar.
     expect(page.querySelector('app-plano [data-interactive]')).toBeNull();
     expect(page.querySelector('app-plano g.t[tabindex]')).toBeNull();
+    expect(drawing().classList.contains('waiting')).toBe(true);
+    expect(drawing().hasAttribute('inert')).toBe(true);
     expect(page.querySelector('.table-step')?.textContent).toContain(
       'Elige un turno para ver las mesas libres',
     );
@@ -796,7 +808,26 @@ describe('BookingPage', () => {
     await chooseShift('Comida');
 
     expect(page.querySelector('app-plano [data-interactive]')).not.toBeNull();
+    expect(drawing().classList.contains('waiting')).toBe(false);
+    expect(drawing().hasAttribute('inert')).toBe(false);
     expect(page.textContent).not.toContain('Elige un turno para ver las mesas libres');
+  });
+
+  it('planoIsDimmedAndInertWhileTheOccupancyIsLoading', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    shiftButtons()[0].click();
+    await settle();
+
+    expect(drawing().classList.contains('waiting')).toBe(true);
+    expect(drawing().hasAttribute('inert')).toBe(true);
+    expect(page.querySelector('.table-step')?.textContent).toContain('Cargando mesas…');
+
+    expectApi('kafe/occupancy').flush(FREE_OCCUPANCY);
+    await settle();
+
+    expect(drawing().classList.contains('waiting')).toBe(false);
+    expect(drawing().hasAttribute('inert')).toBe(false);
   });
 
   it('assignedModeHasNoPlano', async () => {
@@ -908,6 +939,24 @@ describe('BookingPage', () => {
     expect(chosen('button.arrival')).toEqual([]);
     expect(table('2').classList.contains('selected')).toBe(true);
     expect(page.textContent).toContain('Falta: hora de llegada');
+    expect(page.textContent).toContain('La hora 13:30 ya no está disponible. Elige otra.');
+
+    // Elegir otra hora borra el aviso.
+    await chooseArrival('14:00');
+    expect(page.textContent).not.toContain('La hora 13:30');
+  });
+
+  it('changingPartySizeExplainsBothTheHourAndTheTableDropped', async () => {
+    await reserveTable('1');
+
+    await choosePartySize(4);
+    await flushShifts([{ ...SHIFTS[0], arrivalTimes: ['14:00:00'] }, SHIFTS[1]]);
+    expectApi('kafe/occupancy').flush(FREE_OCCUPANCY);
+    await settle();
+
+    const notice = page.querySelector('.choice-notice')?.textContent ?? '';
+    expect(notice).toContain('La hora 13:30 ya no está disponible. Elige otra.');
+    expect(notice).toContain('La Mesa 1 es pequeña para 4 personas. Elige otra.');
   });
 
   it('twoQuickPartySizeChangesOnlyApplyTheLast', async () => {
@@ -951,12 +1000,86 @@ describe('BookingPage', () => {
 
     await choosePartySize(3);
     expect(submitButton().disabled).toBe(true);
+    // No falta nada que elegir, pero el botón no se queda apagado sin decir por qué.
+    const hint = () => page.querySelector('#missing-hint')?.textContent?.trim();
+    expect(hint()).toBe('Comprobando disponibilidad…');
+    expect(submitButton().getAttribute('aria-describedby')).toBe('missing-hint');
     await flushShifts();
     // Falta la ocupación del turno para dar la mesa por buena.
     expect(submitButton().disabled).toBe(true);
+    expect(hint()).toBe('Comprobando disponibilidad…');
     expectApi('kafe/occupancy').flush(FREE_OCCUPANCY);
     await settle();
     expect(submitButton().disabled).toBe(false);
+    expect(hint()).toBeUndefined();
+    expect(submitButton().hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('failedOccupancyAfterChangingPartySizeKeepsTheShiftAndAsksForATable', async () => {
+    await reserveTable('2');
+
+    await choosePartySize(3);
+    await flushShifts();
+    expectApi('kafe/occupancy').flush(null, { status: 500, statusText: 'Server Error' });
+    await settle();
+
+    expect(chosen('button.shift')).toEqual(['Comida · 13:00']);
+    expect(chosen('button.arrival')).toEqual(['13:30']);
+    expect(page.textContent).toContain('No se pudo cargar el plano de mesas');
+    expect(page.querySelector('#missing-hint')?.textContent?.trim()).toBe('Falta: mesa');
+    expect(submitButton().disabled).toBe(true);
+    expect(page.textContent).not.toContain('Mesa 2 · 4 plazas');
+
+    // Pulsar el turno elegido reintenta la ocupación sin perder la hora.
+    shiftButtons()[0].click();
+    await settle();
+    const retry = expectApi('kafe/occupancy');
+    expect(retry.request.params.get('shiftId')).toBe('10');
+    retry.flush(FREE_OCCUPANCY);
+    await settle();
+
+    expect(page.textContent).not.toContain('No se pudo cargar el plano de mesas');
+    expect(chosen('button.arrival')).toEqual(['13:30']);
+    expect(page.querySelector('#missing-hint')?.textContent?.trim()).toBe('Falta: mesa');
+    table('2').dispatchEvent(new Event('click'));
+    await settle();
+    expect(submitButton().disabled).toBe(false);
+  });
+
+  it('changingPartySizeCancelsInFlightOccupancyAndAsksAgain', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    shiftButtons()[0].click();
+    await settle();
+    const stale = expectApi('kafe/occupancy');
+
+    await choosePartySize(3);
+
+    expect(stale.cancelled).toBe(true);
+    await flushShifts();
+    const again = expectApi('kafe/occupancy');
+    expect(again.request.params.get('shiftId')).toBe('10');
+    again.flush(FREE_OCCUPANCY);
+    await settle();
+    expect(page.querySelector('app-plano [data-interactive]')).not.toBeNull();
+  });
+
+  it('noticesLiveInFixedRegionsThatExistBeforeTheTextAppears', async () => {
+    await reserveTable('2');
+    const notice = page.querySelector('.choice-notice');
+    const planoNote = page.querySelector('.plano-note');
+    expect(notice?.getAttribute('role')).toBe('status');
+    expect(planoNote?.getAttribute('role')).toBe('status');
+    expect(notice?.textContent?.trim()).toBe('');
+
+    await choosePartySize(3);
+    await flushShifts([{ ...SHIFTS[0], available: false }, SHIFTS[1]]);
+
+    // Los mismos elementos, ahora con texto: así los lectores de pantalla lo anuncian.
+    expect(page.querySelector('.choice-notice')).toBe(notice);
+    expect(page.querySelector('.plano-note')).toBe(planoNote);
+    expect(notice?.textContent).toContain('Ese turno ya no está disponible para 3 personas.');
+    expect(planoNote?.textContent).toContain('Elige un turno para ver las mesas libres');
   });
 
   it('submitButtonSaysWhatIsMissing', async () => {

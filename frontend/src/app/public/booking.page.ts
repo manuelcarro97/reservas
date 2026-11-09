@@ -41,11 +41,17 @@ export class BookingPage {
    * no haya turno: sin ocupación se pinta sin estados y no se puede pulsar. En modo asignado no hay plano: una columna.
    */
   protected readonly showsPlano = computed(() => this.store.freeChoice());
-  /** "Falta: hora de llegada, nombre y teléfono" bajo el botón; `null` si no falta nada o se está enviando. */
+  /**
+   * Bajo el botón: "Falta: hora de llegada, nombre y teléfono". Si no falta nada pero el botón sigue apagado (se están
+   * pidiendo turnos u ocupación), "Comprobando disponibilidad…". `null` si se puede enviar o se está enviando.
+   */
   protected readonly missingHint = computed(() => {
     const missing = this.store.missing();
-    if (missing.length === 0 || this.store.submitting()) {
+    if (this.store.submitting()) {
       return null;
+    }
+    if (missing.length === 0) {
+      return this.store.canSubmit() ? null : 'Comprobando disponibilidad…';
     }
     const last = missing[missing.length - 1];
     const list = missing.length === 1 ? last : `${missing.slice(0, -1).join(', ')} y ${last}`;

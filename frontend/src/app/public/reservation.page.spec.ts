@@ -55,7 +55,12 @@ describe('ReservationPage', () => {
   });
 
   afterEach(() => {
-    http.verify();
+    // Si `verify` falla, el módulo de test se reinicia igualmente: así el fallo no arrastra a los tests siguientes.
+    try {
+      http.verify();
+    } finally {
+      TestBed.resetTestingModule();
+    }
   });
 
   async function settle(): Promise<void> {

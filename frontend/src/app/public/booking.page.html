@@ -34,16 +34,23 @@
         @if (showsPlano()) {
           <section class="sheet table-step">
             <h2 class="sheet-title">Elige tu mesa</h2>
-            @if (store.shiftId() === null) {
-              <p class="hint" role="status">Elige un turno para ver las mesas libres.</p>
-            } @else if (store.occupancyFailed()) {
-              <p class="hint" role="alert">
-                No se pudo cargar el plano de mesas. Elige el turno otra vez.
-              </p>
-            } @else if (store.occupied() === null) {
-              <p class="hint" role="status">Cargando mesas…</p>
-            }
-            <div class="drawing">
+            <div class="plano-note" role="status">
+              @if (store.shiftId() === null) {
+                <p class="hint">Elige un turno para ver las mesas libres.</p>
+              } @else if (store.occupancyFailed()) {
+                <p class="hint" role="alert">
+                  No se pudo cargar el plano de mesas. Elige el turno otra vez.
+                </p>
+              } @else if (store.occupied() === null) {
+                <p class="hint">Cargando mesas…</p>
+              }
+            </div>
+            <!-- Sin ocupación (sin turno o cargándola) el plano no sabe qué mesas hay libres: atenuado e inerte. -->
+            <div
+              class="drawing"
+              [class.waiting]="store.occupied() === null"
+              [attr.inert]="store.occupied() === null ? '' : null"
+            >
               <app-plano
                 [room]="store.room()"
                 [tables]="store.tables()"
@@ -153,9 +160,11 @@
               </div>
             }
 
-            @if (store.choiceNotice(); as notice) {
-              <p class="callout warn" role="status">{{ notice }}</p>
-            }
+            <div class="choice-notice" role="status">
+              @if (store.choiceNotice(); as notice) {
+                <p class="callout warn">{{ notice }}</p>
+              }
+            </div>
 
             <div class="row">
               <label class="field">

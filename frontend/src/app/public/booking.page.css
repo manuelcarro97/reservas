@@ -59,6 +59,23 @@
 
 .table-step .drawing {
   min-height: 260px;
+  transition: opacity 0.2s;
+}
+
+/* Sin ocupación no se sabe qué mesas hay libres: el plano se atenúa y no responde (lleva `inert`). */
+.table-step .drawing.waiting {
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-step .drawing {
+    transition: none;
+  }
+}
+
+/* Avisos de lo que se quitó al cambiar fecha o personas. El contenedor existe siempre (región viva) y, vacío, no ocupa. */
+.choice-notice:empty {
+  margin-bottom: -16px;
 }
 
 .reserve-sheet {
