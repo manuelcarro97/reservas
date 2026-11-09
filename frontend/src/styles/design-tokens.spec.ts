@@ -2,11 +2,15 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-/** Lee `tokens.css` tal cual está en disco: los tokens son la fuente de verdad del sistema visual. */
-const tokensCss = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8');
+/**
+ * Lee `tokens.css` tal cual está en disco: los tokens son la fuente de verdad del sistema visual.
+ * Se quitan los comentarios para que un valor citado en uno (p. ej. el de la maqueta) no cuente como declaración.
+ */
+const tokensCss = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
 function tokenHex(name: string): string {
-  const match = new RegExp(`${name}\\s*:\\s*(#[0-9a-fA-F]{6})\\b`).exec(tokensCss);
+  // Anclado al inicio de la declaración: `--bg` no casa con `--wash-bg` ni con un `var(--bg)`.
+  const match = new RegExp(`(?:^|[;{\\s])${name}\\s*:\\s*(#[0-9a-fA-F]{6})\\b`).exec(tokensCss);
   if (!match) {
     throw new Error(`Falta el token ${name} con un valor #rrggbb en tokens.css`);
   }
@@ -43,6 +47,14 @@ describe('design tokens', () => {
   it('stateColorsAreReadableOnWhite', () => {
     expect(contrast(tokenHex('--ok'), '#ffffff'), '--ok sobre blanco').toBeGreaterThanOrEqual(AA);
     expect(contrast(tokenHex('--warn'), '#ffffff'), '--warn sobre blanco').toBeGreaterThanOrEqual(AA);
+  });
+
+  it('textAndStateColorsAreReadableOnTheSelectedRow', () => {
+    const selectedRow = tokenHex('--blue-tint');
+
+    for (const token of ['--muted', '--ok', '--warn']) {
+      expect(contrast(tokenHex(token), selectedRow), `${token} sobre --blue-tint`).toBeGreaterThanOrEqual(AA);
+    }
   });
 
   it('tokensKeepTheApprovedPalette', () => {

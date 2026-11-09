@@ -66,7 +66,7 @@
   color: #fff;
 }
 
-.btn.ink:hover:not(:disabled) {
+.btn.ink:hover:not(:disabled, [aria-disabled='true']) {
   background: #18304d;
 }
 
@@ -75,7 +75,7 @@
   color: #fff;
 }
 
-.btn.blue:hover:not(:disabled) {
+.btn.blue:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--blue-deep);
 }
 
@@ -85,7 +85,7 @@
   color: var(--ink);
 }
 
-.btn.line:hover:not(:disabled) {
+.btn.line:hover:not(:disabled, [aria-disabled='true']) {
   border-color: var(--ink-2);
 }
 
@@ -95,7 +95,7 @@
   color: var(--ink-2);
 }
 
-.btn.quiet:hover:not(:disabled) {
+.btn.quiet:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--wash);
 }
 
@@ -105,7 +105,7 @@
   color: var(--bad);
 }
 
-.btn.danger:hover:not(:disabled) {
+.btn.danger:hover:not(:disabled, [aria-disabled='true']) {
   background: #fff6f5;
   border-color: var(--bad);
 }
@@ -120,7 +120,7 @@
   color: var(--ink-2);
 }
 
-.btn.sq:hover:not(:disabled) {
+.btn.sq:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--wash);
 }
 
@@ -410,10 +410,12 @@
 }
 
 /*
- * Fondo de cuadrícula del lienzo del editor. Columna flex sin `align-items`: <app-plano> se estira a todo el
- * ancho y alto, y el svg lo centra y lo escala (viewBox, xMidYMid meet).
+ * Lienzo del editor: cuadrícula de fondo y 34 px de margen. El plano y lo que se superpone a él (p. ej. el overlay
+ * de tiradores, `position:absolute; inset:0`) van los dos dentro de `.canvas-stage__frame`, que no lleva padding,
+ * para que ocupen exactamente la misma caja y sus svg escalen igual. No pongas el plano directamente en `.canvas-stage`.
+ * (La clase `.stage` no es global: el editor actual la define en su propio CSS.)
  */
-.stage {
+.canvas-stage {
   position: relative;
   display: flex;
   flex: 1;
@@ -432,9 +434,19 @@
     24px 24px;
 }
 
+/* Caja del plano dentro de `.canvas-stage`: ocupa todo el espacio, sin padding, y es la referencia del overlay. */
+.canvas-stage__frame {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
 /* <app-plano> es un bloque dentro del contenedor flex y puede encoger. */
 .drawing app-plano,
-.stage app-plano {
+.canvas-stage__frame app-plano {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -445,7 +457,7 @@
  * y no se edita, así que aquí se fuerza con más especificidad. El viewBox lo centra y lo escala sin deformarlo.
  */
 .drawing app-plano svg.plano,
-.stage app-plano svg.plano {
+.canvas-stage__frame app-plano svg.plano {
   width: 100%;
   height: 100%;
 }
