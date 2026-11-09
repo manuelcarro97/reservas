@@ -38,6 +38,8 @@
   --ok: #197b4d;
   --warn: #946010;
   --bad: #c8372d;
+  /* Borde suave de lo peligroso (botón de borrar, zona de peligro). Solo adorno, nunca texto. */
+  --bad-soft: #f0c4c0;
 
   /* Tipografía */
   --serif: 'Instrument Serif', Georgia, serif;

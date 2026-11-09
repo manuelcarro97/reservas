@@ -57,6 +57,18 @@ export class AdminShellComponent {
     currentPlanSlug(this.url(), this.router, this.store.plans()),
   );
 
+  /**
+   * Query de la pestaña Planos: si el plano actual no es el primero, lo lleva en `?plano=` para que Mis planos lo
+   * destaque y no se pierda al pasar por la lista. Con el primero, o sin plano, basta `/panel`.
+   */
+  protected readonly plansTabQuery = computed(() => {
+    const slug = this.planSlug();
+    const plans = this.store.plans();
+    return slug && plans[0]?.slug !== slug && plans.some((plan) => plan.slug === slug)
+      ? { plano: slug }
+      : null;
+  });
+
   /** Una pestaña solo se marca en su URL exacta: `/panel/kafe` no marca Reservas en `/panel/kafe/turnos`. */
   protected readonly tabMatch: IsActiveMatchOptions = {
     paths: 'exact',

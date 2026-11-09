@@ -378,6 +378,74 @@ describe('PlansPage', () => {
     expect(links(featured()!)).toContainEqual(['Plano interactivo', '/panel/kafe/plano']);
   });
 
+  it('aPlanWithAThemeThisClientDoesNotKnowStillRendersWithTheDefaultOne', async () => {
+    await open(meWith([KAFE, TAPAS]), {
+      details: {
+        kafe: { ...DETAILS['kafe'], theme: 'XYZ' as never },
+        tapas: { ...DETAILS['tapas'], theme: 'XYZ' as never },
+      },
+    });
+
+    expect(featured()!.querySelector('app-plano svg.plano')).not.toBeNull();
+    expect(featured()!.textContent).toContain('Tema · Azul');
+  });
+
+  it('aFailedPlanCanBeRetriedAndOnlyThatPlanIsRequestedAgain', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/panel');
+    page = harness.routeNativeElement as HTMLElement;
+    expectApi('GET', 'me').flush(meWith([KAFE, TAPAS]));
+    await settle();
+    for (const request of planGets()) {
+      if (slugOf(request) === 'kafe') {
+        request.flush({}, { status: 500, statusText: 'Server Error' });
+      } else {
+        request.flush(DETAILS[slugOf(request)]);
+      }
+    }
+    await settle();
+    expect(featured()!.textContent).toContain('No se pudo cargar el plano');
+
+    featured()!.querySelector<HTMLButtonElement>('.drawing button')!.click();
+    await settle();
+    // Mientras vuelve la respuesta, el mensaje de error deja paso a la carga.
+    expect(featured()!.textContent).not.toContain('No se pudo cargar el plano');
+    expect(featured()!.textContent).toContain('Cargando el plano');
+    expect(await flushPlanGets()).toEqual(['kafe']);
+
+    expect(featured()!.querySelector('app-plano svg.plano')).not.toBeNull();
+    expect(figure('Capacidad')!.querySelector('b')!.textContent).toBe('12');
+    expect(featured()!.textContent).not.toContain('No se pudo cargar');
+  });
+
+  it('aSmallCardWhosePlanFailedSaysSoInsteadOfLeavingAGap', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/panel');
+    page = harness.routeNativeElement as HTMLElement;
+    expectApi('GET', 'me').flush(meWith([KAFE, TAPAS]));
+    await settle();
+    for (const request of planGets()) {
+      request.flush({}, { status: 500, statusText: 'Server Error' });
+    }
+    await settle();
+
+    expect(card('tapas').textContent).toContain('No se pudo cargar');
+  });
+
+  it('leavingThePageCancelsTheRequestsOfTheCardsStillInFlight', async () => {
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/panel');
+    page = harness.routeNativeElement as HTMLElement;
+    expectApi('GET', 'me').flush(meWith([KAFE, TAPAS]));
+    await settle();
+    const pending = planGets();
+    expect(pending).toHaveLength(2);
+
+    await harness.navigateByUrl('/panel/kafe/plano');
+
+    expect(pending.every((request) => request.cancelled)).toBe(true);
+  });
+
   it('longPlanNamesAreTruncatedWithTheFullNameInTheTitle', async () => {
     const name = 'Un local con un nombre larguísimo '.repeat(4).slice(0, 120);
     const long: PlanSummaryResponse = { slug: 'largo', name, status: 'PUBLISHED' };

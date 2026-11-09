@@ -50,6 +50,9 @@
                 <app-plano [room]="d.room" [tables]="d.tables" [theme]="d.theme" />
               } @else if (featuredDetail()?.state === 'error') {
                 <p class="state">No se pudo cargar el plano.</p>
+                <button type="button" class="btn line sm" (click)="retryDetail(plan.slug)">
+                  <app-icon name="rot" />Reintentar
+                </button>
               } @else {
                 <p class="state" role="status">Cargando el plano…</p>
               }

@@ -32,7 +32,7 @@ import { PLAN_STATUS_LABELS } from './plan-status';
         <!-- El select cubre la caja: el nombre completo también va en su title, o el ratón nunca lo vería. -->
         <select
           name="plan"
-          aria-label="Cambiar de plano"
+          [attr.aria-label]="'Cambiar de plano: ' + label()"
           [attr.title]="label()"
           (change)="choose($event)"
         >

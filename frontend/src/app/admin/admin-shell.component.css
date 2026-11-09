@@ -27,7 +27,7 @@
   min-height: 58px;
   padding: 0 var(--page-gutter);
   border-bottom: 1px solid var(--rule);
-  background: rgba(255, 255, 255, 0.86);
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
   backdrop-filter: blur(8px);
 }
 
@@ -117,7 +117,7 @@
   padding: 0 4px;
   border-radius: 99px;
   background: var(--bad);
-  color: #fff;
+  color: var(--paper);
   font: 600 10px/16px var(--mono);
   text-align: center;
 }

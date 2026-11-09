@@ -47,6 +47,16 @@
   margin: auto;
 }
 
+/* Con "Reintentar" debajo, mensaje y botón quedan juntos en el centro. */
+.drawing .state:has(+ .btn) {
+  margin: auto auto 8px;
+}
+
+.drawing .btn {
+  align-self: center;
+  margin-bottom: auto;
+}
+
 .plan-head {
   display: flex;
   gap: 14px;
@@ -186,7 +196,7 @@
   min-height: 84px;
   border: 1px dashed var(--rule-strong);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.55);
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
   color: var(--muted);
   font-size: 13px;
 }

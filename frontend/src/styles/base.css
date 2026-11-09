@@ -101,7 +101,7 @@
 
 .btn.danger {
   background: var(--paper);
-  border-color: #f0c4c0;
+  border-color: var(--bad-soft);
   color: var(--bad);
 }
 

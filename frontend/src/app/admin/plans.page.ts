@@ -19,7 +19,7 @@ import { errorCode } from '../core/api-errors';
 import { IconComponent } from '../shared/icon.component';
 import { toRoom, toTable } from '../plano/plan-mapping';
 import { PlanoComponent } from '../plano/plano.component';
-import { THEMES } from '../plano/themes';
+import { THEMES, knownTheme } from '../plano/themes';
 import { adminErrorMessage } from './admin-errors';
 import { currentPlanSlug, routerUrl } from './current-plan';
 import { MeStore } from './me.store';
@@ -107,7 +107,7 @@ export class PlansPage {
     return {
       room: toRoom(plan.room),
       tables: (plan.tables ?? []).map(toTable),
-      theme: plan.theme ?? 'AZUL',
+      theme: knownTheme(plan.theme),
     };
   });
 
@@ -132,7 +132,7 @@ export class PlansPage {
           : hours === 0
             ? 'cancelación hasta la hora de la reserva'
             : `cancelación hasta ${hours} h antes`,
-      theme: THEMES[plan.theme ?? 'AZUL'].name,
+      theme: THEMES[knownTheme(plan.theme)].name,
     };
   });
 
@@ -148,7 +148,9 @@ export class PlansPage {
           summary:
             detail?.state === 'ready'
               ? `${count((detail.plan.tables ?? []).length, 'mesa', 'mesas')} · ${count(seatsOf(detail.plan), 'plaza', 'plazas')}`
-              : null,
+              : detail?.state === 'error'
+                ? 'No se pudo cargar'
+                : null,
         };
       }),
   );
@@ -187,9 +189,19 @@ export class PlansPage {
 
   /** Pide el plano si no se ha pedido ya: "Abrir" cambia el destacado sin repetir la petición. */
   private load(slug: string): void {
-    if (this.details()[slug]) {
-      return;
+    if (!this.details()[slug]) {
+      this.fetchDetail(slug);
     }
+  }
+
+  /** "Reintentar" tras un fallo: vuelve a pedir solo ese plano. */
+  protected retryDetail(slug: string | undefined): void {
+    if (slug && this.details()[slug]?.state === 'error') {
+      this.fetchDetail(slug);
+    }
+  }
+
+  private fetchDetail(slug: string): void {
     this.setDetail(slug, { state: 'loading' });
     this.requests.add(
       this.planApi.get({ slug }).subscribe({

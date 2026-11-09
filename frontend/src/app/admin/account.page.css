@@ -15,7 +15,7 @@
 
 .danger-zone {
   margin-top: 22px;
-  border-color: #f0c4c0;
+  border-color: var(--bad-soft);
 }
 
 .danger-zone h2 {

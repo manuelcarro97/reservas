@@ -77,6 +77,7 @@ describe('AdminShellComponent', () => {
               { path: 'cuenta', component: AccountPage },
               { path: ':slug', component: ReservationsStub },
               { path: ':slug/plano', component: EditorStub, canDeactivate: [leaveEditorGuard] },
+              { path: ':slug/turnos', component: ReservationsStub },
             ],
           },
           { path: 'entrar', component: LoginStub },
@@ -214,6 +215,15 @@ describe('AdminShellComponent', () => {
     expect(switcher()).toBeNull();
   });
 
+  it('theSelectNameContainsTheVisibleNameOfThePlan', async () => {
+    await open('/panel/tapas/plano');
+
+    // WCAG 2.5.3: el nombre accesible incluye el texto que se ve en la caja.
+    const name = switcher()!.getAttribute('aria-label')!;
+    expect(name).toContain('Cambiar de plano');
+    expect(name).toContain('Tapas');
+  });
+
   it('switcherShowsTheStateOfThePlan', async () => {
     await open('/panel/tapas/plano');
 
@@ -250,6 +260,39 @@ describe('AdminShellComponent', () => {
 
     expect(tab('Reservas')!.getAttribute('href')).toBe('/panel/tapas');
     expect(tab('Configuración')!.getAttribute('href')).toBe('/panel/tapas/ajustes');
+  });
+
+  it('thePlansTabKeepsThePlanYouAreIn', async () => {
+    await open('/panel/tapas/turnos');
+
+    // Tapas no es el primero: Planos lo lleva en la query para que no se pierda al pasar por la lista.
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel?plano=tapas');
+    tab('Planos')!.click();
+    await settle();
+    expectMe().flush(ME);
+    await settle();
+    flushPlanGets();
+    await settle();
+    expect(TestBed.inject(Router).url).toBe('/panel?plano=tapas');
+    // Estando en la lista, la pestaña sigue marcada y Reservas sigue apuntando a Tapas.
+    expect(tab('Planos')!.getAttribute('aria-current')).toBe('page');
+    expect(tab('Reservas')!.getAttribute('href')).toBe('/panel/tapas');
+
+    tab('Reservas')!.click();
+    await settle();
+    expect(TestBed.inject(Router).url).toBe('/panel/tapas');
+  });
+
+  it('thePlansTabIsPlainWhenTheCurrentPlanIsTheFirstOne', async () => {
+    await open('/panel/kafe/turnos');
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel');
+
+    await harness.navigateByUrl('/panel');
+    expectMe().flush(ME);
+    await settle();
+    flushPlanGets();
+    await settle();
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel');
   });
 
   it('tabsDisabledWithoutPlans', async () => {
