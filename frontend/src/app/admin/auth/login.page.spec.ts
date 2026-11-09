@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { FakeAuthSdk, provideFakeAuthSdk } from '../../core/auth/testing/fake-auth-sdk';
+import { PanelExit } from '../panel-exit.service';
 import { LoginPage } from './login.page';
 
 @Component({ template: '' })
@@ -51,6 +52,23 @@ describe('LoginPage', () => {
   function alertText(): string | null {
     return page.querySelector('[role="alert"]')?.textContent?.trim() ?? null;
   }
+
+  it('explainsThatSigningOutFailedWhenTheOwnerLeftThePanelButKeptTheSession', async () => {
+    expect(alertText()).toBeNull();
+
+    TestBed.inject(PanelExit).signOutFailed.set(true);
+    await settle();
+
+    expect(alertText()).toContain('No se pudo cerrar la sesión');
+  });
+
+  it('forgetsTheSignOutFailureWhenThePageIsLeft', async () => {
+    TestBed.inject(PanelExit).signOutFailed.set(true);
+
+    await harness.navigateByUrl('/panel');
+
+    expect(TestBed.inject(PanelExit).signOutFailed()).toBe(false);
+  });
 
   it('loginShowsFirebaseErrorInSpanish', async () => {
     sdk.failWith = {

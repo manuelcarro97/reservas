@@ -69,14 +69,17 @@ export class AccountPage {
     });
   }
 
-  /** La cuenta ya no existe: se cierra la sesión local y se va a la pantalla de acceso. */
+  /**
+   * La cuenta ya no existe: se va a la pantalla de acceso y se cierra la sesión local. La salida es la forzada
+   * (`toLogin(true)`), como la de un cambio de sesión: no hay nada que preguntar ni nada que guardar con una cuenta
+   * borrada, y no puede quedarse en el panel.
+   */
   private async leave(): Promise<void> {
+    await this.exit.toLogin(true);
     try {
       await this.auth.signOut();
     } catch {
       // Sin cuenta, el token ya no vale: la siguiente petición dará 401 y el interceptor limpiará la sesión.
     }
-    // Con el panel abierto, el cierre de sesión también lo ve el marco del panel: ambos comparten esta salida.
-    await this.exit.toLogin();
   }
 }

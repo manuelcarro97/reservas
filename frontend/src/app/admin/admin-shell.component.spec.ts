@@ -15,6 +15,7 @@ import { FakeAuthSdk, flushPromises, provideFakeAuthSdk } from '../core/auth/tes
 import { AccountPage } from './account.page';
 import { AdminShellComponent } from './admin-shell.component';
 import { ConfirmsLeaving, leaveEditorGuard } from './editor/leave-editor.guard';
+import { PanelExit } from './panel-exit.service';
 import { PlansPage } from './plans.page';
 
 @Component({ template: '<p>entrar</p>' })
@@ -27,10 +28,10 @@ class ReservationsStub {}
 @Component({ template: '<p>plano</p>' })
 class EditorStub implements ConfirmsLeaving {
   static unsaved = false;
-  static leaveAnswer = true;
+  static leaveAnswer: boolean | Promise<boolean> = true;
   static asked = 0;
 
-  confirmLeave(): boolean {
+  confirmLeave(): boolean | Promise<boolean> {
     if (!EditorStub.unsaved) {
       return true;
     }
@@ -190,7 +191,7 @@ describe('AdminShellComponent', () => {
     expect(TestBed.inject(Router).url).toBe('/entrar');
   });
 
-  it('signOutFailureKeepsThePanelAndExplainsIt', async () => {
+  it('signOutFailureAfterLeavingStaysOnLoginAndFlagsItForThatPage', async () => {
     await open('/panel');
     sdk.failWith = new Error('red');
 
@@ -199,10 +200,11 @@ describe('AdminShellComponent', () => {
       .click();
     await settle();
     await flushPromises();
-    harness.detectChanges();
 
-    expect(TestBed.inject(Router).url).toBe('/panel');
-    expect(host.querySelector('header [role="alert"]')?.textContent).toContain('No se pudo salir');
+    // El panel ya se fue (es el orden que deja preguntar al editor); la página de acceso explica el fallo.
+    expect(TestBed.inject(Router).url).toBe('/entrar');
+    expect(sdk.callsTo('signOut')).toHaveLength(1);
+    expect(TestBed.inject(PanelExit).signOutFailed()).toBe(true);
   });
 
   it('panelPollsTheFeedWhileSignedInAndStopsOnSignOut', async () => {
@@ -323,47 +325,65 @@ describe('AdminShellComponent', () => {
     expect(feedRequests()).toHaveLength(0);
   });
 
-  it('signOutNavigatesToLoginOnlyOnce', async () => {
-    await open('/panel');
-    await signIn('uid-a');
-    // Como el SDK real: al salir avisa de que ya no hay sesión, y eso también manda a /entrar.
+  const signOutButton = () =>
+    Array.from(host.querySelectorAll<HTMLButtonElement>('header button')).find((button) =>
+      button.textContent?.includes('Salir'),
+    )!;
+
+  /** Como el SDK real: `signOut` avisa de que ya no hay sesión. Anota dónde estaba el panel al cerrarla. */
+  function emitNullOnSignOut(): { urlAtSignOut: string | null } {
+    const seen = { urlAtSignOut: null as string | null };
     sdk.signOut = () => {
+      sdk.calls.push({ method: 'signOut', args: [] });
+      seen.urlAtSignOut = TestBed.inject(Router).url;
       sdk.emit(null);
       return Promise.resolve();
     };
+    return seen;
+  }
+
+  it('signOutNavigatesToLoginOnceAndOnlyThenClosesTheSession', async () => {
+    await open('/panel');
+    await signIn('uid-a');
+    const seen = emitNullOnSignOut();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
 
-    Array.from(host.querySelectorAll<HTMLButtonElement>('header button'))
-      .find((button) => button.textContent?.includes('Salir'))!
-      .click();
+    signOutButton().click();
     await settle();
     await flushPromises();
 
     expect(navigate.mock.calls.filter(([url]) => url === '/entrar')).toHaveLength(1);
+    expect(seen.urlAtSignOut).toBe('/entrar');
     expect(TestBed.inject(Router).url).toBe('/entrar');
   });
 
-  it('signOutByHandStillAsksAboutUnsavedChangesAndCanBeRetried', async () => {
+  it('signOutByHandAsksAboutUnsavedChangesAndKeepsTheSessionIfTheOwnerStays', async () => {
     await open('/panel/tapas/plano');
     await signIn('uid-a');
-    // Como el SDK real: al salir avisa de que ya no hay sesión antes de que acabe `signOut`.
-    sdk.signOut = () => {
-      sdk.emit(null);
-      return Promise.resolve();
-    };
-    const signOutButton = () =>
-      Array.from(host.querySelectorAll<HTMLButtonElement>('header button')).find((button) =>
-        button.textContent?.includes('Salir'),
-      )!;
+    emitNullOnSignOut();
     EditorStub.unsaved = true;
+    EditorStub.leaveAnswer = false;
 
-    // El dueño sale, el editor le pregunta por los cambios y se queda.
+    signOutButton().click();
+    await settle();
+    await flushPromises();
+
+    // Se queda en el editor y con sesión: guardar seguiría funcionando.
+    expect(EditorStub.asked).toBe(1);
+    expect(sdk.callsTo('signOut')).toHaveLength(0);
+    expect(TestBed.inject(AuthService).user()?.uid).toBe('uid-a');
+    expect(TestBed.inject(Router).url).toBe('/panel/tapas/plano');
+  });
+
+  it('signOutByHandCanBeRetriedAfterStayingAndThenLeavesBeforeClosingTheSession', async () => {
+    await open('/panel/tapas/plano');
+    await signIn('uid-a');
+    const seen = emitNullOnSignOut();
+    EditorStub.unsaved = true;
     EditorStub.leaveAnswer = false;
     signOutButton().click();
     await settle();
     await flushPromises();
-    expect(EditorStub.asked).toBe(1);
-    expect(TestBed.inject(Router).url).toBe('/panel/tapas/plano');
 
     // Salir otra vez no reutiliza la navegación que ya terminó en `false`: pregunta de nuevo y ahora sale.
     EditorStub.leaveAnswer = true;
@@ -372,7 +392,35 @@ describe('AdminShellComponent', () => {
     await flushPromises();
 
     expect(EditorStub.asked).toBe(2);
+    expect(sdk.callsTo('signOut')).toHaveLength(1);
+    expect(seen.urlAtSignOut).toBe('/entrar');
     expect(TestBed.inject(Router).url).toBe('/entrar');
+  });
+
+  it('aSessionChangeWhileTheEditorIsAskingTakesOverTheQuestion', async () => {
+    await open('/panel/tapas/plano');
+    await signIn('uid-a');
+    emitNullOnSignOut();
+    EditorStub.unsaved = true;
+    let answer: (leave: boolean) => void = () => undefined;
+    EditorStub.leaveAnswer = new Promise<boolean>((resolve) => (answer = resolve));
+
+    // El dueño pulsa Salir y el editor pregunta; mientras tanto entra otro dueño en otra pestaña.
+    // Sin `settle()`: la pregunta abierta es una navegación pendiente y `whenStable` esperaría a que se conteste.
+    signOutButton().click();
+    await flushPromises();
+    expect(EditorStub.asked).toBe(1);
+    sdk.emit({ uid: 'uid-b', email: 'otro@example.com' });
+    harness.detectChanges();
+    await flushPromises();
+
+    expect(TestBed.inject(Router).url).toBe('/entrar');
+    // La salida en curso quedó sustituida: no cierra la sesión del dueño nuevo.
+    expect(sdk.callsTo('signOut')).toHaveLength(0);
+    answer(true);
+    await flushPromises();
+    expect(sdk.callsTo('signOut')).toHaveLength(0);
+    feedRequests();
   });
 
   it('deletingTheAccountNavigatesToLoginOnlyOnce', async () => {

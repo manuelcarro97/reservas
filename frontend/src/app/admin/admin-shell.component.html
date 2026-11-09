@@ -16,9 +16,6 @@
     <a routerLink="/panel/cuenta">Cuenta</a>
     <button type="button" (click)="signOut()">Salir</button>
   </nav>
-  @if (signOutError(); as message) {
-    <p class="error" role="alert">{{ message }}</p>
-  }
 </header>
 <main class="admin-main">
   <router-outlet />

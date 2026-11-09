@@ -1,11 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth/auth.service';
 import { MeStore } from './me.store';
@@ -37,7 +30,6 @@ export class AdminShellComponent {
 
   /** Se inyecta aquí para que empiece a consultar al abrir el panel, aunque la cabecera no lo use. */
   protected readonly feed = inject(FeedService);
-  protected readonly signOutError = signal<string | null>(null);
 
   /** Solo cuenta quién es, no su email ni su token: renovarlos no cambia el valor. */
   private readonly uid = computed(() => this.auth.user()?.uid ?? null);
@@ -46,11 +38,6 @@ export class AdminShellComponent {
    * adopta el primero que avise el SDK.
    */
   private ownerUid: string | null = this.auth.user()?.uid ?? null;
-  /**
-   * El dueño pulsó Salir. El `null` que eso provoca no es un cambio de sesión ajeno: la salida la hace `signOut()`,
-   * que deja preguntar al editor. Si el dueño se queda, el panel sigue ahí aunque ya no haya sesión.
-   */
-  private signedOutByHand = false;
 
   constructor() {
     inject(MeStore).refresh();
@@ -58,23 +45,28 @@ export class AdminShellComponent {
       const uid = this.uid();
       if (this.ownerUid === null) {
         this.ownerUid = uid;
-      } else if (uid !== this.ownerUid && !(uid === null && this.signedOutByHand)) {
+      } else if (uid !== this.ownerUid) {
         // La sesión ya no es la de este panel: no se pregunta por cambios sin guardar, no se podrían guardar.
         void this.exit.toLogin(true);
       }
     });
   }
 
+  /**
+   * Primero sale del panel y solo después cierra la sesión: así el editor puede preguntar por los cambios sin guardar
+   * y, si el dueño se queda, sigue con sesión (guardar funcionaría). El `null` que provoca `signOut()` llega con el
+   * panel ya cerrado, así que el efecto de arriba no lo ve.
+   */
   protected async signOut(): Promise<void> {
-    this.signOutError.set(null);
-    this.signedOutByHand = true;
+    this.exit.signOutFailed.set(false);
+    if (!(await this.exit.toLogin())) {
+      return;
+    }
     try {
       await this.auth.signOut();
     } catch {
-      this.signedOutByHand = false;
-      this.signOutError.set('No se pudo salir. Inténtalo de nuevo.');
-      return;
+      // Ya no hay cabecera donde decirlo: la página de acceso lo cuenta.
+      this.exit.signOutFailed.set(true);
     }
-    await this.exit.toLogin();
   }
 }

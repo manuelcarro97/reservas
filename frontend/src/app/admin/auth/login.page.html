@@ -1,5 +1,10 @@
 <section class="card">
   <h1>Entrar</h1>
+  @if (signOutFailed()) {
+    <p class="error" role="alert">
+      No se pudo cerrar la sesión: sigues dentro. Entra en el panel y vuelve a pulsar Salir.
+    </p>
+  }
   <form novalidate (submit)="onSubmit($event, email.value, password.value)">
     <fieldset [disabled]="busy()">
       <label>
