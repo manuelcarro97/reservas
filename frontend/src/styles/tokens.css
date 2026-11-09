@@ -47,8 +47,8 @@
   /* Elevación de las hojas */
   --lift: 0 1px 0 rgba(11, 28, 48, 0.03), 0 8px 24px -16px rgba(11, 28, 48, 0.18);
 
-  /* Anchura máxima del contenido y márgenes laterales */
-  --page-max: 1760px;
+  /* Anchura del contenido: sin tope, con el mismo margen lateral a cualquier ancho de ventana (decisión de Manuel). */
+  --page-max: none;
   --page-gutter: 32px;
 }
 
