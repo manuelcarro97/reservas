@@ -38,3 +38,6 @@ CLAUDE.md
 AGENTS.md
 .env
 .superpowers/
+
+# Caché de deploy de Firebase Hosting
+.firebase/
