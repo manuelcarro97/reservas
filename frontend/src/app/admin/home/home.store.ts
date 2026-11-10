@@ -1,9 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, Subscription, forkJoin, map } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { PlanResponse } from '../../core/api/models/plan-response';
+import { WeekSummaryDay } from '../../core/api/models/week-summary-day';
+import { WeekSummaryResponse } from '../../core/api/models/week-summary-response';
 import { AdminPlanControllerService } from '../../core/api/services/admin-plan-controller.service';
 import { AdminReservationControllerService } from '../../core/api/services/admin-reservation-controller.service';
 import { AdminShiftControllerService } from '../../core/api/services/admin-shift-controller.service';
@@ -13,7 +15,17 @@ import { MeStore } from '../me.store';
 import { PendingReservationsService } from '../reservations/pending-reservations.service';
 import { ActionHost, ReservationActions } from '../reservations/reservation-actions';
 import { byDateThenArrival } from '../reservations/reservation-order';
-import { DayTile, NextShift, dayTile, nextShift, weekStart } from './home-figures';
+import {
+  DayTile,
+  HomeShiftLoad,
+  NextShift,
+  dayTile,
+  nextShift,
+  shiftLoad,
+  summaryShiftLoad,
+  summaryTile,
+  weekStart,
+} from './home-figures';
 
 export type HomeStatus = 'loading' | 'ready' | 'notFound' | 'error';
 
@@ -65,10 +77,13 @@ export class HomeStore implements ActionHost {
 
   /** Reservas de hoy (de todos los estados); `null` mientras se piden. */
   readonly todayRows = signal<AdminReservation[] | null>(null);
-  /** Reservas del día del próximo turno si no es hoy; `null` mientras se piden o si el próximo turno es de hoy. */
+  /**
+   * Reservas del día del próximo turno cuando ese día no sale de otra lectura: no es hoy y cae fuera de la semana (o el
+   * resumen de la semana falló). `null` mientras se piden o si no hace falta.
+   */
   readonly nextRows = signal<AdminReservation[] | null>(null);
-  /** Reservas de los días de la semana que no son hoy (hoy sale de `todayRows`), por fecha; `null` hasta que llegan. */
-  private readonly weekRows = signal<ReadonlyMap<string, AdminReservation[]> | null>(null);
+  /** Resumen de la semana del servidor (los siete días de una sola lectura); `null` hasta que llega. */
+  private readonly weekSummary = signal<WeekSummaryResponse | null>(null);
   /** Pendientes de todos los días. */
   readonly pending = signal<AdminReservation[]>([]);
   readonly closures = signal<ReadonlySet<string>>(new Set());
@@ -113,30 +128,59 @@ export class HomeStore implements ActionHost {
     return Array.from({ length: WEEK_DAYS }, (_, offset) => addDays(monday, offset));
   });
 
+  /** Los días del resumen de la semana por fecha; `null` si no ha llegado o es de otra semana (pasó la medianoche del domingo). */
+  private readonly summaryDays = computed<ReadonlyMap<string, WeekSummaryDay> | null>(() => {
+    const summary = this.weekSummary();
+    if (summary === null || summary.monday !== this.weekDates()[0]) {
+      return null;
+    }
+    return new Map((summary.days ?? []).map((day) => [day.date ?? '', day] as const));
+  });
+
   /**
-   * Una tarjeta por día de la semana; `null` mientras falte algo para pintarla: las reservas de hoy y de los demás
-   * días o los cierres (sin ellos no se sabe qué días abren). Es una señal calculada: cuando la semana llegue de una
-   * sola petición solo cambia `readWeek`, que es quien rellena `weekRows`.
+   * Una tarjeta por día de la semana; `null` mientras falte algo para pintarla: el resumen de la semana, las reservas
+   * de hoy o los cierres. Los demás días salen del resumen del servidor; hoy, de `todayRows` (la lista de hoy ya las
+   * tiene), con el cierre que diga el resumen.
    */
   readonly week = computed<DayTile[] | null>(() => {
     const plan = this.plan();
     const todayRows = this.todayRows();
-    const otherRows = this.weekRows();
+    const days = this.summaryDays();
     const closuresKnown = !this.partLoading().has('closures') && !this.partFailed().has('closures');
-    if (!plan || todayRows === null || otherRows === null || !closuresKnown) {
+    if (!plan || todayRows === null || days === null || !closuresKnown) {
       return null;
     }
     const today = this.today();
-    return this.weekDates().map((date) =>
-      dayTile(
-        date,
-        today,
-        plan.shifts ?? [],
-        this.closures(),
-        date === today ? todayRows : (otherRows.get(date) ?? []),
-        this.tableCount(),
-      ),
-    );
+    const shifts = plan.shifts ?? [];
+    const closedDays = new Set([...days.values()].filter((day) => day.closed).map((day) => day.date ?? ''));
+    return this.weekDates().map((date) => {
+      const day = days.get(date) ?? { date, closed: false, shifts: [] };
+      return date === today
+        ? dayTile(date, today, shifts, closedDays, todayRows, this.tableCount())
+        : summaryTile(day, today, shifts, this.tableCount());
+    });
+  });
+
+  /**
+   * Carga del próximo turno, para "Mesas libres"; `null` mientras llega lo que hace falta. Si es hoy sale de las reservas
+   * de hoy; si cae en la semana, del resumen (sin otra lectura); si no, de la lectura propia de ese día. Si falla el
+   * resumen, esa lectura propia también cubre los días de la semana.
+   */
+  readonly nextLoad = computed<HomeShiftLoad | null>(() => {
+    const next = this.next();
+    if (!next) {
+      return null;
+    }
+    if (next.day === 'today') {
+      const rows = this.todayRows();
+      return rows === null ? null : shiftLoad(rows, next.shift, this.tableCount());
+    }
+    if (this.weekDates().includes(next.date) && !this.partFailed().has('week')) {
+      const days = this.summaryDays();
+      return days === null ? null : summaryShiftLoad(days.get(next.date), next.shift, this.tableCount());
+    }
+    const rows = this.nextRows();
+    return rows === null ? null : shiftLoad(rows, next.shift, this.tableCount());
   });
 
   constructor() {
@@ -168,7 +212,7 @@ export class HomeStore implements ActionHost {
     this.plan.set(null);
     this.todayRows.set(null);
     this.nextRows.set(null);
-    this.weekRows.set(null);
+    this.weekSummary.set(null);
     this.pending.set([]);
     this.closures.set(new Set());
     this.partFailed.set(new Set());
@@ -322,8 +366,8 @@ export class HomeStore implements ActionHost {
     }
     this.nextRowsDate = next.date;
     if (this.weekDates().includes(next.date)) {
-      // Sus reservas llegan con las de la semana: no se piden dos veces.
-      this.feedNextRowsFromWeek();
+      // Su carga llega en el resumen de la semana: solo se pide aparte si el resumen falló.
+      this.readNextRowsIfWeekFailed();
       return;
     }
     this.requestNextRows(next.date);
@@ -339,32 +383,21 @@ export class HomeStore implements ActionHost {
     this.reads.add(this.nextRequest);
   }
 
-  /**
-   * Lee las reservas de los días de la semana que no son hoy (hoy ya se lee aparte), una petición por día. Es lo único
-   * de Inicio que hace tantas lecturas: el endpoint de resumen de la semana la sustituye por una sola, y entonces
-   * este método y `feedNextRowsFromWeek` son lo único que cambia.
-   */
+  /** Lee la semana entera (lunes a domingo) de una sola vez: `summary?week=<lunes>`. */
   private readWeek(): void {
-    const slug = this.slug;
-    const today = this.today();
-    const days = this.weekDates()
-      .filter((date) => date !== today)
-      .map((date) =>
-        this.reservationsApi.pending({ slug, date }).pipe(map((rows) => [date, rows] as const)),
-      );
     this.read(
       'week',
-      forkJoin(days),
-      (entries) => this.weekRows.set(new Map(entries)),
-      () => this.feedNextRowsFromWeek(),
+      this.reservationsApi.summary({ slug: this.slug, week: weekStart(this.today()) }),
+      (summary) => this.weekSummary.set(summary),
+      () => this.readNextRowsIfWeekFailed(),
     );
   }
 
   /**
-   * Si el próximo turno es de un día de la semana (que no sea hoy), sus reservas son las que trajo la semana: se
-   * copian a `nextRows`. Si la semana falló se piden aparte: las cifras de hoy no dependen de la tarjeta de la semana.
+   * Si el próximo turno es de un día de la semana (que no sea hoy), su carga ya viene en el resumen (`nextLoad`). Solo
+   * si el resumen falló se piden aparte las reservas de ese día: las cifras de hoy no dependen de la tarjeta de la semana.
    */
-  private feedNextRowsFromWeek(): void {
+  private readNextRowsIfWeekFailed(): void {
     const next = this.next();
     // Mientras no llegan los cierres no se sabe cuál es el próximo turno.
     if (
@@ -377,11 +410,6 @@ export class HomeStore implements ActionHost {
     }
     if (this.failures.has('week')) {
       this.requestNextRows(next.date);
-      return;
-    }
-    const rows = this.weekRows();
-    if (rows) {
-      this.nextRows.set(rows.get(next.date) ?? null);
     }
   }
 

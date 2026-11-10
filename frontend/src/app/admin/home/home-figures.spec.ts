@@ -1,6 +1,15 @@
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { ShiftResponse } from '../../core/api/models/shift-response';
-import { dayTile, isActive, nextShift, shiftLoad, todayFigures, weekStart } from './home-figures';
+import { WeekSummaryDay } from '../../core/api/models/week-summary-day';
+import {
+  dayTile,
+  isActive,
+  nextShift,
+  shiftLoad,
+  summaryTile,
+  todayFigures,
+  weekStart,
+} from './home-figures';
 
 const EVERY_DAY: ShiftResponse['days'] = [
   'MONDAY',
@@ -209,5 +218,78 @@ describe('home-figures', () => {
 
     expect(monday.shifts.map((load) => load.shift.name)).toEqual(['Comida', 'Cena']);
     expect(tuesday.shifts.map((load) => load.shift.name)).toEqual(['Cena']);
+  });
+
+  describe('summaryTile', () => {
+    const DAY: WeekSummaryDay = {
+      date: '2026-11-10',
+      closed: false,
+      shifts: [
+        { shiftId: 11, occupiedTables: 3, unassigned: 1, reservations: 5, guests: 17, pending: 2 },
+        { shiftId: 10, occupiedTables: 1, unassigned: 0, reservations: 1, guests: 2, pending: 0 },
+      ],
+    };
+
+    it('summaryTileSortsShiftsAndAddsUpTheDay', () => {
+      const tile = summaryTile(DAY, TODAY, SHIFTS, 9);
+
+      expect(tile).toMatchObject({
+        date: '2026-11-10',
+        isToday: false,
+        isPast: false,
+        closed: false,
+        reservations: 6,
+        guests: 19,
+        pending: 2,
+      });
+      expect(tile.shifts.map((load) => load.shift.name)).toEqual(['Comida', 'Cena']);
+      expect(tile.shifts[1]).toMatchObject({ occupied: 3, total: 9, unassigned: 1, reservations: 5 });
+    });
+
+    it('summaryTileMatchesDayTileOfTheSameReservations', () => {
+      const rows = [
+        reservation({ date: '2026-11-10', tableId: 1, partySize: 2 }),
+        reservation({ date: '2026-11-10', tableId: 1, partySize: 3, status: 'PENDING' }),
+        reservation({ date: '2026-11-10', tableId: undefined, partySize: 4 }),
+        reservation({ date: '2026-11-10', tableId: 2, status: 'CANCELLED' }),
+        reservation({ date: '2026-11-10', shiftId: COMIDA.id, tableId: 5 }),
+      ];
+      const fromSummary = summaryTile(
+        {
+          date: '2026-11-10',
+          closed: false,
+          shifts: [
+            { shiftId: 10, occupiedTables: 1, unassigned: 0, reservations: 1, guests: 2, pending: 0 },
+            { shiftId: 11, occupiedTables: 1, unassigned: 1, reservations: 3, guests: 9, pending: 1 },
+          ],
+        },
+        TODAY,
+        SHIFTS,
+        9,
+      );
+
+      expect(fromSummary).toEqual(dayTile('2026-11-10', TODAY, SHIFTS, new Set(), rows, 9));
+    });
+
+    it('summaryTileClosedHasNoShifts', () => {
+      const tile = summaryTile({ date: TODAY, closed: true, shifts: [] }, TODAY, SHIFTS, 9);
+
+      expect(tile).toMatchObject({ isToday: true, closed: true, shifts: [], reservations: 0 });
+    });
+
+    it('summaryTileCountsAShiftMissingFromTheSummaryAsEmpty', () => {
+      const tile = summaryTile({ date: '2026-11-10', closed: false, shifts: [] }, TODAY, SHIFTS, 9);
+
+      expect(tile.shifts.map((load) => load.occupied)).toEqual([0, 0]);
+      expect(tile.reservations).toBe(0);
+    });
+
+    it('summaryTileOnlyShowsShiftsThatOpenThatDay', () => {
+      const onlyMonday: ShiftResponse = { ...COMIDA, days: ['MONDAY'] };
+
+      const tuesday = summaryTile(DAY, TODAY, [onlyMonday, CENA], 9);
+
+      expect(tuesday.shifts.map((load) => load.shift.name)).toEqual(['Cena']);
+    });
   });
 });

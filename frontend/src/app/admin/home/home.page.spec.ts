@@ -11,12 +11,13 @@ import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { FeedEvent } from '../../core/api/models/feed-event';
 import { PlanResponse } from '../../core/api/models/plan-response';
 import { ShiftResponse } from '../../core/api/models/shift-response';
+import { WeekSummaryResponse } from '../../core/api/models/week-summary-response';
 import { OPEN_WINDOW } from '../../core/open-window';
 import { NOW, addDays } from '../../core/time';
 import { embedSnippet } from '../embed-snippet';
 import { MeStore } from '../me.store';
 import { FeedService } from '../notifications/feed.service';
-import { weekStart } from './home-figures';
+import { dayTile, weekStart } from './home-figures';
 import { HomePage } from './home.page';
 
 @Component({ template: '<p>otra</p>' })
@@ -243,16 +244,47 @@ describe('HomePage', () => {
     return request('GET', `${base(slug)}/closures`, { from });
   }
 
-  /** Las lecturas de los demás días de la semana (hoy sale de la de hoy): una por fecha. */
-  function flushWeek(screen: Screen, slug = 'kafe', today = TODAY): void {
-    for (const date of weekOf(today).filter((day) => day !== today)) {
-      expectDay(date, slug).flush(screen.week?.[date] ?? []);
-    }
+  function expectWeek(monday: string, slug = 'kafe') {
+    return request('GET', `${base(slug)}/summary`, { week: monday });
   }
 
   /**
-   * Las lecturas que salen cuando llega el plano: hoy, pendientes, cierres y los otros seis días de la semana. Si el
-   * próximo turno cae dentro de la semana sale de esas mismas lecturas: no hay una petición aparte.
+   * La respuesta del servidor para la semana de `today`, con la misma regla que `WeekSummaryService`: por turno que
+   * abre ese día, mesas distintas ocupadas, reservas sin mesa, reservas, comensales y pendientes de las activas; un día
+   * cerrado va sin turnos. Se calcula desde las reservas de cada fecha para que los tests digan qué hay en la semana.
+   */
+  function summaryOf(screen: Screen, today: string): WeekSummaryResponse {
+    const plan = screen.plan ?? PLAN;
+    const closures = new Set(screen.closures ?? []);
+    return {
+      monday: weekStart(today),
+      days: weekOf(today).map((date) => {
+        const rows = date === today ? (screen.today ?? TODAY_ROWS) : (screen.week?.[date] ?? []);
+        const tile = dayTile(date, today, plan.shifts ?? [], closures, rows, plan.tables?.length ?? 0);
+        return {
+          date,
+          closed: tile.closed,
+          shifts: tile.shifts.map((load) => ({
+            shiftId: load.shift.id,
+            occupiedTables: load.occupied,
+            unassigned: load.unassigned,
+            reservations: load.reservations,
+            guests: load.guests,
+            pending: load.pending,
+          })),
+        };
+      }),
+    };
+  }
+
+  /** La lectura de la semana: una sola petición, `summary?week=<lunes>`, con los siete días. */
+  function flushWeek(screen: Screen, slug = 'kafe', today = TODAY): void {
+    expectWeek(weekStart(today), slug).flush(summaryOf(screen, today));
+  }
+
+  /**
+   * Las lecturas que salen cuando llega el plano: hoy, pendientes, cierres y el resumen de la semana. Si el próximo
+   * turno cae dentro de la semana sale de ese mismo resumen: no hay una petición aparte.
    */
   async function flushReads(screen: Screen, slug = 'kafe', today = TODAY): Promise<void> {
     expectDay(today, slug).flush(screen.today ?? TODAY_ROWS);
@@ -377,7 +409,7 @@ describe('HomePage', () => {
     await harness.navigateByUrl('/panel/kafe/inicio');
     expectPlan().flush(PLAN);
     await settle();
-    // Mañana cae dentro de la semana: sus reservas llegan con las de la semana (una sola petición) y de ellas sale la
+    // Mañana cae dentro de la semana: su carga llega en el resumen de la semana (sin petición aparte) y de ella sale la
     // cifra de mesas libres.
     await flushReads({
       week: {
@@ -569,20 +601,18 @@ describe('HomePage', () => {
     await harness.navigateByUrl('/panel/kafe/inicio');
     expectPlan().flush(PLAN);
     await settle();
-    // Las lecturas de "kafe" quedan en vuelo: hoy, pendientes, cierres y los otros seis días de la semana.
+    // Las lecturas de "kafe" quedan en vuelo: hoy, pendientes, cierres y el resumen de la semana.
     const inFlight = [
       expectDay(TODAY),
       expectPending(),
       expectClosures(TODAY),
-      ...weekOf(TODAY)
-        .filter((date) => date !== TODAY)
-        .map((date) => expectDay(date)),
+      expectWeek(weekStart(TODAY)),
     ];
 
     await harness.navigateByUrl('/panel/otro/inicio');
 
     // Si respondieran después, pisarían la pantalla de "otro": tienen que haberse cancelado.
-    expect(inFlight.length).toBe(9);
+    expect(inFlight.length).toBe(4);
     expect(inFlight.every((pending) => pending.cancelled)).toBe(true);
     expectPlan('otro').flush({ ...PLAN, slug: 'otro', name: 'Otro' });
     await settle();
@@ -1091,7 +1121,6 @@ describe('HomePage', () => {
     }
 
     it('weekRunsMondayToSunday', async () => {
-      // `flushReads` pide una sola respuesta por fecha: si hoy se leyera dos veces, fallaría `expectOne`.
       await open();
 
       expect(days().map((item) => normalized(item.querySelector('.dhead b')?.textContent))).toEqual(
@@ -1103,6 +1132,35 @@ describe('HomePage', () => {
       expect(text('app-home-week .meta')).toBe(
         'semana del 9 al 15 de noviembre · mesas ocupadas por turno, de 9',
       );
+    });
+
+    it('weekUsesOneRequest', async () => {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+
+      // La semana entera es una petición al resumen; de las reservas solo se lee el día de hoy.
+      const summaries = http.match((candidate) => candidate.url.endsWith('/summary'));
+      const dayReads = http.match(
+        (candidate) =>
+          candidate.url.endsWith('/reservations') &&
+          candidate.params.has('date') &&
+          !candidate.params.has('status'),
+      );
+      expect(summaries.length).toBe(1);
+      expect(summaries[0].request.params.get('week')).toBe('2026-11-09');
+      expect(dayReads.length).toBe(1);
+      expect(dayReads[0].request.params.get('date')).toBe(TODAY);
+
+      dayReads[0].flush(TODAY_ROWS);
+      summaries[0].flush(summaryOf({}, TODAY));
+      expectPending().flush(PENDING_ROWS);
+      expectClosures(TODAY).flush([]);
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+
+      expect(days().length).toBe(7);
     });
 
     it('weekShowsLoadingUntilItsReads', async () => {
@@ -1249,10 +1307,7 @@ describe('HomePage', () => {
       expectDay(TODAY).flush(TODAY_ROWS);
       expectPending().flush(PENDING_ROWS);
       expectClosures(TODAY).flush([]);
-      // Un día que falla da por fallida la semana: las demás lecturas se cancelan.
-      const others = weekOf(TODAY).filter((date) => date !== TODAY);
-      expectDay(others[1]).flush(null, { status: 500, statusText: 'Server Error' });
-      others.filter((_, index) => index !== 1).forEach((date) => expectDay(date));
+      expectWeek(weekStart(TODAY)).flush(null, { status: 500, statusText: 'Server Error' });
       await settle();
       page = harness.routeNativeElement as HTMLElement;
 
@@ -1294,8 +1349,8 @@ describe('HomePage', () => {
     });
 
     /**
-     * Lunes 21:30 (la cena ya empezó): el próximo turno es el de mañana, que está en la semana. Falla la lectura de un
-     * día de la semana; `closuresFirst` dice si los cierres llegan antes o después del fallo.
+     * Lunes 21:30 (la cena ya empezó): el próximo turno es el de mañana, que está en la semana. Falla el resumen de la
+     * semana; `closuresFirst` dice si los cierres llegan antes o después del fallo.
      */
     async function weekFailsAfterTheLastShift(closuresFirst: boolean): Promise<void> {
       clock = new Date('2026-11-10T05:30:00Z');
@@ -1308,21 +1363,13 @@ describe('HomePage', () => {
       if (closuresFirst) {
         expectClosures(TODAY).flush([]);
       }
-      expectDay('2026-11-11').flush(null, { status: 500, statusText: 'Server Error' });
+      expectWeek(weekStart(TODAY)).flush(null, { status: 500, statusText: 'Server Error' });
       if (!closuresFirst) {
         expectClosures(TODAY).flush([]);
       }
 
-      // El fallo cancela las demás lecturas de la semana; las reservas de mañana se piden aparte (una sola, viva).
-      const reads = http.match(
-        (candidate) =>
-          candidate.method === 'GET' &&
-          candidate.url.endsWith('/reservations') &&
-          candidate.params.has('date'),
-      );
-      expect(reads.filter((read) => read.cancelled).length).toBe(reads.length - 1);
-      const fallback = reads.find((read) => !read.cancelled)!;
-      expect(fallback.request.params.get('date')).toBe('2026-11-10');
+      // Sin el resumen, las reservas de mañana se piden aparte (una sola lectura).
+      const fallback = expectDay('2026-11-10');
       fallback.flush([reservation({ id: 20, date: '2026-11-10', shiftId: COMIDA.id, tableId: 1 })]);
       await settle();
       page = harness.routeNativeElement as HTMLElement;

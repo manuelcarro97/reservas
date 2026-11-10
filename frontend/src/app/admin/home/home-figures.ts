@@ -1,5 +1,6 @@
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { ShiftResponse } from '../../core/api/models/shift-response';
+import { WeekSummaryDay } from '../../core/api/models/week-summary-day';
 import { addDays } from '../../core/time';
 import { opensOn, weekdayOf } from '../shift-days';
 
@@ -67,6 +68,27 @@ export function shiftLoad(
     reservations: active.length,
     guests: active.reduce((total, row) => total + (row.partySize ?? 0), 0),
     pending: active.filter((row) => row.status === 'PENDING').length,
+  };
+}
+
+/**
+ * Carga de un turno según el resumen de la semana del servidor (misma regla que `shiftLoad`). Si el resumen no trae el
+ * turno (se creó después de pedirlo) se cuenta como vacío.
+ */
+export function summaryShiftLoad(
+  day: WeekSummaryDay | undefined,
+  shift: ShiftResponse,
+  tableCount: number,
+): HomeShiftLoad {
+  const load = day?.shifts?.find((item) => item.shiftId === shift.id);
+  return {
+    shift,
+    occupied: load?.occupiedTables ?? 0,
+    total: tableCount,
+    unassigned: load?.unassigned ?? 0,
+    reservations: load?.reservations ?? 0,
+    guests: load?.guests ?? 0,
+    pending: load?.pending ?? 0,
   };
 }
 
@@ -170,5 +192,35 @@ export function dayTile(
     reservations: active.length,
     guests: active.reduce((total, row) => total + (row.partySize ?? 0), 0),
     pending: active.filter((row) => row.status === 'PENDING').length,
+  };
+}
+
+/**
+ * Tarjeta de un día con lo que trae el resumen de la semana del servidor, en vez de las reservas del día. Mismo
+ * resultado que `dayTile`: un día cerrado no lleva turnos; uno abierto, los que abren ese día de la semana, y las
+ * cifras del día suman las de sus turnos.
+ */
+export function summaryTile(
+  day: WeekSummaryDay,
+  today: string,
+  shifts: readonly ShiftResponse[],
+  tableCount: number,
+): DayTile {
+  const date = day.date ?? '';
+  const base = { date, isToday: date === today, isPast: date < today };
+  if (day.closed) {
+    return { ...base, closed: true, shifts: [], reservations: 0, guests: 0, pending: 0 };
+  }
+  const loads = shifts
+    .filter((shift) => opensOn(shift, date))
+    .sort(byStart)
+    .map((shift) => summaryShiftLoad(day, shift, tableCount));
+  return {
+    ...base,
+    closed: false,
+    shifts: loads,
+    reservations: loads.reduce((total, load) => total + load.reservations, 0),
+    guests: loads.reduce((total, load) => total + load.guests, 0),
+    pending: loads.reduce((total, load) => total + load.pending, 0),
   };
 }

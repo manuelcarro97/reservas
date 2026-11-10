@@ -18,7 +18,7 @@ import { HomePendingComponent } from './home-pending.component';
 import { HomePlanCardComponent } from './home-plan-card.component';
 import { HomeSettingsComponent } from './home-settings.component';
 import { HomeWeekComponent } from './home-week.component';
-import { shiftLoad, todayFigures } from './home-figures';
+import { todayFigures } from './home-figures';
 import { HomeStore } from './home.store';
 
 /** "2 h 40 min", "2 h" o "40 min". */
@@ -107,8 +107,7 @@ export class HomePage {
     const name = next.shift.name ?? 'Turno';
     const time = (next.shift.start ?? '').slice(0, 5);
     const weekday = longDateParts(next.date).weekday;
-    const rows = next.day === 'today' ? this.store.todayRows() : this.store.nextRows();
-    const load = rows === null ? null : shiftLoad(rows, next.shift, this.store.tableCount());
+    const load = this.store.nextLoad();
     // El nombre del turno va tal cual, sin artículo: lo pone el dueño ("Cena", "Noche", "Mediodía").
     const when =
       next.day === 'today'
