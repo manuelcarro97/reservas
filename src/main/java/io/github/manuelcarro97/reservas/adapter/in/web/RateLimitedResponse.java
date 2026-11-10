@@ -18,6 +18,7 @@ import jakarta.servlet.http.HttpServletResponse;
 final class RateLimitedResponse {
 
 	private static final String DETAIL = "Too many requests, try again later";
+	private static final String DAILY_BOOKING_DETAIL = "Too many bookings from this connection today, try again tomorrow";
 
 	private static final JacksonJsonHttpMessageConverter CONVERTER = new JacksonJsonHttpMessageConverter();
 
@@ -25,7 +26,17 @@ final class RateLimitedResponse {
 	}
 
 	static void write(HttpServletResponse response, long retryAfterSeconds) throws IOException {
-		ProblemDetail problem = ApiExceptionHandler.problem(HttpStatus.TOO_MANY_REQUESTS, DETAIL, "RATE_LIMITED");
+		write(response, retryAfterSeconds, DETAIL, "RATE_LIMITED");
+	}
+
+	/** El cupo de altas del día de una IP en un plano: otro {@code code}, para que la web no diga "espera unos segundos". */
+	static void writeDailyBookingLimit(HttpServletResponse response, long retryAfterSeconds) throws IOException {
+		write(response, retryAfterSeconds, DAILY_BOOKING_DETAIL, "DAILY_BOOKING_LIMIT");
+	}
+
+	private static void write(HttpServletResponse response, long retryAfterSeconds, String detail, String code)
+			throws IOException {
+		ProblemDetail problem = ApiExceptionHandler.problem(HttpStatus.TOO_MANY_REQUESTS, detail, code);
 		response.setStatus(problem.getStatus());
 		response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
 		CONVERTER.write(problem, MediaType.APPLICATION_PROBLEM_JSON, new ServletServerHttpResponse(response));

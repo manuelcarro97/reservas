@@ -585,6 +585,50 @@ describe('BookingPage', () => {
     expect(table('2').classList.contains('selected')).toBe(true);
   });
 
+  it('tooManyActiveReservationsShowsMessage', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+    table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
+    await fillCustomer();
+
+    const request = await submit();
+    request.flush(
+      { code: 'TOO_MANY_ACTIVE_RESERVATIONS' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    await settle();
+
+    expect(page.querySelector('[role=alert]')?.textContent).toContain(
+      'Ya tienes 3 reservas activas en este local. Cancela alguna para poder hacer otra.',
+    );
+    expect(table('2').classList.contains('selected')).toBe(true);
+  });
+
+  it('dailyBookingLimitShowsMessageWithoutTheSecondsOfRetryAfter', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+    table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
+    await fillCustomer();
+
+    const request = await submit();
+    request.flush(
+      { code: 'DAILY_BOOKING_LIMIT' },
+      { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '86280' } },
+    );
+    await settle();
+
+    const alert = page.querySelector('[role=alert]')?.textContent;
+    expect(alert).toContain(
+      'Se han hecho demasiadas reservas desde esta conexión hoy. Inténtalo mañana o llama al local.',
+    );
+    expect(alert).not.toContain('segundos');
+    expect(table('2').classList.contains('selected')).toBe(true);
+  });
+
   it('footerLinkPresentInEmbed', async () => {
     await open('/r/kafe?embed=1');
     await flushShifts();

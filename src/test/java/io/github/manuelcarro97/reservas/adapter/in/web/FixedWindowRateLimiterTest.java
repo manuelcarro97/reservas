@@ -91,6 +91,44 @@ class FixedWindowRateLimiterTest {
 	}
 
 	@Test
+	void releaseGivesBackOneUnitOfTheWindow() {
+		FixedWindowRateLimiter limiter = new FixedWindowRateLimiter(clock, 2, WINDOW);
+		limiter.tryAcquire("a");
+		limiter.tryAcquire("a");
+		assertThat(limiter.tryAcquire("a")).isFalse();
+
+		limiter.release("a");
+
+		assertThat(limiter.tryAcquire("a")).isTrue();
+		assertThat(limiter.tryAcquire("a")).isFalse();
+	}
+
+	@Test
+	void releasingTheOnlyUnitForgetsTheKeySoItNoLongerTakesRoom() {
+		FixedWindowRateLimiter limiter = new FixedWindowRateLimiter(clock, 2, WINDOW, 1);
+		limiter.tryAcquire("a");
+
+		limiter.release("a");
+
+		assertThat(limiter.trackedKeys()).isZero();
+		assertThat(limiter.tryAcquire("b")).isTrue();
+	}
+
+	@Test
+	void releaseOfAnUnknownOrExpiredKeyChangesNothing() {
+		FixedWindowRateLimiter limiter = new FixedWindowRateLimiter(clock, 1, WINDOW);
+		limiter.tryAcquire("a");
+
+		limiter.release("nunca-vista");
+		clock.set(MutableClock.START.plus(WINDOW));
+		limiter.release("a");
+
+		assertThat(limiter.trackedKeys()).isZero();
+		assertThat(limiter.tryAcquire("a")).isTrue();
+		assertThat(limiter.tryAcquire("a")).isFalse();
+	}
+
+	@Test
 	void concurrentCallersWithTheSameKeyGetExactlyTheLimit() throws Exception {
 		int limit = 10;
 		int threads = 64;

@@ -12,6 +12,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,11 +44,12 @@ class OverbookingConcurrencyIT extends PostgresIT {
 	private List<Attempt> reserveInParallel(long shiftId, Long tableId, int partySize)
 			throws InterruptedException, ExecutionException {
 		CountDownLatch start = new CountDownLatch(1);
-		Callable<Attempt> attempt = () -> {
+		// Un teléfono distinto por intento: con el mismo, el tope de activas por teléfono rechazaría antes que la capacidad.
+		Function<Integer, Callable<Attempt>> attempt = index -> () -> {
 			start.await();
 			try {
 				return new Attempt(createReservation.create("demo",
-						new CreateReservationCommand(DATE, shiftId, partySize, "Ana", "600000000", null, tableId, LocalTime.of(20, 0))),
+						new CreateReservationCommand(DATE, shiftId, partySize, "Ana", "6000000%02d".formatted(index), null, tableId, LocalTime.of(20, 0))),
 						null);
 			}
 			catch (TableTakenException | NoTableAvailableException rejected) {
@@ -57,7 +59,7 @@ class OverbookingConcurrencyIT extends PostgresIT {
 		try (ExecutorService executor = Executors.newFixedThreadPool(THREADS)) {
 			List<Future<Attempt>> futures = new ArrayList<>();
 			for (int i = 0; i < THREADS; i++) {
-				futures.add(executor.submit(attempt));
+				futures.add(executor.submit(attempt.apply(i)));
 			}
 			start.countDown();
 			List<Attempt> attempts = new ArrayList<>();

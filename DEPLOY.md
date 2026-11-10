@@ -101,7 +101,7 @@ El plan gratuito da 512 MB. El `Dockerfile` fija `JAVA_TOOL_OPTIONS` con un heap
 
 ### IP del cliente (`FORWARD_HEADERS_STRATEGY=native`)
 
-La API limita las reservas (10 por minuto) y las consultas por código (30 por minuto) **por IP**, y solo lee la que resuelve Tomcat con `getRemoteAddr()`. Detrás de Render esa IP llega en `X-Forwarded-For`, y `native` solo la acepta si la petición viene de un proxy interno. El valor por defecto de `server.tomcat.remoteip.internal-proxies` en Spring Boot 4.1.2 ya cubre `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` y `100.64.0.0/10`.
+La API limita las reservas (10 por minuto y 10 al día por local) y las consultas por código (30 por minuto) **por IP**, y solo lee la que resuelve Tomcat con `getRemoteAddr()`. Detrás de Render esa IP llega en `X-Forwarded-For`, y `native` solo la acepta si la petición viene de un proxy interno. El valor por defecto de `server.tomcat.remoteip.internal-proxies` en Spring Boot 4.1.2 ya cubre `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` y `100.64.0.0/10`.
 
 Hay dos dudas sin comprobar, y las dos acaban igual (el cupo deja de ser por persona):
 
