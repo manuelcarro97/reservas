@@ -17,9 +17,11 @@ import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 class TablePersistenceAdapter implements TableRepositoryPort {
 
 	private final DiningTableJpaRepository tables;
+	private final ReservationJpaRepository reservations;
 
-	TablePersistenceAdapter(DiningTableJpaRepository tables) {
+	TablePersistenceAdapter(DiningTableJpaRepository tables, ReservationJpaRepository reservations) {
 		this.tables = tables;
+		this.reservations = reservations;
 	}
 
 	@Override
@@ -70,6 +72,16 @@ class TablePersistenceAdapter implements TableRepositoryPort {
 	@Override
 	public void softDelete(long id, Instant at) {
 		tables.softDelete(id, at);
+	}
+
+	@Override
+	public void delete(long restaurantId, long id) {
+		tables.delete(id, restaurantId);
+	}
+
+	@Override
+	public boolean hasAnyReservation(long id) {
+		return reservations.existsByTableId(id);
 	}
 
 	@Override

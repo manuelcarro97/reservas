@@ -30,6 +30,10 @@ interface DiningTableJpaRepository extends JpaRepository<DiningTableEntity, Long
 	int softDelete(long id, Instant at);
 
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("delete from DiningTableEntity t where t.id = :id and t.restaurantId = :restaurantId")
+	int delete(long id, long restaurantId);
+
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query(value = "UPDATE dining_table SET label = '~' || id WHERE id IN (:ids) AND deleted_at IS NULL",
 			nativeQuery = true)
 	int renameTemporarily(Collection<Long> ids);

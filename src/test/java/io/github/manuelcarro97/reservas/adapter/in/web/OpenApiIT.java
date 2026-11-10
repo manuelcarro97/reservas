@@ -42,7 +42,7 @@ class OpenApiIT extends PostgresIT {
 
 	/** Datos personales del cliente: solo en respuestas de administración, nunca en las públicas. */
 	private static final Set<String> NEVER_IN_PUBLIC_RESPONSES = Set.of("customerPhone", "customer_phone",
-			"customerEmail", "customer_email");
+			"customerEmail", "customer_email", "customerName", "customer_name");
 
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
