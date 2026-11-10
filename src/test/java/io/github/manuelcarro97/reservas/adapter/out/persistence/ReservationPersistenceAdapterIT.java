@@ -93,6 +93,36 @@ class ReservationPersistenceAdapterIT extends PostgresIT {
 		assertThatThrownBy(() -> reservations.update(stale)).isInstanceOf(ConcurrentUpdateException.class);
 	}
 
+	private Reservation reservationOn(String code, LocalDate date, long restaurantId) {
+		return Reservation.newPending(code, restaurantId, shift.id(), table.id(), date, shift.start(), 2, "Ana",
+				"600000000", null, Instant.parse("2026-11-01T10:00:00Z"));
+	}
+
+	@Test
+	void findActiveBetweenIsInclusiveAndActiveOnly() {
+		LocalDate from = DATE;
+		LocalDate to = DATE.plusDays(6);
+		reservations.tryInsert(reservationOn("BEFORE", from.minusDays(1), restaurant.id()));
+		reservations.tryInsert(reservationOn("FROM", from, restaurant.id()));
+		Reservation cancelled = reservations.tryInsert(reservationOn("CANCELLED", from.plusDays(2), restaurant.id()))
+			.orElseThrow();
+		cancelled.cancel();
+		reservations.update(cancelled);
+		reservations.tryInsert(reservationOn("MIDDLE", from.plusDays(3), restaurant.id()));
+		reservations.tryInsert(reservationOn("TO", to, restaurant.id()));
+		reservations.tryInsert(reservationOn("AFTER", to.plusDays(1), restaurant.id()));
+		Restaurant other = restaurants.save(new Restaurant(null, "otro", "Otro", ZoneId.of("Europe/Madrid"), 2,
+				"owner-b", PlanStatus.PUBLISHED, RoomLayout.defaultRoom(), Theme.AZUL, BookingMode.FREE_CHOICE));
+		DiningTable otherTable = tables.save(new DiningTable(null, other.id(), "M1", TableShape.SQUARE, 4, 0, 10, 20));
+		Shift otherShift = shifts.save(new Shift(null, other.id(), "Cena", LocalTime.of(20, 0), LocalTime.of(22, 0),
+				EnumSet.allOf(DayOfWeek.class)));
+		reservations.tryInsert(Reservation.newPending("OTHER", other.id(), otherShift.id(), otherTable.id(), from,
+				otherShift.start(), 2, "Eva", "600000001", null, Instant.parse("2026-11-01T10:00:00Z")));
+
+		assertThat(reservations.findActiveBetween(restaurant.id(), from, to)).extracting(Reservation::code)
+			.containsExactly("FROM", "MIDDLE", "TO");
+	}
+
 	@Test
 	void closureIsReportedForThatDateOnly() {
 		restaurants.addClosure(restaurant.id(), DATE, "Festivo");

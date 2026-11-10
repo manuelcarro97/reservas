@@ -22,6 +22,7 @@ import io.github.manuelcarro97.reservas.application.port.in.AdminReservation;
 import io.github.manuelcarro97.reservas.application.port.in.ManageReservationUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.ReservationDetails;
 import io.github.manuelcarro97.reservas.application.port.in.TableSuggestion;
+import io.github.manuelcarro97.reservas.application.port.in.WeekSummaryUseCase;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -29,9 +30,11 @@ import io.github.manuelcarro97.reservas.application.port.in.TableSuggestion;
 class AdminReservationController {
 
 	private final ManageReservationUseCase manageReservation;
+	private final WeekSummaryUseCase weekSummary;
 
-	AdminReservationController(ManageReservationUseCase manageReservation) {
+	AdminReservationController(ManageReservationUseCase manageReservation, WeekSummaryUseCase weekSummary) {
 		this.manageReservation = manageReservation;
+		this.weekSummary = weekSummary;
 	}
 
 	// Dos filtros excluyentes; cualquier otra combinación (ninguno, o un estado distinto de PENDING) da 400.
@@ -44,6 +47,13 @@ class AdminReservationController {
 	@GetMapping(path = "/restaurants/{slug}/reservations", params = { "status=PENDING", "!date" })
 	List<AdminReservation> pending(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug) {
 		return manageReservation.pending(jwt.getSubject(), slug);
+	}
+
+	// Cualquier día de la semana vale: se normaliza al lunes.
+	@GetMapping("/restaurants/{slug}/summary")
+	WeekSummaryResponse summary(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug,
+			@RequestParam @SupportedDate @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week) {
+		return WeekSummaryResponse.from(weekSummary.week(jwt.getSubject(), slug, week));
 	}
 
 	@PutMapping("/reservations/{id}/table")

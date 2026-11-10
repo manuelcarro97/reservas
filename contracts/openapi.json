@@ -884,6 +884,68 @@
           "start"
         ],
         "type": "object"
+      },
+      "WeekShiftLoad": {
+        "properties": {
+          "guests": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "occupiedTables": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pending": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "reservations": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "shiftId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unassigned": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "WeekSummaryDay": {
+        "properties": {
+          "closed": {
+            "type": "boolean"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "shifts": {
+            "items": {
+              "$ref": "#/components/schemas/WeekShiftLoad"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "WeekSummaryResponse": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/WeekSummaryDay"
+            },
+            "type": "array"
+          },
+          "monday": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -1861,6 +1923,50 @@
         ],
         "tags": [
           "admin-shift-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/restaurants/{slug}/summary": {
+      "get": {
+        "operationId": "summary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "week",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeekSummaryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ],
+        "tags": [
+          "admin-reservation-controller"
         ]
       }
     },

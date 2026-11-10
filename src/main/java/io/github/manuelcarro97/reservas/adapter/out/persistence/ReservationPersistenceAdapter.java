@@ -138,6 +138,16 @@ class ReservationPersistenceAdapter implements ReservationRepositoryPort {
 	}
 
 	@Override
+	public List<Reservation> findActiveBetween(long restaurantId, LocalDate from, LocalDate to) {
+		return reservations
+			.findByRestaurantIdAndDateBetweenAndStatusInOrderByDateAscIdAsc(restaurantId, from, to,
+					List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED))
+			.stream()
+			.map(ReservationEntity::toDomain)
+			.toList();
+	}
+
+	@Override
 	public List<Reservation> findActiveFor(long restaurantId, long shiftId, LocalDate date) {
 		return reservations
 			.findByRestaurantIdAndShiftIdAndDateAndStatusInOrderById(restaurantId, shiftId, date,

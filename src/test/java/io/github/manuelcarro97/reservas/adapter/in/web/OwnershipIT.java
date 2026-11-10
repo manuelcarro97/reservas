@@ -123,7 +123,10 @@ class OwnershipIT extends PostgresIT {
 				new Route("GET pending reservations",
 						it -> get("/api/v1/admin/restaurants/plano-a/reservations").param("status", "PENDING"),
 						RESTAURANT_NOT_FOUND),
-				new Route("PUT reservation table", it -> put(it.reservationPath("table"))
+				new Route("GET summary",
+						it -> get("/api/v1/admin/restaurants/plano-a/summary").param("week", DATE.toString()),
+						RESTAURANT_NOT_FOUND),
+				new Route("PUT reservation table",it -> put(it.reservationPath("table"))
 					.contentType(MediaType.APPLICATION_JSON)
 					.content("""
 							{"tableId":%d}
