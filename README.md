@@ -178,7 +178,7 @@ La API se publica en Render (plan gratuito, Docker, [`render.yaml`](render.yaml)
 ## Límites
 
 - Sin juntar mesas, turnos que cruzan medianoche, emails ni pagos.
-- El límite de peticiones es en memoria y de una sola instancia: por IP en las altas de reserva (10 por minuto y 10 al día por local) y en las consultas y cancelaciones por código (30 por minuto), y por usuario en las escrituras de la gestión (60 por minuto).
+- El límite de peticiones es en memoria y de una sola instancia: por IP en las altas de reserva (10 por minuto) y en las consultas y cancelaciones por código (30 por minuto), y por usuario en las escrituras de la gestión (60 por minuto).
 - La comprobación de turnos solapados y de reservas al cerrar un día se hace en la aplicación, no en la base de datos: dos operaciones exactamente simultáneas del mismo dueño podrían saltársela. Con un dueño por local, el riesgo es asumible.
 - Diseño pensado para escritorio. En pantallas de menos de 1024 px las columnas se apilan, pero aún no hay un diseño móvil propio.
 

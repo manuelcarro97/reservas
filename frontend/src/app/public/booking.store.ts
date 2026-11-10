@@ -29,8 +29,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   PAYLOAD_TOO_LARGE: 'Los datos son demasiado largos. Revísalos.',
   TOO_MANY_ACTIVE_RESERVATIONS:
     'Ya tienes 3 reservas activas en este local. Cancela alguna para poder hacer otra.',
-  DAILY_BOOKING_LIMIT:
-    'Se han hecho demasiadas reservas desde esta conexión hoy. Inténtalo mañana o llama al local.',
 };
 const GENERIC_ERROR = 'No se pudo completar la reserva. Inténtalo de nuevo.';
 const TABLE_TAKEN_MESSAGE = 'Esa mesa se acaba de reservar, elige otra';
@@ -381,8 +379,7 @@ export class BookingStore {
       // La hora ya pasó o dejó de ser del turno: se piden las horas de nuevo y se elige otra.
       this.requestShifts();
       this.error.set(ARRIVAL_UNAVAILABLE_MESSAGE);
-    } else if (error.status === 429 && code !== 'DAILY_BOOKING_LIMIT') {
-      // El cupo del día es otro 429: su Retry-After son horas y "espera unos segundos" no sirve; va por ERROR_MESSAGES.
+    } else if (error.status === 429) {
       this.error.set(rateLimitedMessage(error));
     } else if (code === 'TABLE_TAKEN') {
       // Otro cliente se la llevó: se pide la ocupación de nuevo y se vuelve a elegir mesa.

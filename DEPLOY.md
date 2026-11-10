@@ -101,7 +101,7 @@ El plan gratuito da 512 MB. El `Dockerfile` fija `JAVA_TOOL_OPTIONS` con un heap
 
 ### IP del cliente (`FORWARD_HEADERS_STRATEGY=native`)
 
-La API limita las reservas (10 por minuto y 10 al día por local) y las consultas por código (30 por minuto) **por IP**, y solo lee la que resuelve Tomcat con `getRemoteAddr()`. Detrás de Render esa IP llega en `X-Forwarded-For`, y `native` solo la acepta si la petición viene de un proxy interno. El valor por defecto de `server.tomcat.remoteip.internal-proxies` en Spring Boot 4.1.2 ya cubre `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` y `100.64.0.0/10`.
+La API limita las reservas (10 por minuto) y las consultas por código (30 por minuto) **por IP**, y solo lee la que resuelve Tomcat con `getRemoteAddr()`. Detrás de Render esa IP llega en `X-Forwarded-For`, y `native` solo la acepta si la petición viene de un proxy interno. El valor por defecto de `server.tomcat.remoteip.internal-proxies` en Spring Boot 4.1.2 ya cubre `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` y `100.64.0.0/10`.
 
 Hay dos dudas sin comprobar, y las dos acaban igual (el cupo deja de ser por persona):
 
@@ -131,6 +131,8 @@ Ejemplo para Cloudflare: esa lista más los rangos actuales de las dos URLs de a
 **Opción B, última opción: `SERVER_TOMCAT_REMOTEIP_REMOTE_IP_HEADER=CF-Connecting-IP`.** Tomcat toma la IP de esa cabecera, que escribe Cloudflare, en lugar de recorrer `X-Forwarded-For`. No he encontrado que Render documente que esa cabecera llegue siempre al servicio ni que sea Cloudflare quien la escribe: si no está, o si una petición llega al servicio sin pasar por Cloudflare, el cliente la puede poner él mismo y falsear su IP (vaciar su cupo a voluntad). Úsala solo si la A no funciona, y repite la comprobación mandando tú una petición con `-H "CF-Connecting-IP: 1.2.3.4"`: `newRemoteAddr` no debe ser `1.2.3.4`.
 
 `render.yaml` deja `native` solo; es una decisión que depende del resultado de la comprobación.
+
+**Tope diario de altas por IP: retirado.** Se probó un tope de altas por día, IP y local, y se retiró hasta saber qué IP ve Tomcat. Antes de volver a añadirlo (por ejemplo cuando haya locales reales) hay que hacer la comprobación de esta sección: si la API ve la IP de un edge de Cloudflare, todos los clientes de ese edge compartirían el cupo diario.
 
 ## 4. Firebase Hosting: el frontend
 

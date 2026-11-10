@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDate;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
+import io.github.manuelcarro97.reservas.application.service.DemoAccount;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
 import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.ReservationCode;
@@ -39,8 +41,16 @@ class PublicApiIT extends PostgresIT {
 	@Autowired
 	private MockMvc mvc;
 
+	@Autowired
+	private DemoAccount demoAccount;
+
 	private Shift shift;
 	private DiningTable table;
+
+	@AfterEach
+	void forgetDemoAccount() {
+		demoAccount.setUid(null);
+	}
 
 	@BeforeEach
 	void seed() {
@@ -388,6 +398,17 @@ class PublicApiIT extends PostgresIT {
 		Shift otherShift = givenDinnerShift(other);
 		for (int day = 3; day <= 5; day++) {
 			activeWithPhone(other, otherShift, LocalDate.of(2026, 12, day), "600000000");
+		}
+
+		postReservation(body(2)).andExpect(status().isCreated());
+	}
+
+	@Test
+	void demoPlanHasNoPhoneLimit() throws Exception {
+		// Los visitantes de /r/demo teclean todos el mismo teléfono falso: el tope no se aplica a la cuenta demo.
+		demoAccount.setUid("owner-a");
+		for (int day = 3; day <= 5; day++) {
+			activeWithPhone(LocalDate.of(2026, 12, day), "600000000");
 		}
 
 		postReservation(body(2)).andExpect(status().isCreated());

@@ -110,10 +110,14 @@ class ReservationService implements CreateReservationUseCase, GetReservationUseC
 				restaurants.maxCapacity(restaurant.id()), restaurants.isClosed(restaurant.id(), command.date()), clock);
 		// Después de validate: un turno ya empezado se rechaza allí, así que aquí solo llega una hora de un turno futuro.
 		arrivalPolicy.requireValid(shift, command.arrivalTime(), command.date(), restaurant.zone(), clock.instant());
-		// Las activas del plano (hoy en adelante, con "hoy" en su zona) están acotadas por la ventana de reserva; se filtran
-		// aquí por teléfono y no en SQL porque el teléfono es texto libre y se compara por sus dígitos.
-		LocalDate today = LocalDate.ofInstant(clock.instant(), restaurant.zone());
-		bookingPolicy.requireBelowPhoneLimit(command.customerPhone(), reservations.findActiveFrom(restaurant.id(), today));
+		// La demo no tiene tope: sus visitantes (los reclutadores) teclean todos el mismo teléfono falso.
+		if (!demoAccount.isDemo(restaurant.ownerUid())) {
+			// Las activas del plano (hoy en adelante, con "hoy" en su zona) están acotadas por la ventana de reserva; se
+			// filtran aquí por teléfono y no en SQL porque el teléfono es texto libre y se compara por sus dígitos.
+			LocalDate today = LocalDate.ofInstant(clock.instant(), restaurant.zone());
+			bookingPolicy.requireBelowPhoneLimit(command.customerPhone(),
+					reservations.findActiveFrom(restaurant.id(), today));
+		}
 
 		List<DiningTable> free = tables.findFree(restaurant.id(), shift.id(), command.date());
 		List<Integer> unassignedParties = reservations.findActiveFor(restaurant.id(), shift.id(), command.date())

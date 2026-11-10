@@ -74,22 +74,6 @@ public class FixedWindowRateLimiter {
 	}
 
 	/**
-	 * Devuelve la unidad que contó un {@link #tryAcquire} aceptado, para una petición que al final no debe gastar cupo.
-	 * Si era la única de la ventana, la clave se olvida y deja de ocupar sitio. Si la ventana ya caducó, también se
-	 * olvida. No distingue una ventana nueva abierta entre el acquire y el release (solo ocurre al rotar la ventana
-	 * justo en ese intervalo y a lo sumo da una petición de más).
-	 */
-	public void release(String key) {
-		long now = clock.millis();
-		windows.computeIfPresent(key, (ignored, window) -> {
-			if (isExpired(window, now) || window.count() <= 1) {
-				return null;
-			}
-			return new Window(window.startMillis(), window.count() - 1);
-		});
-	}
-
-	/**
 	 * Segundos hasta que rota la ventana de {@code key}, redondeados hacia arriba y nunca menos de 1. Una clave que el
 	 * tope dejó fuera no tiene ventana: se le dice que espere una ventana entera, lo que tarda en caducar con certeza
 	 * cualquiera de las que lo llenan.
