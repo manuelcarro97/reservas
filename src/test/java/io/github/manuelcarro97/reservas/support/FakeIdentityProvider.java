@@ -1,9 +1,13 @@
 package io.github.manuelcarro97.reservas.support;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
+import io.github.manuelcarro97.reservas.application.port.out.EmailTakenException;
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderPort;
 
 /** Proveedor de identidad de pruebas: registra las llamadas y nunca sale a la red. */
@@ -14,10 +18,12 @@ public class FakeIdentityProvider implements IdentityProviderPort {
 
 	private final List<String> deleted = new CopyOnWriteArrayList<>();
 	private final List<Ensured> ensured = new CopyOnWriteArrayList<>();
+	private final Map<String, String> uidByEmail = new ConcurrentHashMap<>();
 	private volatile Consumer<String> onDelete = uid -> {
 	};
 	private volatile RuntimeException failure;
 	private volatile RuntimeException ensureFailure;
+	private volatile RuntimeException findFailure;
 
 	public List<String> deleted() {
 		return deleted;
@@ -42,13 +48,28 @@ public class FakeIdentityProvider implements IdentityProviderPort {
 		ensureFailure = exception;
 	}
 
+	/** Hace que {@code findUidByEmail} lance esta excepción. */
+	public void failFindWith(RuntimeException exception) {
+		findFailure = exception;
+	}
+
+	/**
+	 * Ese email es de la cuenta {@code uid}: {@code ensureUser} para otro uid falla con {@link EmailTakenException} hasta
+	 * que se borra esa cuenta con {@code deleteUser}.
+	 */
+	public void holdEmail(String email, String uid) {
+		uidByEmail.put(email, uid);
+	}
+
 	public void reset() {
 		deleted.clear();
 		ensured.clear();
+		uidByEmail.clear();
 		onDelete = uid -> {
 		};
 		failure = null;
 		ensureFailure = null;
+		findFailure = null;
 	}
 
 	@Override
@@ -58,6 +79,7 @@ public class FakeIdentityProvider implements IdentityProviderPort {
 		if (failure != null) {
 			throw failure;
 		}
+		uidByEmail.values().removeIf(uid::equals);
 	}
 
 	@Override
@@ -65,8 +87,20 @@ public class FakeIdentityProvider implements IdentityProviderPort {
 		if (ensureFailure != null) {
 			throw ensureFailure;
 		}
+		String holder = uidByEmail.get(email);
+		if (holder != null && !holder.equals(uid)) {
+			throw new EmailTakenException("ensureUser", "ALREADY_EXISTS, EMAIL_ALREADY_EXISTS");
+		}
 		ensured.add(new Ensured(uid, email));
 		return uid;
+	}
+
+	@Override
+	public Optional<String> findUidByEmail(String email) {
+		if (findFailure != null) {
+			throw findFailure;
+		}
+		return Optional.ofNullable(uidByEmail.get(email));
 	}
 
 }

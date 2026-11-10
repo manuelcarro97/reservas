@@ -277,13 +277,27 @@ class PlanService implements ManagePlanUseCase {
 			.collect(Collectors.toSet());
 
 		Instant now = clock.instant();
-		current.stream().filter(table -> !keptIds.contains(table.id())).forEach(table -> tables.softDelete(table.id(), now));
+		current.stream().filter(table -> !keptIds.contains(table.id())).forEach(table -> removeTable(table, now));
 		tables.renameTemporarily(changes.stream()
 			.filter(change -> change.id() != null && !currentById.get(change.id()).label().equals(change.label().strip()))
 			.map(TableChange::id)
 			.toList());
 		changes.stream().filter(change -> change.id() != null).forEach(change -> tables.update(toTable(restaurantId, change)));
 		changes.stream().filter(change -> change.id() == null).forEach(change -> tables.save(toTable(restaurantId, change)));
+	}
+
+	/**
+	 * Una mesa que ninguna reserva ha referenciado nunca (de cualquier estado) se borra de verdad: si no, guardar el
+	 * plano en bucle dejaría filas ocultas para siempre. Si alguna la referencia (la FK lo impediría, y la reserva
+	 * conserva la etiqueta de su mesa) solo se oculta.
+	 */
+	private void removeTable(DiningTable table, Instant now) {
+		if (tables.hasAnyReservation(table.id())) {
+			tables.softDelete(table.id(), now);
+		}
+		else {
+			tables.delete(table.restaurantId(), table.id());
+		}
 	}
 
 	private static DiningTable toTable(long restaurantId, TableChange change) {

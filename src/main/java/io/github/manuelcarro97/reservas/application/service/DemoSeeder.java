@@ -25,6 +25,7 @@ import io.github.manuelcarro97.reservas.application.port.in.PlanView;
 import io.github.manuelcarro97.reservas.application.port.in.ResetDemoUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.TableChange;
 import io.github.manuelcarro97.reservas.application.port.out.DemoDataCleanerPort;
+import io.github.manuelcarro97.reservas.application.port.out.EmailTakenException;
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderException;
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderPort;
 import io.github.manuelcarro97.reservas.application.port.out.RestaurantRepositoryPort;
@@ -164,7 +165,7 @@ class DemoSeeder implements ResetDemoUseCase {
 		// Los datos de la demo no dependen del proveedor de identidad: si falla, la base de datos se restaura igualmente
 		// (si no, la demo pública quedaría sucia hasta la noche siguiente) y el fallo se registra aparte.
 		try {
-			identityProvider.ensureUser(ownerUid, email, password);
+			ensureUserReclaimingTheEmail();
 		}
 		catch (IdentityProviderException failure) {
 			// Su mensaje es seguro por contrato: operación y códigos enumerados.
@@ -175,6 +176,29 @@ class DemoSeeder implements ResetDemoUseCase {
 			StackTraceElement[] frames = failure.getStackTrace();
 			log.warn("Demo account provisioning failed for uid {}: {} at {}", ownerUid, failure.getClass().getName(),
 					frames.length > 0 ? frames[0] : "unknown");
+		}
+	}
+
+	/**
+	 * La contraseña de la demo es pública: quien entre puede cambiar el email de la cuenta y registrar otra con el email
+	 * de la demo, y sin esto la restauración fallaría cada noche con "email ya en uso" y los visitantes entrarían en la
+	 * cuenta del intruso. Si el email es de otra cuenta, esa cuenta se borra y se reintenta una vez; si el reintento (o
+	 * cualquier paso) falla, el fallo sale tal cual y lo registra {@link #ensureAccount}.
+	 */
+	private void ensureUserReclaimingTheEmail() {
+		try {
+			identityProvider.ensureUser(ownerUid, email, password);
+		}
+		catch (EmailTakenException taken) {
+			String holder = identityProvider.findUidByEmail(email).orElseThrow(() -> taken);
+			if (holder.equals(ownerUid)) {
+				throw taken;
+			}
+			identityProvider.deleteUser(holder);
+			// Solo el uid: el email de la demo no se escribe en los logs.
+			log.warn("Demo email was taken by uid {}: that account was deleted; its plans remain and must be cleaned by hand",
+					holder);
+			identityProvider.ensureUser(ownerUid, email, password);
 		}
 	}
 

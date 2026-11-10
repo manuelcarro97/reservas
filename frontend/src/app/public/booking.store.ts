@@ -27,6 +27,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   TABLE_TOO_SMALL: 'Esa mesa es pequeña para tu grupo. Elige otra.',
   NO_TABLE_AVAILABLE: 'Ya no quedan mesas libres para tu grupo en ese turno. Prueba con otro.',
   PAYLOAD_TOO_LARGE: 'Los datos son demasiado largos. Revísalos.',
+  TOO_MANY_ACTIVE_RESERVATIONS:
+    'Este teléfono ya tiene el máximo de reservas activas en este local. Cancela alguna para poder hacer otra.',
 };
 const GENERIC_ERROR = 'No se pudo completar la reserva. Inténtalo de nuevo.';
 const TABLE_TAKEN_MESSAGE = 'Esa mesa se acaba de reservar, elige otra';

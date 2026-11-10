@@ -10,7 +10,9 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -20,8 +22,10 @@ import io.github.manuelcarro97.reservas.domain.exception.DateTooFarException;
 import io.github.manuelcarro97.reservas.domain.exception.PartyTooLargeException;
 import io.github.manuelcarro97.reservas.domain.exception.RestaurantClosedException;
 import io.github.manuelcarro97.reservas.domain.exception.ShiftNotOpenException;
+import io.github.manuelcarro97.reservas.domain.exception.TooManyActiveReservationsException;
 import io.github.manuelcarro97.reservas.domain.model.BookingMode;
 import io.github.manuelcarro97.reservas.domain.model.PlanStatus;
+import io.github.manuelcarro97.reservas.domain.model.Reservation;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.RoomLayout;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
@@ -124,6 +128,38 @@ class BookingPolicyTest {
 
 		assertThatThrownBy(() -> policy.validate(RESTAURANT, shift, date, 2, MAX_CAPACITY, false,
 				clockAt("2026-11-01T22:30:00Z"))).isInstanceOf(DateInPastException.class);
+	}
+
+	private static List<Reservation> activeWithPhones(String... phones) {
+		return Arrays.stream(phones)
+			.map(phone -> Reservation.newPending("DEMO-X", 1L, 2L, null, TOMORROW, LocalTime.of(20, 0), 2, "Ana", phone,
+					null, Instant.parse("2026-12-01T11:00:00Z")))
+			.toList();
+	}
+
+	@Test
+	void phoneWithTwoActiveReservationsStillFits() {
+		assertThatCode(() -> policy.requireBelowPhoneLimit("600111222",
+				activeWithPhones("600111222", "600 111 222", "600999999"))).doesNotThrowAnyException();
+	}
+
+	@Test
+	void phoneWithThreeActiveReservationsIsRejected() {
+		assertThatThrownBy(() -> policy.requireBelowPhoneLimit("600111222",
+				activeWithPhones("600111222", "600 111 222", "+600-111-222"))).isInstanceOf(TooManyActiveReservationsException.class);
+	}
+
+	@Test
+	void phoneComparisonIgnoresEverythingButDigits() {
+		assertThatThrownBy(() -> policy.requireBelowPhoneLimit("(600) 111.222",
+				activeWithPhones("600111222", "600 111 222", "600-111-222"))).isInstanceOf(TooManyActiveReservationsException.class);
+	}
+
+	@Test
+	void reservationsWithoutDigitsInThePhoneNeverCount() {
+		assertThatCode(() -> policy.requireBelowPhoneLimit("-", activeWithPhones("-", "-", "-", "-"))).doesNotThrowAnyException();
+		assertThatCode(() -> policy.requireBelowPhoneLimit("600111222", activeWithPhones("-", null, "", "abc")))
+			.doesNotThrowAnyException();
 	}
 
 	@Test

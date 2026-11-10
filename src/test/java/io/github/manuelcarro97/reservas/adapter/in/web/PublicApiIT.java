@@ -1,5 +1,6 @@
 package io.github.manuelcarro97.reservas.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
@@ -10,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDate;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +24,10 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
+import io.github.manuelcarro97.reservas.application.service.DemoAccount;
 import io.github.manuelcarro97.reservas.domain.model.DiningTable;
+import io.github.manuelcarro97.reservas.domain.model.Reservation;
+import io.github.manuelcarro97.reservas.domain.model.ReservationCode;
 import io.github.manuelcarro97.reservas.domain.model.Restaurant;
 import io.github.manuelcarro97.reservas.domain.model.Shift;
 import io.github.manuelcarro97.reservas.support.PostgresIT;
@@ -34,8 +41,16 @@ class PublicApiIT extends PostgresIT {
 	@Autowired
 	private MockMvc mvc;
 
+	@Autowired
+	private DemoAccount demoAccount;
+
 	private Shift shift;
 	private DiningTable table;
+
+	@AfterEach
+	void forgetDemoAccount() {
+		demoAccount.setUid(null);
+	}
 
 	@BeforeEach
 	void seed() {
@@ -319,6 +334,94 @@ class PublicApiIT extends PostgresIT {
 	void partyTooLargeReturns422() throws Exception {
 		postReservation(body(3)).andExpect(status().isUnprocessableContent())
 			.andExpect(jsonPath("$.code").value("PARTY_TOO_LARGE"));
+	}
+
+	/** Reserva activa sin mesa en {@code date}: no choca con la mesa que usa el POST de los tests. */
+	private Reservation activeWithPhone(Restaurant plan, Shift planShift, LocalDate date, String phone) {
+		return reservations
+			.tryInsert(Reservation.newPending(ReservationCode.generate(plan.slug()), plan.id(), planShift.id(), null,
+					date, planShift.start(), 2, "Ana", phone, null, clock.instant()))
+			.orElseThrow();
+	}
+
+	private Reservation activeWithPhone(LocalDate date, String phone) {
+		return activeWithPhone(restaurants.findBySlug("demo").orElseThrow(), shift, date, phone);
+	}
+
+	@Test
+	void fourthActiveReservationWithTheSamePhoneIsRejected() throws Exception {
+		for (int day = 3; day <= 5; day++) {
+			activeWithPhone(LocalDate.of(2026, 12, day), "600000000");
+		}
+
+		postReservation(body(2), MediaType.APPLICATION_JSON).andExpect(status().isConflict())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.code").value("TOO_MANY_ACTIVE_RESERVATIONS"))
+			.andExpect(content().string(not(containsString("600000000"))));
+		assertThat(jdbc.sql("SELECT count(*) FROM reservation").query(Long.class).single()).isEqualTo(3);
+	}
+
+	@Test
+	void thirdActiveReservationWithTheSamePhoneIsAccepted() throws Exception {
+		for (int day = 3; day <= 4; day++) {
+			activeWithPhone(LocalDate.of(2026, 12, day), "600000000");
+		}
+
+		postReservation(body(2)).andExpect(status().isCreated());
+	}
+
+	@Test
+	void phoneIsComparedByDigits() throws Exception {
+		activeWithPhone(LocalDate.of(2026, 12, 3), "600 111 222");
+		activeWithPhone(LocalDate.of(2026, 12, 4), "600111222");
+		activeWithPhone(LocalDate.of(2026, 12, 5), "600-111-222");
+
+		postReservation(body(2).replace("600000000", "(600) 111 222")).andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("TOO_MANY_ACTIVE_RESERVATIONS"));
+	}
+
+	@Test
+	void pastAndCancelledReservationsDoNotCount() throws Exception {
+		activeWithPhone(LocalDate.of(2026, 12, 3), "600000000");
+		activeWithPhone(LocalDate.of(2026, 12, 4), "600000000");
+		// El reloj de la suite está en el 1-12-2026: el 30-11 ya pasó.
+		activeWithPhone(LocalDate.of(2026, 11, 30), "600000000");
+		Reservation cancelled = activeWithPhone(LocalDate.of(2026, 12, 6), "600000000");
+		jdbc.sql("UPDATE reservation SET status = 'CANCELLED' WHERE id = :id").param("id", cancelled.id()).update();
+
+		postReservation(body(2)).andExpect(status().isCreated());
+	}
+
+	@Test
+	void samePhoneInAnotherPlanIsNotCounted() throws Exception {
+		Restaurant other = givenRestaurant("otro");
+		Shift otherShift = givenDinnerShift(other);
+		for (int day = 3; day <= 5; day++) {
+			activeWithPhone(other, otherShift, LocalDate.of(2026, 12, day), "600000000");
+		}
+
+		postReservation(body(2)).andExpect(status().isCreated());
+	}
+
+	@Test
+	void demoPlanHasNoPhoneLimit() throws Exception {
+		// Los visitantes de /r/demo teclean todos el mismo teléfono falso: el tope no se aplica a la cuenta demo.
+		demoAccount.setUid("owner-a");
+		for (int day = 3; day <= 5; day++) {
+			activeWithPhone(LocalDate.of(2026, 12, day), "600000000");
+		}
+
+		postReservation(body(2)).andExpect(status().isCreated());
+	}
+
+	@Test
+	void phoneWithoutDigitsIsNotLimited() throws Exception {
+		// Un teléfono sin dígitos ("-") no se compara con nada: el tope no se aplica aunque ya haya tres activas con él.
+		for (int day = 3; day <= 5; day++) {
+			activeWithPhone(LocalDate.of(2026, 12, day), "-");
+		}
+
+		postReservation(body(2).replace("600000000", "-")).andExpect(status().isCreated());
 	}
 
 }

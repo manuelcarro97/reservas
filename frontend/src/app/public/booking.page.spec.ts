@@ -585,6 +585,27 @@ describe('BookingPage', () => {
     expect(table('2').classList.contains('selected')).toBe(true);
   });
 
+  it('tooManyActiveReservationsShowsMessage', async () => {
+    await open('/r/kafe');
+    await flushShifts();
+    await chooseShift('Comida');
+    table('2').dispatchEvent(new Event('click'));
+    await chooseArrival('13:30');
+    await fillCustomer();
+
+    const request = await submit();
+    request.flush(
+      { code: 'TOO_MANY_ACTIVE_RESERVATIONS' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    await settle();
+
+    expect(page.querySelector('[role=alert]')?.textContent).toContain(
+      'Este teléfono ya tiene el máximo de reservas activas en este local. Cancela alguna para poder hacer otra.',
+    );
+    expect(table('2').classList.contains('selected')).toBe(true);
+  });
+
   it('footerLinkPresentInEmbed', async () => {
     await open('/r/kafe?embed=1');
     await flushShifts();

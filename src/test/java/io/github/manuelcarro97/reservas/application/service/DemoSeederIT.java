@@ -44,6 +44,7 @@ import io.github.manuelcarro97.reservas.application.port.in.ManagePlanUseCase;
 import io.github.manuelcarro97.reservas.application.port.in.PlanSettings;
 import io.github.manuelcarro97.reservas.application.port.in.PlanView;
 import io.github.manuelcarro97.reservas.application.port.in.TableChange;
+import io.github.manuelcarro97.reservas.application.port.out.EmailTakenException;
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderException;
 import io.github.manuelcarro97.reservas.domain.exception.DemoReadOnlyException;
 import io.github.manuelcarro97.reservas.domain.exception.DomainException;
@@ -407,6 +408,103 @@ class DemoSeederIT extends PostgresIT {
 			assertThat(event.getFormattedMessage()).contains(DEMO_UID).contains("ensureUser (UNAVAILABLE, UNKNOWN)");
 		});
 		// Aunque falle, la cuenta sigue restringida: si ya existe en el proveedor, no puede borrarse a sí misma.
+		assertThat(demoAccount.isDemo(DEMO_UID)).isTrue();
+	}
+
+	// --- email de la demo en manos de otra cuenta ---
+
+	private static final String DEMO_EMAIL = "demo@example.test";
+	private static final EmailTakenException EMAIL_TAKEN = new EmailTakenException("ensureUser",
+			"ALREADY_EXISTS, EMAIL_ALREADY_EXISTS");
+
+	/** Lo que el seeder avisa (nivel WARN) durante una restauración. */
+	private List<String> warningsWhileResetting() {
+		Logger seederLogger = (Logger) LoggerFactory.getLogger(DemoSeeder.class);
+		ListAppender<ILoggingEvent> logs = new ListAppender<>();
+		logs.start();
+		seederLogger.addAppender(logs);
+		try {
+			assertThat(seeder.reset()).isEqualTo(DEMO_UID);
+		}
+		finally {
+			seederLogger.detachAppender(logs);
+		}
+		return logs.list.stream()
+			.filter(event -> event.getLevel() == Level.WARN)
+			.map(ILoggingEvent::getFormattedMessage)
+			.toList();
+	}
+
+	/** Un atacante cambia el email de la cuenta demo y registra otra con el email público: la demo lo recupera. */
+	@Test
+	void takenEmailIsReclaimedFromAnotherAccount() {
+		identity.holdEmail(DEMO_EMAIL, "intruso");
+
+		List<String> warnings = warningsWhileResetting();
+
+		assertThat(identity.deleted()).containsExactly("intruso");
+		assertThat(identity.ensured()).containsExactly(new FakeIdentityProvider.Ensured(DEMO_UID, DEMO_EMAIL));
+		assertThat(warnings).containsExactly("Demo email was taken by uid intruso: that account was deleted; "
+				+ "its plans remain and must be cleaned by hand");
+		assertThat(count("reservation")).isEqualTo(6);
+	}
+
+	@Test
+	void takenEmailByTheDemoItselfIsNotDeleted() {
+		identity.holdEmail(DEMO_EMAIL, DEMO_UID);
+		identity.failEnsureWith(EMAIL_TAKEN);
+
+		List<String> warnings = warningsWhileResetting();
+
+		assertThat(identity.deleted()).isEmpty();
+		assertThat(identity.ensured()).isEmpty();
+		assertThat(warnings).singleElement().satisfies(warning -> assertThat(warning).contains(DEMO_UID)
+			.contains("ensureUser (ALREADY_EXISTS, EMAIL_ALREADY_EXISTS)")
+			.doesNotContain(DEMO_EMAIL));
+		assertThat(count("reservation")).isEqualTo(6);
+	}
+
+	@Test
+	void takenEmailThatNoAccountHoldsIsLoggedAndNotRetried() {
+		identity.failEnsureWith(EMAIL_TAKEN);
+
+		List<String> warnings = warningsWhileResetting();
+
+		assertThat(identity.deleted()).isEmpty();
+		assertThat(identity.ensured()).isEmpty();
+		assertThat(warnings).singleElement().satisfies(warning -> assertThat(warning).contains(DEMO_UID)
+			.contains("ensureUser (ALREADY_EXISTS, EMAIL_ALREADY_EXISTS)"));
+	}
+
+	@Test
+	void reclaimFailureIsLoggedAndTheSeedGoesOn() {
+		identity.holdEmail(DEMO_EMAIL, "intruso");
+		identity.failWith(new IdentityProviderException("deleteUser", "UNAVAILABLE, UNKNOWN"));
+
+		List<String> warnings = warningsWhileResetting();
+
+		assertThat(identity.deleted()).containsExactly("intruso");
+		assertThat(identity.ensured()).isEmpty();
+		assertThat(warnings).singleElement().satisfies(warning -> assertThat(warning).contains(DEMO_UID)
+			.contains("deleteUser (UNAVAILABLE, UNKNOWN)")
+			.doesNotContain(DEMO_EMAIL));
+		assertThat(count("reservation")).isEqualTo(6);
+		assertThat(demoAccount.isDemo(DEMO_UID)).isTrue();
+	}
+
+	@Test
+	void reclaimLookupFailureIsLoggedAndTheSeedGoesOn() {
+		identity.holdEmail(DEMO_EMAIL, "intruso");
+		identity.failFindWith(new IdentityProviderException("findUidByEmail", "UNAVAILABLE, UNKNOWN"));
+
+		List<String> warnings = warningsWhileResetting();
+
+		assertThat(identity.deleted()).isEmpty();
+		assertThat(identity.ensured()).isEmpty();
+		assertThat(warnings).singleElement().satisfies(warning -> assertThat(warning).contains(DEMO_UID)
+			.contains("findUidByEmail (UNAVAILABLE, UNKNOWN)")
+			.doesNotContain(DEMO_EMAIL));
+		assertThat(count("reservation")).isEqualTo(6);
 		assertThat(demoAccount.isDemo(DEMO_UID)).isTrue();
 	}
 

@@ -335,10 +335,82 @@ class LayoutApiIT extends PostgresIT {
 		assertThat(stored).hasSize(2);
 		assertThat(stored.get(1).label()).isEqualTo("4");
 		assertThat(stored.get(1).id()).isNotEqualTo(four.id());
-		assertThat(jdbc.sql("SELECT count(*) FROM dining_table WHERE id = :id AND deleted_at IS NOT NULL")
-			.param("id", four.id())
+		// Sin reservas, la mesa quitada se borra de verdad.
+		assertThat(rowsOfTable(four.id())).isZero();
+	}
+
+	@Test
+	void labelOfRemovedTableWithReservationsCanBeReusedInSameSave() throws Exception {
+		DiningTable three = givenTable(plan, "3", 2);
+		DiningTable four = givenTable(plan, "4", 2);
+		cancel(givenReservation(plan, shift, four, DATE, 2));
+
+		save(body(DEFAULT_ROOM, same(three), table(null, "4", 4, 480, 300))).andExpect(status().isOk())
+			.andExpect(jsonPath("$.tables[*].label", contains("3", "4")));
+
+		assertThat(tables.findAll(plan.id())).extracting(DiningTable::label).containsExactly("3", "4");
+		assertThat(hiddenTable(four.id())).isTrue();
+	}
+
+	@Test
+	void removedTableWithoutReservationsIsDeleted() throws Exception {
+		DiningTable first = givenTable(plan, "M1", 2);
+		DiningTable second = givenTable(plan, "M2", 2);
+
+		save(body(DEFAULT_ROOM, same(second))).andExpect(status().isOk());
+
+		assertThat(rowsOfTable(first.id())).isZero();
+		assertThat(rowsOfTable(second.id())).isEqualTo(1);
+	}
+
+	/** La reserva cancelada sigue apuntando a la mesa (FK sin borrado en cascada): la fila se oculta, no se borra. */
+	@Test
+	void removedTableWithOnlyACancelledReservationIsSoftDeleted() throws Exception {
+		DiningTable first = givenTable(plan, "M1", 2);
+		DiningTable second = givenTable(plan, "M2", 2);
+		Reservation booked = givenReservation(plan, shift, first, DATE, 2);
+		cancel(booked);
+
+		save(body(DEFAULT_ROOM, same(second))).andExpect(status().isOk());
+
+		assertThat(rowsOfTable(first.id())).isEqualTo(1);
+		assertThat(hiddenTable(first.id())).isTrue();
+		mvc.perform(get("/api/v1/reservations/" + booked.code()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.tableLabel").value("M1"));
+	}
+
+	/** Guardar el plano en bucle no puede acumular filas: cada pasada quita y crea mesas sin reservas. */
+	@Test
+	void savingTheLayoutInALoopDoesNotAccumulateRows() throws Exception {
+		for (int i = 0; i < 5; i++) {
+			save(body(DEFAULT_ROOM, table(null, "A", 2, 120, 120), table(null, "B", 2, 480, 120)))
+				.andExpect(status().isOk());
+			save(body(DEFAULT_ROOM, table(null, "C", 2, 120, 120))).andExpect(status().isOk());
+		}
+
+		assertThat(jdbc.sql("SELECT count(*) FROM dining_table WHERE restaurant_id = :id")
+			.param("id", plan.id())
 			.query(Integer.class)
 			.single()).isEqualTo(1);
+	}
+
+	private int rowsOfTable(long id) {
+		return jdbc.sql("SELECT count(*) FROM dining_table WHERE id = :id")
+			.param("id", id)
+			.query(Integer.class)
+			.single();
+	}
+
+	private boolean hiddenTable(long id) {
+		return jdbc.sql("SELECT deleted_at IS NOT NULL FROM dining_table WHERE id = :id")
+			.param("id", id)
+			.query(Boolean.class)
+			.single();
+	}
+
+	private void cancel(Reservation reservation) {
+		jdbc.sql("UPDATE reservation SET status = 'CANCELLED' WHERE id = :id").param("id", reservation.id()).update();
 	}
 
 	@Test

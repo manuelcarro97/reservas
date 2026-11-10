@@ -1,5 +1,7 @@
 package io.github.manuelcarro97.reservas.adapter.out.identity;
 
+import java.util.Optional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,6 +24,12 @@ class LoggingIdentityProvider implements IdentityProviderPort {
 	public String ensureUser(String uid, String email, String password) {
 		log.info("Identity provider not configured: user creation skipped");
 		return uid;
+	}
+
+	@Override
+	public Optional<String> findUidByEmail(String email) {
+		log.info("Identity provider not configured: user lookup skipped");
+		return Optional.empty();
 	}
 
 }

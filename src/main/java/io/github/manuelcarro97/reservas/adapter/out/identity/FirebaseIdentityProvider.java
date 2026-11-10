@@ -1,11 +1,14 @@
 package io.github.manuelcarro97.reservas.adapter.out.identity;
 
+import java.util.Optional;
+
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
 
+import io.github.manuelcarro97.reservas.application.port.out.EmailTakenException;
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderException;
 import io.github.manuelcarro97.reservas.application.port.out.IdentityProviderPort;
 
@@ -52,7 +55,24 @@ class FirebaseIdentityProvider implements IdentityProviderPort, AutoCloseable {
 			return uid;
 		}
 		catch (FirebaseAuthException failure) {
+			// Tanto al restablecer el email de la cuenta como al crearla: el email es de otra.
+			if (failure.getAuthErrorCode() == AuthErrorCode.EMAIL_ALREADY_EXISTS) {
+				throw new EmailTakenException("ensureUser", codesOf(failure));
+			}
 			throw new IdentityProviderException("ensureUser", codesOf(failure));
+		}
+	}
+
+	@Override
+	public Optional<String> findUidByEmail(String email) {
+		try {
+			return Optional.of(auth.getUserByEmail(email).getUid());
+		}
+		catch (FirebaseAuthException failure) {
+			if (failure.getAuthErrorCode() == AuthErrorCode.USER_NOT_FOUND) {
+				return Optional.empty();
+			}
+			throw new IdentityProviderException("findUidByEmail", codesOf(failure));
 		}
 	}
 
