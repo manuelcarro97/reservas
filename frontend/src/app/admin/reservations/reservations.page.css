@@ -205,6 +205,11 @@ ul {
   box-shadow: inset 2px 0 0 var(--blue);
 }
 
+/* La reserva a la que lleva un enlace de Inicio: resaltada, sin el filete de la que se está editando. */
+.res.highlight {
+  background: var(--blue-tint);
+}
+
 .res.inactive {
   color: var(--muted);
 }

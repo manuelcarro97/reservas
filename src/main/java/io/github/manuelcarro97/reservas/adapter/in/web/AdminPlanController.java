@@ -29,7 +29,7 @@ class AdminPlanController {
 
 	/** Nombres que la interfaz usa como ruta ({@code /panel/cuenta} convive con {@code /panel/:slug}) o que dan nombre a la demo; el caso de uso no los rechaza (el seeder crea "demo"). */
 	private static final Set<String> RESERVED_SLUGS = Set.of("demo", "admin", "api", "r", "panel", "reserva",
-			"cuenta");
+			"cuenta", "planos");
 
 	private final ManagePlanUseCase managePlan;
 

@@ -1,6 +1,22 @@
-import { addDays, calendarLeaf, formatDate, longDateParts, todayIn } from './time';
+import { addDays, calendarLeaf, formatDate, longDateParts, timeIn, todayIn } from './time';
 
 describe('time', () => {
+  it('timeInUsesPlanZone', () => {
+    const instant = new Date('2026-11-09T23:30:00Z');
+
+    expect(timeIn('Europe/Madrid', instant)).toBe('00:30');
+    expect(timeIn('America/Los_Angeles', instant)).toBe('15:30');
+    // Medianoche en punto: siempre 00:xx, nunca 24:xx.
+    expect(timeIn('Europe/Madrid', new Date('2026-11-09T23:00:00Z'))).toBe('00:00');
+  });
+
+  it('timeInFallsBackToBrowserTime', () => {
+    const instant = new Date(2030, 0, 5, 9, 7);
+
+    expect(timeIn('No/Existe', instant)).toBe('09:07');
+    expect(timeIn(undefined, instant)).toBe('09:07');
+  });
+
   it('todayFollowsTheRestaurantZoneNotTheBrowser', () => {
     const instant = new Date('2030-01-05T23:30:00Z');
 

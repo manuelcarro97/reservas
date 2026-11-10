@@ -4,7 +4,7 @@
   }
   @case ('notFound') {
     <p class="state" role="alert">Este plano no existe.</p>
-    <p><a routerLink="/panel">Volver a tus planos</a></p>
+    <p><a routerLink="/panel/planos">Volver a tus planos</a></p>
   }
   @case ('error') {
     <p class="state" role="alert">No se pudo cargar el plano.</p>
@@ -160,6 +160,7 @@
                   reservation.status === 'CANCELLED' || reservation.status === 'NO_SHOW'
                 "
                 [class.sel]="isAssigning(reservation)"
+                [class.highlight]="store.highlighted() === reservation.id"
               >
                 <div class="time">
                   <span class="hour">{{ reservation.arrivalTime?.slice(0, 5) ?? '—' }}</span>

@@ -7,8 +7,8 @@ import { PLAN_STATUS_LABELS } from './plan-status';
 
 /**
  * Selector de plano de la cabecera del panel. Enseña el plano actual con su estado y deja pasar a otro:
- * - En la página de un plano conserva la sección (plano, turnos…).
- * - En `/panel` y `/panel/cuenta` no hay sección: el elegido pasa a ser el destacado de Mis planos (`?plano=`).
+ * - En la página de un plano conserva la sección (inicio, plano, turnos…).
+ * - En `/panel/planos` y `/panel/cuenta` no hay sección: el elegido pasa a ser el destacado de Mis planos (`?plano=`).
  *
  * El `<select>` nativo cubre toda la caja con opacidad 0: se conserva su teclado y su lista, y la caja pinta el
  * nombre (recortado si es largo, con el nombre completo en `title`) y el estado.
@@ -115,7 +115,7 @@ export class PlanSwitcherComponent {
     const { slug, section } = panelLocation(this.url(), this.router);
     await (slug
       ? this.router.navigate(['/panel', select.value, ...(section ? section.split('/') : [])])
-      : this.router.navigate(['/panel'], { queryParams: { plano: select.value } }));
+      : this.router.navigate(['/panel/planos'], { queryParams: { plano: select.value } }));
     // Si la página no dejó salir (cambios sin guardar en el editor) el selector no debe seguir enseñando el plano elegido.
     select.value = this.current() ? (this.slug() ?? '') : '';
   }

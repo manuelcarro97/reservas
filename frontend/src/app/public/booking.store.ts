@@ -12,9 +12,7 @@ import { tableName } from '../plano/table-name';
 import { ThemeKey, knownTheme } from '../plano/themes';
 import { errorCode, rateLimitedMessage } from '../core/api-errors';
 import { NOW, addDays, todayIn } from '../core/time';
-
-/** Días de antelación máximos, inclusive (`BookingPolicy.BOOKING_WINDOW_DAYS` del backend). */
-export const BOOKING_WINDOW_DAYS = 90;
+import { BOOKING_WINDOW_DAYS } from '../core/booking-policy';
 
 export type PlanStatus = 'loading' | 'ready' | 'unavailable' | 'error';
 

@@ -1,0 +1,118 @@
+/* Disposición de Inicio. El aspecto común (hojas, cifras, botones, títulos) sale de styles/base.css. */
+/*
+ * `fit`: el marco del panel mide la ventana (admin-shell.component.css) y Inicio reparte ese alto sin scroll de página.
+ * Las cifras, el título y la semana ocupan lo suyo; las tres tarjetas del centro se quedan con lo que sobra y solo la
+ * lista de pendientes se desplaza por dentro.
+ */
+:host(.fit) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.top {
+  flex: none;
+}
+
+.page-title {
+  margin-top: 8px;
+}
+
+/* Cifras de hoy: una franja de cinco con el aire de la maqueta. */
+.today {
+  flex: none;
+  padding: 0;
+}
+
+.today .figures {
+  border-top: 0;
+}
+
+.today .fig {
+  padding: 14px 20px 12px;
+}
+
+.fig b small {
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.fig.warn b {
+  color: var(--warn);
+}
+
+/*
+ * Con pendientes la cifra es un botón que lleva a su tarjeta: se ve como las demás cifras, con una flecha. Un botón
+ * centra su contenido en vertical: como columna que empieza arriba, su caja es la de un `.fig` normal aunque el
+ * kicker de otra cifra ocupe dos líneas.
+ */
+button.fig {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  border: 0;
+  border-right: 1px solid var(--rule);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.fig:hover {
+  background: var(--wash);
+}
+
+.today .figlink .sub {
+  color: var(--warn);
+}
+
+/* La flecha es adorno: va fuera del texto de la cifra. */
+.today .figlink .sub::after {
+  content: ' →';
+}
+
+.part-error {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 20px;
+}
+
+.part-error p {
+  margin: 0;
+}
+
+/* Las tres tarjetas del centro reparten el alto que sobra: solo la lista de pendientes se desplaza por dentro. */
+.grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.grid > .sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Estrecha: las tarjetas se apilan y la página puede desplazarse. */
+@media (max-width: 1023px) {
+  :host(.fit) {
+    flex: none;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .today .figures {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

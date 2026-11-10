@@ -22,6 +22,10 @@ interface ReservationJpaRepository extends JpaRepository<ReservationEntity, Long
 	List<ReservationEntity> findByRestaurantIdAndDateGreaterThanEqualAndStatusInOrderByDateAscIdAsc(long restaurantId,
 			LocalDate from, Collection<ReservationStatus> statuses);
 
+	// Between de Spring Data incluye los dos extremos.
+	List<ReservationEntity> findByRestaurantIdAndDateBetweenAndStatusInOrderByDateAscIdAsc(long restaurantId,
+			LocalDate from, LocalDate to, Collection<ReservationStatus> statuses);
+
 	List<ReservationEntity> findByRestaurantIdAndShiftIdAndDateAndStatusInOrderById(long restaurantId, long shiftId,
 			LocalDate date, Collection<ReservationStatus> statuses);
 

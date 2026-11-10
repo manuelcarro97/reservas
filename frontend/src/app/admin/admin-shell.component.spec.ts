@@ -15,6 +15,7 @@ import { FakeAuthSdk, flushPromises, provideFakeAuthSdk } from '../core/auth/tes
 import { AccountPage } from './account.page';
 import { AdminShellComponent } from './admin-shell.component';
 import { ConfirmsLeaving, leaveEditorGuard } from './editor/leave-editor.guard';
+import { PanelEntryComponent } from './panel-entry.component';
 import { PanelExit } from './panel-exit.service';
 import { PlansPage } from './plans.page';
 
@@ -23,6 +24,10 @@ class LoginStub {}
 
 @Component({ template: '<p>reservas</p>' })
 class ReservationsStub {}
+
+/** El Inicio real pide datos del plano; aquí solo interesa la ruta. */
+@Component({ template: '<p>inicio</p>' })
+class HomeStub {}
 
 /** El editor real pregunta si hay cambios sin guardar; aquí el dueño contesta `leaveAnswer`. */
 @Component({ template: '<p>plano</p>' })
@@ -73,9 +78,11 @@ describe('AdminShellComponent', () => {
             path: 'panel',
             component: AdminShellComponent,
             children: [
-              { path: '', component: PlansPage },
+              { path: '', component: PanelEntryComponent },
+              { path: 'planos', component: PlansPage },
               { path: 'cuenta', component: AccountPage },
               { path: ':slug', component: ReservationsStub },
+              { path: ':slug/inicio', component: HomeStub },
               { path: ':slug/plano', component: EditorStub, canDeactivate: [leaveEditorGuard] },
               { path: ':slug/turnos', component: ReservationsStub },
             ],
@@ -152,7 +159,7 @@ describe('AdminShellComponent', () => {
   }
 
   it('loadsMeOnceForTheShellAndItsPage', async () => {
-    await open('/panel');
+    await open('/panel/planos');
 
     expect(host.querySelectorAll('[data-plan]')).toHaveLength(2);
     // `expectMe()` exige exactamente una petición: la cabecera y la página comparten el mismo almacén.
@@ -186,14 +193,29 @@ describe('AdminShellComponent', () => {
     expect(TestBed.inject(Router).url).toBe('/panel/kafe');
   });
 
-  it('switcherFromThePlanListPromotesThePlan', async () => {
+  it('switcherKeepsHomeWhenChangingPlan', async () => {
+    await open('/panel/kafe/inicio');
+
+    await choose('tapas');
+
+    expect(TestBed.inject(Router).url).toBe('/panel/tapas/inicio');
+  });
+
+  it('panelEntryRedirectsToHomeWithOneRequestForMe', async () => {
     await open('/panel');
+
+    expect(TestBed.inject(Router).url).toBe('/panel/kafe/inicio');
+    expect(switcher()!.value).toBe('kafe');
+  });
+
+  it('switcherFromThePlanListPromotesThePlan', async () => {
+    await open('/panel/planos');
     // En la lista no hay slug en la URL: el selector enseña el plano destacado, el primero.
     expect(switcher()!.value).toBe('kafe');
 
     await choose('tapas');
 
-    expect(TestBed.inject(Router).url).toBe('/panel?plano=tapas');
+    expect(TestBed.inject(Router).url).toBe('/panel/planos?plano=tapas');
     expect(switcher()!.value).toBe('tapas');
     // La página sigue viva y ya tenía el plano de "tapas": no lo vuelve a pedir.
     expect(planGets()).toHaveLength(0);
@@ -210,12 +232,12 @@ describe('AdminShellComponent', () => {
     flushPlanGets();
     await settle();
 
-    expect(TestBed.inject(Router).url).toBe('/panel?plano=tapas');
+    expect(TestBed.inject(Router).url).toBe('/panel/planos?plano=tapas');
     expect(switcher()!.value).toBe('tapas');
   });
 
   it('switcherIsHiddenWithoutPlans', async () => {
-    await open('/panel', { ...ME, plans: [] });
+    await open('/panel/planos', { ...ME, plans: [] });
 
     expect(switcher()).toBeNull();
   });
@@ -252,16 +274,61 @@ describe('AdminShellComponent', () => {
   });
 
   it('tabsPointToTheCurrentPlan', async () => {
-    await open('/panel');
+    await open('/panel/planos');
 
-    expect(tab('Planos')!.getAttribute('href')).toBe('/panel');
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel/planos');
     expect(tab('Reservas')!.getAttribute('href')).toBe('/panel/kafe');
     expect(tab('Turnos')!.getAttribute('href')).toBe('/panel/kafe/turnos');
     expect(tab('Configuración')!.getAttribute('href')).toBe('/panel/kafe/ajustes');
   });
 
+  it('homeTabComesFirstAndPointsToCurrentPlan', async () => {
+    await open('/panel/planos');
+
+    const tabs = Array.from(host.querySelectorAll<HTMLAnchorElement>('header nav.tabs a'));
+    expect(tabs[0].textContent?.trim()).toBe('Inicio');
+    expect(tabs[0].getAttribute('href')).toBe('/panel/kafe/inicio');
+  });
+
+  it('plansTabPointsToPlanos', async () => {
+    await open('/panel/planos');
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel/planos');
+
+    await harness.navigateByUrl('/panel/tapas/turnos');
+    harness.detectChanges();
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel/planos?plano=tapas');
+  });
+
+  it('brandGoesToPanel', async () => {
+    await open('/panel/planos');
+
+    // Va directo al Inicio del plano actual: pasar por la entrada del panel dejaría una entrada duplicada en el historial.
+    expect(host.querySelector('header a.brand')!.getAttribute('href')).toBe('/panel/kafe/inicio');
+  });
+
+  it('brandGoesToPanelWithoutPlans', async () => {
+    await open('/panel/planos', { ...ME, plans: [] });
+
+    // Sin plano no hay Inicio al que ir: la entrada del panel.
+    expect(host.querySelector('header a.brand')!.getAttribute('href')).toBe('/panel');
+  });
+
+  it('brandKeepsThePlanYouAreIn', async () => {
+    await open('/panel/tapas/turnos');
+
+    // Tapas no es el primero: la marca lleva a su Inicio.
+    expect(host.querySelector('header a.brand')!.getAttribute('href')).toBe('/panel/tapas/inicio');
+  });
+
+  it('currentTabIsHomeOnItsPage', async () => {
+    await open('/panel/tapas/inicio');
+
+    expect(tab('Inicio')!.getAttribute('aria-current')).toBe('page');
+    expect(tab('Planos')!.hasAttribute('aria-current')).toBe(false);
+  });
+
   it('tabsFollowThePlanPromotedByTheQuery', async () => {
-    await open('/panel?plano=tapas');
+    await open('/panel/planos?plano=tapas');
 
     expect(tab('Reservas')!.getAttribute('href')).toBe('/panel/tapas');
     expect(tab('Configuración')!.getAttribute('href')).toBe('/panel/tapas/ajustes');
@@ -271,14 +338,14 @@ describe('AdminShellComponent', () => {
     await open('/panel/tapas/turnos');
 
     // Tapas no es el primero: Planos lo lleva en la query para que no se pierda al pasar por la lista.
-    expect(tab('Planos')!.getAttribute('href')).toBe('/panel?plano=tapas');
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel/planos?plano=tapas');
     tab('Planos')!.click();
     await settle();
     expectMe().flush(ME);
     await settle();
     flushPlanGets();
     await settle();
-    expect(TestBed.inject(Router).url).toBe('/panel?plano=tapas');
+    expect(TestBed.inject(Router).url).toBe('/panel/planos?plano=tapas');
     // Estando en la lista, la pestaña sigue marcada y Reservas sigue apuntando a Tapas.
     expect(tab('Planos')!.getAttribute('aria-current')).toBe('page');
     expect(tab('Reservas')!.getAttribute('href')).toBe('/panel/tapas');
@@ -290,29 +357,29 @@ describe('AdminShellComponent', () => {
 
   it('thePlansTabIsPlainWhenTheCurrentPlanIsTheFirstOne', async () => {
     await open('/panel/kafe/turnos');
-    expect(tab('Planos')!.getAttribute('href')).toBe('/panel');
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel/planos');
 
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl('/panel/planos');
     expectMe().flush(ME);
     await settle();
     flushPlanGets();
     await settle();
-    expect(tab('Planos')!.getAttribute('href')).toBe('/panel');
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel/planos');
   });
 
   it('tabsDisabledWithoutPlans', async () => {
-    await open('/panel', { ...ME, plans: [] });
+    await open('/panel/planos', { ...ME, plans: [] });
 
-    for (const name of ['Reservas', 'Turnos', 'Configuración']) {
+    for (const name of ['Inicio', 'Reservas', 'Turnos', 'Configuración']) {
       const link = tab(name)!;
       expect(link.getAttribute('aria-disabled')).toBe('true');
       expect(link.hasAttribute('href')).toBe(false);
     }
-    expect(tab('Planos')!.getAttribute('href')).toBe('/panel');
+    expect(tab('Planos')!.getAttribute('href')).toBe('/panel/planos');
   });
 
   it('currentTabIsMarked', async () => {
-    await open('/panel');
+    await open('/panel/planos');
     expect(tab('Planos')!.getAttribute('aria-current')).toBe('page');
     expect(tab('Reservas')!.hasAttribute('aria-current')).toBe(false);
 
@@ -328,7 +395,7 @@ describe('AdminShellComponent', () => {
   });
 
   it('iconButtonsHaveNames', async () => {
-    await open('/panel');
+    await open('/panel/planos');
 
     // La campana es un indicador con icono: el icono lleva el nombre.
     expect(host.querySelector('header [role="img"][aria-label="Avisos"]')).not.toBeNull();
@@ -343,7 +410,7 @@ describe('AdminShellComponent', () => {
   });
 
   it('theFooterCreditsTheAuthorOnce', async () => {
-    await open('/panel');
+    await open('/panel/planos');
 
     const footers = host.querySelectorAll('footer');
     expect(footers).toHaveLength(1);
@@ -354,14 +421,14 @@ describe('AdminShellComponent', () => {
   });
 
   it('headerLinksToTheAccount', async () => {
-    await open('/panel');
+    await open('/panel/planos');
 
     const link = host.querySelector<HTMLAnchorElement>('header a[href="/panel/cuenta"]');
     expect(link?.textContent).toContain('Cuenta');
   });
 
   it('signOutGoesToLogin', async () => {
-    await open('/panel');
+    await open('/panel/planos');
 
     Array.from(host.querySelectorAll<HTMLButtonElement>('header button'))
       .find((button) => button.textContent?.includes('Salir'))!
@@ -374,7 +441,7 @@ describe('AdminShellComponent', () => {
   });
 
   it('signOutFailureAfterLeavingStaysOnLoginAndFlagsItForThatPage', async () => {
-    await open('/panel');
+    await open('/panel/planos');
     sdk.failWith = new Error('red');
 
     Array.from(host.querySelectorAll<HTMLButtonElement>('header button'))
@@ -390,7 +457,7 @@ describe('AdminShellComponent', () => {
   });
 
   it('panelPollsTheFeedWhileSignedInAndStopsOnSignOut', async () => {
-    await open('/panel');
+    await open('/panel/planos');
     // El SDK ya está cargado y su listener registrado; a partir de aquí todo es síncrono con reloj falso.
     await flushPromises();
     vi.useFakeTimers();
@@ -429,7 +496,7 @@ describe('AdminShellComponent', () => {
   }
 
   it('sessionEndedInAnotherTabSendsThePanelToLogin', async () => {
-    await open('/panel');
+    await open('/panel/planos');
     expect(host.querySelectorAll('[data-plan]')).toHaveLength(2);
     await signIn('uid-a');
 
@@ -446,7 +513,7 @@ describe('AdminShellComponent', () => {
     TestBed.inject(AuthService);
     await flushPromises();
     sdk.emit({ uid: 'uid-a', email: 'uid-a@example.com' });
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl('/panel/planos');
 
     sdk.emit(null);
     expectMe().flush(ME);
@@ -460,7 +527,7 @@ describe('AdminShellComponent', () => {
   });
 
   it('anotherOwnerSignedInElsewhereSendsThePanelToLoginInsteadOfShowingTheirData', async () => {
-    await open('/panel');
+    await open('/panel/planos');
     await signIn('uid-a');
 
     sdk.emit({ uid: 'uid-b', email: 'otro@example.com' });
@@ -497,14 +564,14 @@ describe('AdminShellComponent', () => {
   }
 
   it('renewingTheTokenOfTheSameOwnerKeepsThePanelOpen', async () => {
-    await open('/panel');
+    await open('/panel/planos');
     await signIn('uid-a');
 
     sdk.emit({ uid: 'uid-a', email: 'nuevo@example.com' });
     await settle();
     await flushPromises();
 
-    expect(TestBed.inject(Router).url).toBe('/panel');
+    expect(TestBed.inject(Router).url).toBe('/panel/planos');
     expect(host.querySelectorAll('[data-plan]')).toHaveLength(2);
     expect(feedRequests()).toHaveLength(0);
   });
@@ -527,7 +594,7 @@ describe('AdminShellComponent', () => {
   }
 
   it('signOutNavigatesToLoginOnceAndOnlyThenClosesTheSession', async () => {
-    await open('/panel');
+    await open('/panel/planos');
     await signIn('uid-a');
     const seen = emitNullOnSignOut();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
@@ -635,11 +702,11 @@ describe('AdminShellComponent', () => {
   });
 
   it('eachVisitToThePanelLoadsItsOwnData', async () => {
-    await open('/panel');
+    await open('/panel/planos');
     await harness.navigateByUrl('/entrar');
 
     // Otro dueño entra después: no debe ver los planos del anterior mientras llega su respuesta.
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl('/panel/planos');
     harness.detectChanges();
     expect(host.querySelectorAll('[data-plan]')).toHaveLength(0);
     expectMe().flush({ ...ME, email: 'otro@example.com', plans: [] });

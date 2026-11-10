@@ -17,8 +17,8 @@ import { PanelExit } from './panel-exit.service';
 import { PlanSwitcherComponent } from './plan-switcher.component';
 
 /**
- * Marco del panel del dueño (`/panel/**`): cabecera con selector de plano, pestañas (Planos, Reservas, Turnos y
- * Configuración, las tres últimas del plano actual), avisos, Cuenta y Salir, y el pie común. Es aparte del
+ * Marco del panel del dueño (`/panel/**`): cabecera con selector de plano, pestañas (Inicio, Planos, Reservas, Turnos
+ * y Configuración; todas menos Planos son del plano actual), avisos, Cuenta y Salir, y el pie común. Es aparte del
  * marco público (`ShellComponent`), que no puede inyectar `AuthService` para no descargar Firebase en las páginas
  * públicas. Provee el `MeStore` que comparten la cabecera y las páginas del panel, y el `FeedService`, que consulta
  * los avisos mientras el panel está abierto.
@@ -52,14 +52,20 @@ export class AdminShellComponent {
   /** Se inyecta aquí para que empiece a consultar al abrir el panel, aunque la cabecera no lo use. */
   protected readonly feed = inject(FeedService);
 
-  /** Plano al que apuntan las pestañas Reservas, Turnos y Configuración. `null` si el dueño no tiene ninguno. */
+  /** Plano al que apuntan las pestañas Inicio, Reservas, Turnos y Configuración. `null` si el dueño no tiene ninguno. */
   protected readonly planSlug = computed(() =>
     currentPlanSlug(this.url(), this.router, this.store.plans()),
   );
 
+  /** Destino de la marca: el Inicio del plano actual, o la entrada del panel si el dueño no tiene ninguno. */
+  protected readonly brandLink = computed(() => {
+    const slug = this.planSlug();
+    return slug ? ['/panel', slug, 'inicio'] : ['/panel'];
+  });
+
   /**
    * Query de la pestaña Planos: si el plano actual no es el primero, lo lleva en `?plano=` para que Mis planos lo
-   * destaque y no se pierda al pasar por la lista. Con el primero, o sin plano, basta `/panel`.
+   * destaque y no se pierda al pasar por la lista. Con el primero, o sin plano, basta la ruta sola.
    */
   protected readonly plansTabQuery = computed(() => {
     const slug = this.planSlug();

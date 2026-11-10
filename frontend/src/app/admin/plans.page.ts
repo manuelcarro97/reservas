@@ -23,15 +23,8 @@ import { THEMES, knownTheme } from '../plano/themes';
 import { adminErrorMessage } from './admin-errors';
 import { currentPlanSlug, routerUrl } from './current-plan';
 import { MeStore } from './me.store';
-import { PLAN_STATUS_LABELS } from './plan-status';
+import { BOOKING_MODE_LABELS, PLAN_STATUS_LABELS } from './plan-status';
 import { slugProblem, suggestSlug } from './slug';
-
-type BookingMode = NonNullable<PlanResponse['bookingMode']>;
-
-const MODE_LABELS: Record<BookingMode, string> = {
-  FREE_CHOICE: 'Elección libre',
-  ASSIGNED: 'Asigno yo la mesa',
-};
 
 /** El `PlanResponse` de un plano, que la lista del dueño (`PlanSummaryResponse`) no trae. */
 type PlanDetail =
@@ -52,7 +45,7 @@ function seatsOf(plan: PlanResponse): number {
 }
 
 /**
- * `/panel`: mis planos (hasta 3). La tarjeta grande es el plano actual (`currentPlanSlug`: el primero, o el que pide
+ * `/panel/planos`: mis planos (hasta 3). La tarjeta grande es el plano actual (`currentPlanSlug`: el primero, o el que pide
  * `?plano=`) con su plano dibujado en solo lectura, su ficha y sus accesos; debajo, los demás con "Abrir", que los
  * sube a la tarjeta grande. A la derecha, el alta de un plano nuevo. Borrar un plano se hace en Configuración.
  *
@@ -125,7 +118,7 @@ export class PlansPage {
       seats: seatsOf(plan),
       shifts: shifts.length,
       shiftNames: shifts.map((shift) => shift.name).join(' · ') || 'Sin turnos todavía',
-      mode: MODE_LABELS[plan.bookingMode ?? 'FREE_CHOICE'],
+      mode: BOOKING_MODE_LABELS[plan.bookingMode ?? 'FREE_CHOICE'],
       cancellation:
         hours === undefined
           ? null

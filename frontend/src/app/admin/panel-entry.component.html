@@ -1,0 +1,29 @@
+@switch (store.status()) {
+  @case ('error') {
+    <p class="state" role="alert">No se pudieron cargar tus planos. Inténtalo de nuevo.</p>
+    <div><button type="button" class="btn line" (click)="store.retry()">Reintentar</button></div>
+  }
+  @case ('ready') {
+    @if (store.plans().length === 0) {
+      <div class="top">
+        <div class="eyebrow">Panel</div>
+        <h1 class="page-title">Bienvenido a <em>reservas</em></h1>
+      </div>
+      <section class="sheet welcome">
+        <h2>Aún no tienes ningún plano</h2>
+        <p class="hint">
+          Dibuja tu sala, publícala y recibe reservas en tu enlace o incrustadas en tu web.
+        </p>
+        <div>
+          <a class="btn ink" routerLink="/panel/planos">Crear mi primer plano</a>
+        </div>
+      </section>
+    } @else {
+      <!-- Con planos esta página dura un instante: el efecto del componente ya está redirigiendo. -->
+      <p class="state" role="status">Cargando…</p>
+    }
+  }
+  @default {
+    <p class="state" role="status">Cargando…</p>
+  }
+}

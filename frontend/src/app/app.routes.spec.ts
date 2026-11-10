@@ -88,9 +88,9 @@ describe('routes', () => {
   });
 
   it('panelOpensForASignedInOwnerWithItsOwnHeader', async () => {
-    await visitWithSession('/panel', { uid: 'uid-1', email: 'dueno@example.com' });
+    await visitWithSession('/panel/planos', { uid: 'uid-1', email: 'dueno@example.com' });
 
-    expect(TestBed.inject(Router).url).toBe('/panel');
+    expect(TestBed.inject(Router).url).toBe('/panel/planos');
     const me = backend.expectOne((request) => request.url.endsWith('/api/v1/admin/me'));
     expect(me.request.headers.get('Authorization')).toBe('Bearer token-1');
     me.flush({ email: 'dueno@example.com', demo: false, maxPlans: 3, plans: [] });
@@ -102,8 +102,27 @@ describe('routes', () => {
     expect(page.querySelector('app-shell')).toBeNull();
   });
 
-  it('everyPlanLinkOfThePanelResolvesToARoute', async () => {
+  it('panelEntryRedirectsToTheHomeOfTheFirstPlan', async () => {
     await visitWithSession('/panel', { uid: 'uid-1', email: 'dueno@example.com' });
+
+    backend
+      .expectOne((request) => request.url.endsWith('/api/v1/admin/me'))
+      .flush({
+        email: 'dueno@example.com',
+        demo: false,
+        maxPlans: 3,
+        plans: [{ slug: 'kafe', name: 'Kafé', status: 'DRAFT' }],
+      });
+    await harness.fixture.whenStable();
+    await flushPromises();
+    harness.detectChanges();
+
+    expect(TestBed.inject(Router).url).toBe('/panel/kafe/inicio');
+    expect((harness.fixture.nativeElement as HTMLElement).textContent).toContain('Hoy');
+  });
+
+  it('everyPlanLinkOfThePanelResolvesToARoute', async () => {
+    await visitWithSession('/panel/planos', { uid: 'uid-1', email: 'dueno@example.com' });
     backend
       .expectOne((request) => request.url.endsWith('/api/v1/admin/me'))
       .flush({
@@ -137,7 +156,9 @@ describe('routes', () => {
       '/panel/kafe/ajustes',
     ]);
 
-    for (const href of hrefs) {
+    // Inicio no sale en la tarjeta del plano, sino en la pestaña de la cabecera. Va el primero: los ajustes vuelven a
+    // pedir los datos del dueño y su respuesta de prueba no trae planos.
+    for (const href of ['/panel/kafe/inicio', ...hrefs]) {
       // `navigateByUrl` rechaza (NG04002) si ninguna ruta casa.
       await harness.navigateByUrl(href!);
       harness.detectChanges();
@@ -187,6 +208,28 @@ describe('routes', () => {
         harness.detectChanges();
         expect(host.textContent).toContain('Kafé / Turnos');
         expect(host.textContent).toContain('Días cerrados');
+      } else if (href === '/panel/kafe/inicio') {
+        // Inicio pide el plano y, con su zona horaria, las reservas de hoy, los pendientes y los cierres.
+        await flushPromises();
+        backend
+          .expectOne((request) => request.url.endsWith('/api/v1/admin/restaurants/kafe'))
+          .flush({
+            slug: 'kafe',
+            name: 'Kafé',
+            status: 'DRAFT',
+            timeZone: 'Europe/Madrid',
+            tables: [],
+            shifts: [],
+          });
+        await harness.fixture.whenStable();
+        await flushPromises();
+        backend
+          .match((request) => request.url.includes('/api/v1/admin/restaurants/kafe/'))
+          .forEach((request) => request.flush([]));
+        await harness.fixture.whenStable();
+        harness.detectChanges();
+        expect(host.querySelector('app-home-page .eyebrow b')?.textContent).toBe('Kafé');
+        expect(host.querySelector('app-home-page h1')?.textContent).toContain('Hoy');
       } else {
         // Los ajustes piden el plano y vuelven a pedir los datos del dueño (la cabecera ya los pidió una vez).
         await flushPromises();

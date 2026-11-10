@@ -1,0 +1,29 @@
+/* Entrada del panel: bienvenida sin planos. El aspecto común (hojas, botones, títulos) sale de styles/base.css. */
+:host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.top {
+  flex: none;
+  margin-bottom: 18px;
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 460px;
+}
+
+.welcome h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.welcome .hint {
+  margin: 0 0 12px;
+}

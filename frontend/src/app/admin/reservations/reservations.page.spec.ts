@@ -7,6 +7,8 @@ import {
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { Location } from '@angular/common';
+import { Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { Subject } from 'rxjs';
 import type { Mock } from 'vitest';
@@ -830,6 +832,30 @@ describe('ReservationsPage', () => {
     expect(row('Zoe')).toBeTruthy();
   });
 
+  it('assigningOnAnotherDayUpdatesTheUrl', async () => {
+    const far: AdminReservation = { ...MARTA, id: 7, date: '2026-11-15', customerName: 'Zoe' };
+    await open({ day: [], pending: [far] });
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate');
+    const pushed = vi.spyOn(TestBed.inject(Location), 'go');
+
+    await click(page, 'Pendientes · 1');
+    await click(row('Zoe'), 'Asignar mesa');
+    expectDay('2026-11-15').flush([far]);
+    expectOccupancy('2026-11-15', 11).flush(OCCUPANCY);
+    request('GET', '/api/v1/admin/reservations/7/suggestions').flush([]);
+    await settle();
+
+    // Igual que al cambiar la fecha a mano: recargar sigue en el día de la reserva, sin entrada nueva en el historial.
+    expect(navigate).toHaveBeenCalledWith([], {
+      queryParams: { fecha: '2026-11-15', reserva: null, tab: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+    expect(router.url).toBe('/panel/kafe?fecha=2026-11-15');
+    expect(pushed).not.toHaveBeenCalled();
+  });
+
   it('rejectAsksFirstThenCancelsAndOpensWhatsapp', async () => {
     await open({ day: [ANA], pending: [ANA] });
 
@@ -1353,6 +1379,197 @@ describe('ReservationsPage', () => {
       feedEvents.next(NEW_EVENT);
 
       expect(feedEvents.observed).toBe(false);
+    });
+  });
+
+  // Los enlaces de Inicio abren Reservas en un día, una reserva o la pestaña de pendientes.
+  describe('startingPoint', () => {
+    /** Abre `url` y responde solo al plano: cada test responde a las lecturas del día en su orden. */
+    async function openAt(url: string, plan: PlanResponse = PLAN): Promise<void> {
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl(url);
+      request('GET', '/api/v1/admin/restaurants/kafe').flush(plan);
+      await settle();
+      page = harness.routeNativeElement as HTMLElement;
+    }
+
+    function title(): string {
+      return normalized(page.querySelector('h1')?.textContent);
+    }
+
+    it('fechaOpensThatDay', async () => {
+      await openAt('/panel/kafe?fecha=2026-11-12');
+
+      await flushScreen('2026-11-12', 11, {});
+
+      expect(title()).toBe('Jueves, 12 de noviembre');
+      expect((page.querySelector('input[name="date"]') as HTMLInputElement).value).toBe(
+        '2026-11-12',
+      );
+    });
+
+    it('pastFechaStillOpens', async () => {
+      // La semana de Inicio también enseña sus días pasados: Reservas no los limita a hoy en adelante.
+      await openAt('/panel/kafe?fecha=2026-11-02');
+
+      await flushScreen('2026-11-02', 11, {});
+
+      expect(title()).toBe('Lunes, 2 de noviembre');
+    });
+
+    it('invalidFechaFallsBackToToday', async () => {
+      // El 30 de febrero no existe.
+      await openAt('/panel/kafe?fecha=2026-02-30');
+
+      await flushScreen(TODAY, 11, {});
+
+      expect(title()).toBe('Martes, 10 de noviembre');
+      expect(page.querySelector('[role="alert"]')).toBeNull();
+    });
+
+    it('nonsenseFechaFallsBackToToday', async () => {
+      await openAt('/panel/kafe?fecha=hola');
+
+      await flushScreen(TODAY, 11, {});
+
+      expect(title()).toBe('Martes, 10 de noviembre');
+      expect(page.querySelector('[role="alert"]')).toBeNull();
+    });
+
+    it('reservaWithoutTableOpensAssign', async () => {
+      await openAt('/panel/kafe?fecha=2026-11-10&reserva=3');
+
+      // La reserva se busca entre las pendientes, que llegan aparte del día: esas se responden las últimas.
+      expectDay(TODAY).flush([MARTA]);
+      expectOccupancy(TODAY, 11).flush(OCCUPANCY);
+      expectPending().flush([MARTA]);
+      request('GET', '/api/v1/admin/reservations/3/suggestions').flush([]);
+      await settle();
+
+      expect(row('Marta').querySelector('.assign')).not.toBeNull();
+      expect(row('Marta').classList).toContain('sel');
+      // La reserva ya se usó: la URL se queda con el día y sin `reserva`.
+      expect(TestBed.inject(Router).url).toBe('/panel/kafe?fecha=2026-11-10');
+    });
+
+    it('reservaWithTableHighlightsRow', async () => {
+      const cena = { ...ANA, date: '2026-11-12' };
+      await openAt('/panel/kafe?fecha=2026-11-12&reserva=1', TWO_SHIFTS);
+
+      // Se abre con la comida (la primera por hora); la reserva es de la cena y hay que moverse a ella.
+      expectDay('2026-11-12').flush([cena]);
+      expectOccupancy('2026-11-12', 10).flush(OCCUPANCY);
+      expectPending().flush([cena]);
+      expectOccupancy('2026-11-12', 11).flush(OCCUPANCY);
+      await settle();
+
+      expect(row('Ana').classList).toContain('highlight');
+      expect(row('Ana').classList).not.toContain('sel');
+      expect(row('Ana').querySelector('.assign')).toBeNull();
+      const selected = page.querySelector('[aria-label="Turno"] [aria-pressed="true"]');
+      expect(normalized(selected?.textContent)).toBe('Cena · 20:00');
+    });
+
+    it('reservaThatIsNotPendingOnlyUsesFecha', async () => {
+      await openAt('/panel/kafe?fecha=2026-11-12&reserva=99');
+
+      await flushScreen('2026-11-12', 11, { day: [{ ...LUIS, date: '2026-11-12' }] });
+
+      expect(title()).toBe('Jueves, 12 de noviembre');
+      expect(rows().some((item) => item.classList.contains('highlight'))).toBe(false);
+      expect(page.querySelector('.assign')).toBeNull();
+    });
+
+    it('reservaIsOnlyUsedOnTheFirstLoad', async () => {
+      await open({ day: [MARTA], pending: [MARTA] });
+      await harness.navigateByUrl('/panel/kafe?reserva=3');
+      await settle();
+      // Cambiar solo la query no recarga la página, y menos aún vuelve a aplicar la reserva.
+      expect(page.querySelector('.assign')).toBeNull();
+
+      feedEvents.next({ restaurantSlug: 'kafe' });
+      await settle();
+      await flushScreen(TODAY, 11, { day: [MARTA], pending: [MARTA] });
+
+      expect(page.querySelector('.assign')).toBeNull();
+    });
+
+    it('reservaIsRemovedFromTheUrlOnceUsed', async () => {
+      const cena = { ...ANA, date: '2026-11-12' };
+      await openAt('/panel/kafe?fecha=2026-11-12&reserva=1', TWO_SHIFTS);
+      expectDay('2026-11-12').flush([cena]);
+      expectOccupancy('2026-11-12', 10).flush(OCCUPANCY);
+      expectPending().flush([cena]);
+      expectOccupancy('2026-11-12', 11).flush(OCCUPANCY);
+      await settle();
+
+      // La fila sigue resaltada, pero recargar o compartir la URL no vuelve a abrirla.
+      expect(row('Ana').classList).toContain('highlight');
+      expect(TestBed.inject(Router).url).toBe('/panel/kafe?fecha=2026-11-12');
+    });
+
+    it('reservaThatIsNotPendingIsAlsoRemovedFromTheUrl', async () => {
+      await openAt('/panel/kafe?fecha=2026-11-12&reserva=99');
+
+      await flushScreen('2026-11-12', 11, { day: [{ ...LUIS, date: '2026-11-12' }] });
+
+      expect(TestBed.inject(Router).url).toBe('/panel/kafe?fecha=2026-11-12');
+    });
+
+    it('reservaWithoutTableOnAnotherDayLeavesTheNewDateInTheUrl', async () => {
+      const far: AdminReservation = { ...MARTA, id: 7, date: '2026-11-15', customerName: 'Zoe' };
+      await openAt('/panel/kafe?fecha=2026-11-10&reserva=7');
+
+      expectDay(TODAY).flush([]);
+      expectOccupancy(TODAY, 11).flush(OCCUPANCY);
+      expectPending().flush([far]);
+      expectDay('2026-11-15').flush([far]);
+      expectOccupancy('2026-11-15', 11).flush(OCCUPANCY);
+      request('GET', '/api/v1/admin/reservations/7/suggestions').flush([]);
+      await settle();
+
+      expect(row('Zoe').querySelector('.assign')).not.toBeNull();
+      expect(TestBed.inject(Router).url).toBe('/panel/kafe?fecha=2026-11-15');
+    });
+
+    it('tabPendientesOpensPendingTab', async () => {
+      await openAt('/panel/kafe?tab=pendientes');
+
+      await flushScreen(TODAY, 11, { pending: [ANA, MARTA] });
+
+      const pressed = page.querySelector('[aria-label="Qué reservas ver"] [aria-pressed="true"]');
+      expect(normalized(pressed?.textContent)).toBe('Pendientes · 2');
+      expect(page.querySelector('.board')).toBeNull();
+      expect(rows().map((item) => item.querySelector('.name')?.textContent?.trim())).toEqual([
+        'Ana',
+        'Marta',
+      ]);
+    });
+
+    it('changingDateUpdatesUrlWithoutHistory', async () => {
+      await open({ day: [LUIS] });
+      const router = TestBed.inject(Router);
+      const navigate = vi.spyOn(router, 'navigate');
+      const pushed = vi.spyOn(TestBed.inject(Location), 'go');
+
+      const input = page.querySelector<HTMLInputElement>('input[name="date"]')!;
+      input.value = '2026-11-12';
+      input.dispatchEvent(new Event('change'));
+      await settle();
+      expectDay('2026-11-12').flush([]);
+      expectOccupancy('2026-11-12', 11).flush(OCCUPANCY);
+      await settle();
+
+      expect(navigate).toHaveBeenCalledWith([], {
+        queryParams: { fecha: '2026-11-12', reserva: null, tab: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+      expect(router.url).toBe('/panel/kafe?fecha=2026-11-12');
+      // Sin entrada nueva en el historial y sin volver a pedir el plano.
+      expect(pushed).not.toHaveBeenCalled();
+      http.expectNone((candidate) => candidate.url.endsWith('/api/v1/admin/restaurants/kafe'));
+      expect(title()).toBe('Jueves, 12 de noviembre');
     });
   });
 });

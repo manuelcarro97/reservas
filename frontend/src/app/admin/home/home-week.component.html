@@ -1,0 +1,70 @@
+<div class="sheet-head">
+  <h2 class="sheet-title">Esta semana</h2>
+  <span class="meta"
+    >semana {{ range() }} · mesas ocupadas por turno, de {{ store.tableCount() }}</span
+  >
+</div>
+
+@if (failed()) {
+  <div class="part-error">
+    <p class="state" [attr.role]="announced() ? 'alert' : null">No se pudo cargar la semana.</p>
+    <button type="button" class="btn line sm" (click)="store.refresh()">Reintentar</button>
+  </div>
+} @else if (store.week() === null) {
+  <p class="state" role="status">Cargando…</p>
+} @else {
+  <div class="week">
+    @for (day of days(); track day.date) {
+      @if (day.closed) {
+        <div class="day closed" [class.is-today]="day.today" [class.past]="day.past">
+          <ng-container *ngTemplateOutlet="content; context: { $implicit: day }" />
+        </div>
+      } @else {
+        <a
+          class="day"
+          title="Abrir este día en Reservas"
+          [class.is-today]="day.today"
+          [class.past]="day.past"
+          [routerLink]="['/panel', slug()]"
+          [queryParams]="{ fecha: day.date }"
+        >
+          <ng-container *ngTemplateOutlet="content; context: { $implicit: day }" />
+        </a>
+      }
+    }
+  </div>
+}
+
+<!-- Lo que llevan las dos variantes de tarjeta: la abierta (un enlace) y la cerrada (sin clic). -->
+<ng-template #content let-day>
+  <div class="dhead">
+    <b>{{ day.label }}</b>
+    <span class="tags">
+      @if (day.today) {
+        <span class="tag">hoy</span>
+      }
+      @if (day.closed) {
+        <span class="tag">cerrado</span>
+      } @else if (day.pendingText) {
+        <span class="tag warn">{{ day.pendingText }}</span>
+      }
+    </span>
+  </div>
+  @if (day.closed) {
+    <div class="closed-note">Día cerrado</div>
+  } @else {
+    @for (shift of day.shifts; track shift.id) {
+      <div class="srow">
+        <span class="truncate" [attr.title]="shift.name">{{ shift.name }}</span>
+        <div class="bar" [class.full]="shift.full">
+          <span [style.width.%]="shift.percent"></span>
+        </div>
+        <em>{{ shift.occupied }}/{{ shift.total }}</em>
+        @if (shift.unassigned > 0) {
+          <span class="note">{{ shift.unassigned }} sin mesa</span>
+        }
+      </div>
+    }
+  }
+  <div class="dfoot">{{ day.footer }}</div>
+</ng-template>

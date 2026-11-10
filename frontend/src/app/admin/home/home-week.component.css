@@ -1,0 +1,191 @@
+/* Disposición de "Esta semana". El aspecto común (hoja, botones, estados) sale de styles/base.css. */
+:host {
+  display: block;
+  flex: none;
+  padding-bottom: 16px;
+}
+
+.sheet-head {
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.sheet-title {
+  font: 400 24px/28px var(--serif);
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.part-error {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.part-error p,
+.state {
+  margin: 0;
+}
+
+.week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  color: inherit;
+  text-decoration: none;
+}
+
+a.day {
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+a.day:hover {
+  border-color: var(--blue);
+  box-shadow: var(--lift);
+}
+
+.day.is-today {
+  border-color: var(--blue);
+  background: var(--blue-tint);
+}
+
+/* Un día pasado se ve atenuado pero sigue siendo un enlace con sus datos. */
+.day.past:not(.closed) {
+  background: var(--bg);
+}
+
+.day.past b {
+  color: var(--muted);
+}
+
+.day.past .bar span {
+  background: var(--faint);
+}
+
+.day.past .bar.full span {
+  background: var(--bad);
+}
+
+/* Si las etiquetas no caben junto al día pasan a la línea de abajo. */
+.dhead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.dhead b {
+  font: 400 20px/1 var(--serif);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.tag {
+  color: var(--muted);
+  font: 500 10px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tag.warn {
+  color: var(--warn);
+}
+
+.srow {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 30px;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.srow em {
+  color: var(--ink-2);
+  font: 500 11px var(--mono);
+  text-align: right;
+}
+
+/* Reservas activas sin mesa: una línea propia bajo la barra, a la derecha. */
+.note {
+  grid-column: 1 / -1;
+  font-size: 10.5px;
+  text-align: right;
+}
+
+.bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--wash-2);
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--blue);
+}
+
+.bar.full span {
+  background: var(--bad);
+}
+
+.dfoot {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.day.past .dfoot {
+  color: var(--muted);
+}
+
+/* Día cerrado: rayado y sin clic. */
+.closed {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--wash),
+    var(--wash) 5px,
+    var(--paper) 5px,
+    var(--paper) 10px
+  );
+}
+
+.closed-note {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-height: 30px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Estrecha: los días se reparten en filas en vez de apretarse en siete columnas. */
+@media (max-width: 1023px) {
+  .week {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}

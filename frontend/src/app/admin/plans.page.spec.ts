@@ -102,7 +102,7 @@ describe('PlansPage', () => {
         provideHttpClientTesting(),
         MeStore,
         provideRouter([
-          { path: 'panel', component: PlansPage },
+          { path: 'panel/planos', component: PlansPage },
           { path: 'panel/:slug/plano', component: EditorStub },
         ]),
       ],
@@ -159,7 +159,7 @@ describe('PlansPage', () => {
     options: { url?: string; details?: Record<string, PlanResponse> } = {},
   ): Promise<void> {
     harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl(options.url ?? '/panel');
+    await harness.navigateByUrl(options.url ?? '/panel/planos');
     page = harness.routeNativeElement as HTMLElement;
     expectApi('GET', 'me').flush(me);
     await settle();
@@ -255,12 +255,12 @@ describe('PlansPage', () => {
       ['Código para tu web', '/panel/kafe/ajustes'],
     ]);
     // De los demás se llega a "Abrir", que lo sube a la tarjeta grande.
-    expect(links(other)).toEqual([['Abrir Tapas <b>Sol</b>', '/panel?plano=tapas']]);
+    expect(links(other)).toEqual([['Abrir Tapas <b>Sol</b>', '/panel/planos?plano=tapas']]);
   });
 
   it('showsLoadingThenFailureWithRetry', async () => {
     harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl('/panel/planos');
     page = harness.routeNativeElement as HTMLElement;
     expect(page.textContent).toContain('Cargando');
 
@@ -319,7 +319,7 @@ describe('PlansPage', () => {
 
   it('eachPlanIsRequestedOnceAndOpenDoesNotRepeatIt', async () => {
     harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl('/panel/planos');
     page = harness.routeNativeElement as HTMLElement;
     expectApi('GET', 'me').flush(meWith([KAFE, TAPAS, CUSTOM]));
     await settle();
@@ -338,7 +338,7 @@ describe('PlansPage', () => {
     page.querySelector<HTMLAnchorElement>('[data-plan="terraza"] a')!.click();
     await settle();
 
-    expect(TestBed.inject(Router).url).toBe('/panel?plano=terraza');
+    expect(TestBed.inject(Router).url).toBe('/panel/planos?plano=terraza');
     expect(featured()!.getAttribute('data-plan')).toBe('terraza');
     expect(featured()!.textContent).toContain('Terraza');
     expect(featured()!.textContent).toContain('Tema · Terracota');
@@ -349,20 +349,20 @@ describe('PlansPage', () => {
   });
 
   it('theQueryInTheUrlPicksTheFeaturedPlanOnLoad', async () => {
-    await open(meWith([KAFE, TAPAS]), { url: '/panel?plano=tapas' });
+    await open(meWith([KAFE, TAPAS]), { url: '/panel/planos?plano=tapas' });
 
     expect(featured()!.getAttribute('data-plan')).toBe('tapas');
   });
 
   it('anUnknownPlanInTheQueryFallsBackToTheFirst', async () => {
-    await open(meWith([KAFE, TAPAS]), { url: '/panel?plano=no-existe' });
+    await open(meWith([KAFE, TAPAS]), { url: '/panel/planos?plano=no-existe' });
 
     expect(featured()!.getAttribute('data-plan')).toBe('kafe');
   });
 
   it('aPlanThatFailsToLoadShowsAMessageInsteadOfAFigureSheet', async () => {
     harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl('/panel/planos');
     page = harness.routeNativeElement as HTMLElement;
     expectApi('GET', 'me').flush(meWith([KAFE, TAPAS]));
     await settle();
@@ -392,7 +392,7 @@ describe('PlansPage', () => {
 
   it('aFailedPlanCanBeRetriedAndOnlyThatPlanIsRequestedAgain', async () => {
     harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl('/panel/planos');
     page = harness.routeNativeElement as HTMLElement;
     expectApi('GET', 'me').flush(meWith([KAFE, TAPAS]));
     await settle();
@@ -420,7 +420,7 @@ describe('PlansPage', () => {
 
   it('aSmallCardWhosePlanFailedSaysSoInsteadOfLeavingAGap', async () => {
     harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl('/panel/planos');
     page = harness.routeNativeElement as HTMLElement;
     expectApi('GET', 'me').flush(meWith([KAFE, TAPAS]));
     await settle();
@@ -434,7 +434,7 @@ describe('PlansPage', () => {
 
   it('leavingThePageCancelsTheRequestsOfTheCardsStillInFlight', async () => {
     harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/panel');
+    await harness.navigateByUrl('/panel/planos');
     page = harness.routeNativeElement as HTMLElement;
     expectApi('GET', 'me').flush(meWith([KAFE, TAPAS]));
     await settle();
@@ -624,7 +624,7 @@ describe('PlansPage', () => {
     await settle();
 
     expect(alertText()).toContain(message);
-    expect(TestBed.inject(Router).url).toBe('/panel');
+    expect(TestBed.inject(Router).url).toBe('/panel/planos');
     expect(field('name').value).toBe('Bar Sol');
   });
 

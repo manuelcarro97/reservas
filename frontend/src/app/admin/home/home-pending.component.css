@@ -1,0 +1,185 @@
+/* Disposición de "Pendientes de confirmar". El aspecto común (hoja, botones, avisos) sale de styles/base.css. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Las filas se reorganizan según el ancho de la tarjeta, no el de la ventana. */
+  container-type: inline-size;
+}
+
+.sheet-head {
+  flex: none;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.sheet-title {
+  font: 400 24px/28px var(--serif);
+}
+
+.more {
+  color: var(--blue-deep);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.more:hover {
+  text-decoration: underline;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.state {
+  margin: 0 0 8px;
+}
+
+/* Resultado de la última acción y aviso de borrador: fijos arriba, la lista es la que se desplaza. */
+.callout {
+  flex: none;
+  margin-bottom: 10px;
+}
+
+.callout .btn {
+  margin-left: 8px;
+}
+
+.draft-note {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.publish-error {
+  color: var(--bad);
+}
+
+.empty-ok {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.empty-ok .big {
+  color: var(--ok);
+  font: 400 28px/1 var(--serif);
+}
+
+/* Solo la lista se desplaza por dentro: la página no. */
+.pending-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0 6px;
+  color: var(--muted);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.group:first-child {
+  margin-top: 0;
+}
+
+.count {
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: var(--wash);
+  color: var(--ink-2);
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border-top: 1px solid var(--rule);
+}
+
+.row.urgent {
+  border-left: 3px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 6%, var(--paper));
+}
+
+.time {
+  font: 500 16px var(--mono);
+}
+
+.date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--muted);
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+}
+
+.date b {
+  color: var(--ink);
+  font: 400 24px/1 var(--serif);
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* El nombre es el enlace a la reserva en Reservas; los botones van aparte. */
+.name {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name:hover {
+  color: var(--blue-deep);
+  text-decoration: underline;
+}
+
+.deadline {
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.confirm-box {
+  margin-top: 6px;
+}
+
+/* Tarjeta estrecha: los botones pasan debajo del texto en vez de apretarlo. */
+@container (max-width: 460px) {
+  .row {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .row > .buttons {
+    grid-column: 2;
+  }
+}

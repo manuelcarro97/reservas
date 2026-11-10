@@ -32,6 +32,26 @@ export function todayIn(timeZone: string | undefined, now: Date): string {
   }
 }
 
+/**
+ * Hora (`HH:mm`, 24 h) que es ahora en `timeZone`; mismo criterio de zona que `todayIn`. `hourCycle: 'h23'` evita el
+ * `24:30` que da `hour12: false` en algunos navegadores a medianoche.
+ */
+export function timeIn(timeZone: string | undefined, now: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(now);
+    const part = (type: string) => parts.find((candidate) => candidate.type === type)?.value ?? '';
+    return `${part('hour')}:${part('minute')}`;
+  } catch {
+    return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+}
+
 /** `YYYY-MM-DD` más `days` días, en UTC: sin horario de verano que desplace el día. */
 export function addDays(isoDate: string, days: number): string {
   const [year, month, day] = isoDate.split('-').map(Number);

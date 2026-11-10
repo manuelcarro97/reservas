@@ -1,0 +1,147 @@
+<div class="sheet-head">
+  <h2 class="sheet-title">Pendientes de confirmar</h2>
+  @if (!store.partFailed().has('pending') && total() > 0) {
+    <a class="more" [routerLink]="['/panel', slug()]" [queryParams]="{ tab: 'pendientes' }"
+      >Ver en Reservas →</a
+    >
+  }
+</div>
+
+@if (actions.error(); as message) {
+  <p class="callout bad" role="alert">{{ message }}</p>
+}
+@if (actions.notice(); as message) {
+  <p class="callout ok" role="status">
+    {{ message }}
+    @if (actions.whatsappUrl(); as url) {
+      <a class="btn line sm" [href]="url" target="_blank" rel="noopener">Abrir WhatsApp</a>
+    }
+  </p>
+}
+
+@if (draft()) {
+  <div class="callout warn draft-note">
+    <span
+      ><b>Tu plano está en borrador.</b> Los clientes aún no pueden reservar: publícalo cuando
+      tengas mesas y turnos.</span
+    >
+    @if (store.publishError(); as message) {
+      <span class="publish-error" role="alert">{{ message }}</span>
+    }
+    <div class="buttons">
+      <button
+        type="button"
+        class="btn ink sm"
+        [disabled]="store.publishing()"
+        (click)="store.publish()"
+      >
+        Publicar plano
+      </button>
+      <a class="btn line sm" [routerLink]="['/panel', slug(), 'plano']">Editar plano</a>
+    </div>
+  </div>
+}
+
+@if (store.partFailed().has('pending')) {
+  <p class="state" role="alert">No se pudieron cargar las pendientes.</p>
+  <div>
+    <button type="button" class="btn line sm" (click)="store.refresh()">Reintentar</button>
+  </div>
+} @else if (store.partLoading().has('pending')) {
+  <p class="state" role="status">Cargando…</p>
+} @else if (total() === 0) {
+  <!-- En borrador el aviso de arriba ocupa la tarjeta: "Todo al día" no tiene sentido sin poder recibir reservas. -->
+  @if (!draft()) {
+    <div class="empty-ok">
+      <span class="big">Todo al día</span>
+      <span class="meta">No hay reservas esperando confirmación.</span>
+    </div>
+  }
+} @else {
+  <div class="pending-list">
+    @for (group of groups(); track group.title) {
+      <h3 class="group">
+        {{ group.title }} <span class="count">{{ group.rows.length }}</span>
+      </h3>
+      <ul class="rows">
+        @for (reservation of group.rows; track reservation.id) {
+          <li class="row" [class.urgent]="group.today">
+            @if (group.today) {
+              <span class="time">{{ arrival(reservation) }}</span>
+            } @else {
+              <span class="date"
+                ><b>{{ leaf(reservation).day }}</b
+                >{{ leaf(reservation).weekday }}</span
+              >
+            }
+            <div class="who">
+              <a
+                class="name"
+                [routerLink]="['/panel', slug()]"
+                [queryParams]="{ fecha: reservation.date, reserva: reservation.id }"
+                >{{ reservation.customerName }}</a
+              >
+              <span class="meta">{{ meta(reservation, group.today) }}</span>
+              @if (group.today && deadline(reservation); as start) {
+                <span class="deadline">Se cancela sola a las {{ start }} si no la confirmas</span>
+              }
+              @if (asksAbout(reservation)) {
+                @if (actions.questionText(); as question) {
+                  <div class="confirm-box" role="group" aria-label="Confirmación">
+                    <p>{{ question.text }}</p>
+                    <div class="buttons">
+                      <button
+                        type="button"
+                        class="btn danger sm"
+                        [disabled]="actions.busy()"
+                        (click)="actions.answerYes()"
+                      >
+                        {{ question.yes }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn quiet sm"
+                        (click)="actions.dismissQuestion()"
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+            <div class="buttons">
+              @if (hasTable(reservation)) {
+                <button
+                  type="button"
+                  class="btn ink sm"
+                  [disabled]="actions.busy()"
+                  (click)="actions.confirm(reservation)"
+                >
+                  Confirmar
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="btn ink sm"
+                  [disabled]="actions.busy()"
+                  (click)="store.chooseTable(reservation)"
+                >
+                  Asignar mesa
+                </button>
+              }
+              <button
+                type="button"
+                class="btn line sm"
+                [disabled]="actions.busy()"
+                (click)="actions.ask('reject', reservation)"
+              >
+                Rechazar
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+}

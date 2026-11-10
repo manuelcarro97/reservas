@@ -4,11 +4,14 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { PlanSummaryResponse } from '../core/api/models/plan-summary-response';
 
-/** Dónde está el panel según su URL: `/panel`, `/panel/cuenta` o `/panel/:slug/:section`. */
+/** Segmentos de `/panel/…` que son páginas del dueño y no el slug de un plano (el backend reserva esos slugs). */
+const NON_PLAN_SEGMENTS = new Set(['cuenta', 'planos']);
+
+/** Dónde está el panel según su URL: `/panel`, `/panel/planos`, `/panel/cuenta` o `/panel/:slug/:section`. */
 export interface PanelLocation {
-  /** Plano de la URL. `null` en `/panel` y `/panel/cuenta`: `cuenta` nunca es un slug. */
+  /** Plano de la URL. `null` en `/panel`, `/panel/planos` y `/panel/cuenta`: `planos` y `cuenta` nunca son un slug. */
   slug: string | null;
-  /** Lo que va tras el slug (`''` en las reservas, `plano`, `turnos`, `ajustes`). */
+  /** Lo que va tras el slug (`''` en las reservas, `inicio`, `plano`, `turnos`, `ajustes`). */
   section: string;
   /** Plano que pide `?plano=` para subirlo a la tarjeta grande de Mis planos. */
   queryPlan: string | null;
@@ -17,7 +20,8 @@ export interface PanelLocation {
 export function panelLocation(url: string, router: Router): PanelLocation {
   const tree = router.parseUrl(url);
   const segments = tree.root.children['primary']?.segments.map((segment) => segment.path) ?? [];
-  const isPlanUrl = segments[0] === 'panel' && segments.length >= 2 && segments[1] !== 'cuenta';
+  const isPlanUrl =
+    segments[0] === 'panel' && segments.length >= 2 && !NON_PLAN_SEGMENTS.has(segments[1]);
   const queryPlan: unknown = tree.queryParams['plano'];
   return {
     slug: isPlanUrl ? segments[1] : null,

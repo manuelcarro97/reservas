@@ -1,0 +1,137 @@
+<div class="top">
+  <div class="eyebrow">
+    Panel
+    @if (planName(); as name) {
+      <span>/</span> <b class="truncate" [attr.title]="name">{{ name }}</b>
+    }
+  </div>
+  <h1 class="page-title">
+    @if (store.status() === 'ready') {
+      Hoy, <em>{{ title().weekday }} {{ title().day }}</em>
+    } @else {
+      Hoy
+    }
+  </h1>
+</div>
+
+@switch (store.status()) {
+  @case ('loading') {
+    <p class="state" role="status">Cargando…</p>
+  }
+  @case ('notFound') {
+    <p class="state" role="alert">Este plano no existe.</p>
+    <p><a routerLink="/panel/planos">Volver a tus planos</a></p>
+  }
+  @case ('error') {
+    <p class="state" role="alert">No se pudo cargar el resumen.</p>
+    <div><button type="button" class="btn line" (click)="retry()">Reintentar</button></div>
+  }
+  @case ('ready') {
+    @let plan = store.plan()!;
+    @let counts = pendingCounts();
+    @let next = nextShift();
+    @let waitingForClosures = store.partLoading().has('closures');
+
+    <!-- Cifras del día -->
+    <section class="sheet today" aria-label="Cifras de hoy">
+      @if (store.partFailed().has('today')) {
+        <div class="part-error">
+          <p class="state" role="alert">No se pudieron cargar las cifras de hoy.</p>
+          <button type="button" class="btn line sm" (click)="refresh()">Reintentar</button>
+        </div>
+      } @else {
+        <div class="figures">
+          <div class="fig">
+            <span class="kicker">Reservas hoy</span>
+            @if (figures(); as f) {
+              <b>{{ f.reservations }}</b>
+              <span class="sub">{{
+                f.toConfirm > 0 ? f.toConfirm + ' por confirmar' : 'todas confirmadas'
+              }}</span>
+            } @else {
+              <b>—</b><span class="sub">Cargando…</span>
+            }
+          </div>
+          <div class="fig">
+            <span class="kicker">Comensales</span>
+            @if (figures(); as f) {
+              <b>{{ f.guests }}</b>
+              <span class="sub">de {{ f.capacity }} plazas por turno</span>
+            } @else {
+              <b>—</b><span class="sub">Cargando…</span>
+            }
+          </div>
+          @if (
+            !store.partFailed().has('pending') &&
+            !store.partLoading().has('pending') &&
+            counts.today + counts.later > 0
+          ) {
+            <!-- Con pendientes la cifra lleva a su tarjeta. -->
+            <button type="button" class="fig warn figlink" (click)="goToPending()">
+              <span class="kicker">Pendientes</span>
+              <b>{{ counts.today + counts.later }}</b>
+              <span class="sub">{{ counts.today }} hoy · {{ counts.later }} próximos días</span>
+            </button>
+          } @else {
+            <div class="fig">
+              <span class="kicker">Pendientes</span>
+              @if (store.partFailed().has('pending')) {
+                <b>—</b><span class="sub">no disponible</span>
+              } @else if (store.partLoading().has('pending')) {
+                <b>—</b><span class="sub">Cargando…</span>
+              } @else {
+                <b>0</b><span class="sub">todo al día</span>
+              }
+            </div>
+          }
+          <div class="fig">
+            <span class="kicker">Próximo turno</span>
+            @if (waitingForClosures) {
+              <b>—</b><span class="sub">Cargando…</span>
+            } @else if (next) {
+              <b class="txt">{{ next.value }}</b
+              ><span class="sub">{{ next.sub }}</span>
+            } @else {
+              <b>—</b><span class="sub">sin turnos próximos</span>
+            }
+          </div>
+          <div class="fig">
+            <span class="kicker">{{ next ? next.freeKicker : 'Mesas libres' }}</span>
+            @if (waitingForClosures || (next && !next.load)) {
+              <b>—</b><span class="sub">Cargando…</span>
+            } @else if (next?.load; as load) {
+              <b
+                >{{ next!.free }} <small>/ {{ load.total }}</small></b
+              >
+              <span class="sub">
+                {{
+                  load.reservations === 0
+                    ? 'sin reservas aún'
+                    : 'ocupación ' + next!.occupancy + ' %'
+                }}
+                @if (load.unassigned > 0) {
+                  · {{ load.unassigned }} sin mesa
+                }
+              </span>
+            } @else {
+              <b>—</b>
+            }
+          </div>
+        </div>
+      }
+    </section>
+
+    <div class="grid">
+      <app-home-plan-card [plan]="plan" [publicUrl]="publicUrl()" />
+
+      <app-home-pending />
+      <app-home-settings
+        [plan]="plan"
+        [nextClosure]="nextClosure()"
+        [closureStatus]="closureStatus()"
+      />
+    </div>
+
+    <app-home-week />
+  }
+}
