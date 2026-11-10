@@ -415,7 +415,8 @@ class PublicApiIT extends PostgresIT {
 	}
 
 	@Test
-	void anonymizedReservationsDoNotCount() throws Exception {
+	void phoneWithoutDigitsIsNotLimited() throws Exception {
+		// Un teléfono sin dígitos ("-") no se compara con nada: el tope no se aplica aunque ya haya tres activas con él.
 		for (int day = 3; day <= 5; day++) {
 			activeWithPhone(LocalDate.of(2026, 12, day), "-");
 		}

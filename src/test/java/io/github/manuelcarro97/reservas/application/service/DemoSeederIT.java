@@ -492,6 +492,22 @@ class DemoSeederIT extends PostgresIT {
 		assertThat(demoAccount.isDemo(DEMO_UID)).isTrue();
 	}
 
+	@Test
+	void reclaimLookupFailureIsLoggedAndTheSeedGoesOn() {
+		identity.holdEmail(DEMO_EMAIL, "intruso");
+		identity.failFindWith(new IdentityProviderException("findUidByEmail", "UNAVAILABLE, UNKNOWN"));
+
+		List<String> warnings = warningsWhileResetting();
+
+		assertThat(identity.deleted()).isEmpty();
+		assertThat(identity.ensured()).isEmpty();
+		assertThat(warnings).singleElement().satisfies(warning -> assertThat(warning).contains(DEMO_UID)
+			.contains("findUidByEmail (UNAVAILABLE, UNKNOWN)")
+			.doesNotContain(DEMO_EMAIL));
+		assertThat(count("reservation")).isEqualTo(6);
+		assertThat(demoAccount.isDemo(DEMO_UID)).isTrue();
+	}
+
 	/** Un fallo a mitad de la restauración (aquí al confirmar una reserva) deja el estado anterior entero. */
 	@Test
 	void failureHalfwayRollsBackToThePreviousState() {

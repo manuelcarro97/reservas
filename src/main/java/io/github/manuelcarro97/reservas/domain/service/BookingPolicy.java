@@ -38,7 +38,8 @@ public class BookingPolicy {
 	 * Un mismo teléfono no puede tener más de {@value #MAX_ACTIVE_RESERVATIONS_PER_PHONE} reservas activas en el plano.
 	 * {@code activeReservations} son las activas del plano (PENDING o CONFIRMED de hoy en adelante). Los teléfonos se
 	 * comparan solo por sus dígitos, porque el campo es texto libre ("600 111 222" y "600111222" son el mismo). Las
-	 * reservas anonimizadas (teléfono "-") no tienen dígitos y no cuentan; un teléfono nuevo sin dígitos tampoco se limita.
+	 * reservas anonimizadas (teléfono "-") nunca están activas, porque solo se anonimizan las de hace más de 30 días, así
+	 * que no cuentan. Un teléfono sin dígitos no se limita.
 	 */
 	public void requireBelowPhoneLimit(String phone, List<Reservation> activeReservations) {
 		String digits = digitsOf(phone);

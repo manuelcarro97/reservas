@@ -601,7 +601,7 @@ describe('BookingPage', () => {
     await settle();
 
     expect(page.querySelector('[role=alert]')?.textContent).toContain(
-      'Ya tienes 3 reservas activas en este local. Cancela alguna para poder hacer otra.',
+      'Este teléfono ya tiene el máximo de reservas activas en este local. Cancela alguna para poder hacer otra.',
     );
     expect(table('2').classList.contains('selected')).toBe(true);
   });
