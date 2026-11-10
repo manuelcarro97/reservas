@@ -57,10 +57,15 @@ export class AdminShellComponent {
     currentPlanSlug(this.url(), this.router, this.store.plans()),
   );
 
+  /** Destino de la marca: el Inicio del plano actual, o la entrada del panel si el dueño no tiene ninguno. */
+  protected readonly brandLink = computed(() => {
+    const slug = this.planSlug();
+    return slug ? ['/panel', slug, 'inicio'] : ['/panel'];
+  });
+
   /**
-   * Query de la pestaña Planos y de la marca: si el plano actual no es el primero, lo lleva en `?plano=` para que Mis
-   * planos lo destaque y la entrada del panel abra su Inicio, y no se pierda al pasar por ellos. Con el primero, o sin
-   * plano, basta la ruta sola.
+   * Query de la pestaña Planos: si el plano actual no es el primero, lo lleva en `?plano=` para que Mis planos lo
+   * destaque y no se pierda al pasar por la lista. Con el primero, o sin plano, basta la ruta sola.
    */
   protected readonly plansTabQuery = computed(() => {
     const slug = this.planSlug();

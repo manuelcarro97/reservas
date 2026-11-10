@@ -47,7 +47,9 @@
   <div class="buttons">
     <a class="btn ink sm" [routerLink]="['/panel', plan().slug, 'plano']">Editar plano</a>
     @if (published()) {
-      <a class="btn line sm" [routerLink]="['/r', plan().slug]">Ver página pública</a>
+      <a class="btn line sm" [routerLink]="['/r', plan().slug]" target="_blank" rel="noopener"
+        >Ver página pública</a
+      >
     }
   </div>
 </div>

@@ -89,22 +89,17 @@ export class HomeWeekComponent {
   protected readonly days = computed(() => (this.store.week() ?? []).map(viewOf));
 
   /**
-   * La semana falla si falla su lectura. Si no ha llegado y falló algo de lo que depende (las reservas de hoy o los
-   * cierres, sin los que no se sabe qué días abren) tampoco se puede pintar: se dice en vez de quedarse en "Cargando…".
+   * La semana falla si falla su lectura. Si no ha llegado y fallaron las reservas de hoy, de las que depende la tarjeta
+   * de hoy, tampoco se puede pintar: se dice en vez de quedarse en "Cargando…". Los cierres no cuentan: los días
+   * cerrados vienen en el resumen de la semana.
    */
   protected readonly failed = computed(() => {
     const failed = this.store.partFailed();
-    return (
-      failed.has('week') ||
-      (this.store.week() === null && (failed.has('today') || failed.has('closures')))
-    );
+    return failed.has('week') || (this.store.week() === null && failed.has('today'));
   });
 
   /** Se anuncia como alerta salvo que la causa sea la lectura de hoy: esa ya la anuncia la tarjeta de las cifras. */
-  protected readonly announced = computed(() => {
-    const failed = this.store.partFailed();
-    return failed.has('week') || failed.has('closures');
-  });
+  protected readonly announced = computed(() => this.store.partFailed().has('week'));
 
   /** `del 9 al 15 de noviembre`, o `del 26 de octubre al 1 de noviembre` si la semana cruza de mes. */
   protected readonly range = computed(() => {

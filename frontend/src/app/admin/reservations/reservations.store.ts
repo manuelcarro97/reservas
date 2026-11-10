@@ -343,14 +343,20 @@ export class ReservationsStore implements ActionHost {
     this.loadFailed.set(false);
     this.dayRequests.next(date);
     this.requestOccupancy();
-    // La fecha queda en la URL (recargar no pierde el día) y lo que abrió la página ya no cuenta. Sin entrada nueva
-    // en el historial, y como el cambio es solo de query la página no se recarga.
+    this.showDateInUrl(date);
+    return true;
+  }
+
+  /**
+   * La fecha queda en la URL (recargar no pierde el día) y lo que abrió la página ya no cuenta. Sin entrada nueva
+   * en el historial, y como el cambio es solo de query la página no se recarga.
+   */
+  private showDateInUrl(date: string): void {
     void this.router.navigate([], {
       queryParams: { fecha: date, reserva: null, tab: null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
-    return true;
   }
 
   selectShift(shiftId: number): void {
@@ -429,6 +435,7 @@ export class ReservationsStore implements ActionHost {
       if (dateChanged) {
         this.day.set(null);
         this.dayRequests.next(date);
+        this.showDateInUrl(date);
       }
       this.requestOccupancy();
     }
@@ -437,7 +444,8 @@ export class ReservationsStore implements ActionHost {
 
   /**
    * Abre la reserva que pidió la URL, una sola vez: si no tiene mesa, la elección de mesa; si la tiene, su día y turno
-   * con la fila resaltada. Si no está entre las pendientes (ya la atendieron) solo se queda el día.
+   * con la fila resaltada. Si no está entre las pendientes (ya la atendieron) solo se queda el día. Se use o no, la
+   * URL deja de llevar `reserva`: recargar o compartirla no vuelve a abrirla.
    */
   private openRequestedReservation(): void {
     const id = this.reservationToOpen;
@@ -445,6 +453,12 @@ export class ReservationsStore implements ActionHost {
       return;
     }
     this.reservationToOpen = null;
+    // Va antes que el resto: si abrir la reserva cambia de día, esa navegación (que ya quita `reserva`) sustituye a esta.
+    void this.router.navigate([], {
+      queryParams: { reserva: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
     const reservation = this.pending().find((item) => item.id === id);
     if (!reservation) {
       return;

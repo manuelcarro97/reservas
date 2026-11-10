@@ -1,6 +1,6 @@
 <header class="admin-header">
-  <!-- La marca lleva a la entrada del panel, que redirige al Inicio del plano actual. -->
-  <a class="brand" routerLink="/panel" [queryParams]="plansTabQuery()"
+  <!-- La marca lleva al Inicio del plano actual (o a la entrada del panel si no hay plano): pasar por la entrada, que redirige, dejaría una entrada duplicada en el historial. -->
+  <a class="brand" [routerLink]="brandLink()"
     >reservas<i>.</i><small class="kicker">panel</small></a
   >
   <span class="vr" aria-hidden="true"></span>

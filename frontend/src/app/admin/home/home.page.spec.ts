@@ -260,7 +260,14 @@ describe('HomePage', () => {
       monday: weekStart(today),
       days: weekOf(today).map((date) => {
         const rows = date === today ? (screen.today ?? TODAY_ROWS) : (screen.week?.[date] ?? []);
-        const tile = dayTile(date, today, plan.shifts ?? [], closures, rows, plan.tables?.length ?? 0);
+        const tile = dayTile(
+          date,
+          today,
+          plan.shifts ?? [],
+          closures,
+          rows,
+          plan.tables?.length ?? 0,
+        );
         return {
           date,
           closed: tile.closed,
@@ -493,6 +500,15 @@ describe('HomePage', () => {
     expect(text('.link-box')).toContain(`${location.host}/r/kafe`);
   });
 
+  it('publicPageOpensInANewTab', async () => {
+    await open();
+
+    // Sale del panel: en la misma pestaña el dueño perdería su sitio en él (igual que en Configuración).
+    const publicPage = link('Ver página pública');
+    expect(publicPage?.getAttribute('target')).toBe('_blank');
+    expect(publicPage?.getAttribute('rel')).toBe('noopener');
+  });
+
   it('copyLinkUsesClipboardWithManualFallback', async () => {
     await open();
 
@@ -663,6 +679,77 @@ describe('HomePage', () => {
     await flushReads({ today: [ANA] });
 
     expect(figures()[0].value).toBe('1');
+  });
+
+  describe('reloj', () => {
+    /** Solo el temporizador: con todos los relojes falsos `whenStable` y las peticiones de prueba no avanzan. */
+    beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }));
+    afterEach(() => vi.useRealTimers());
+
+    /** Pasa un minuto de reloj: la hora del navegador pasa a `to` y salta el temporizador de Inicio. */
+    async function tick(to: string): Promise<void> {
+      clock = new Date(to);
+      vi.advanceTimersByTime(60_000);
+      await settle();
+    }
+
+    it('clockTicksWithoutRequests', async () => {
+      // 19:50 en Los Ángeles: la cena empieza en 10 min.
+      clock = new Date('2026-11-10T03:50:00Z');
+      await open();
+      expect(figures()[3]).toMatchObject({ value: 'Cena · 20:00', sub: 'empieza en 10 min' });
+
+      // 20:01: la cena ya empezó y el próximo turno es el de mañana. Es la misma lectura de la semana, sin peticiones.
+      await tick('2026-11-10T04:01:00Z');
+
+      http.expectNone(() => true);
+      expect(figures()[3]).toMatchObject({ value: 'Mañana · Comida 13:00' });
+      expect(text('h1')).toBe('Hoy, lunes 9 de noviembre');
+    });
+
+    it('newDayRefreshesTheData', async () => {
+      // 23:50 del lunes 9 en Los Ángeles.
+      clock = new Date('2026-11-10T07:50:00Z');
+      await open();
+      expect(text('h1')).toBe('Hoy, lunes 9 de noviembre');
+
+      // 00:01 del martes 10: cambia el día, así que "hoy" y la semana se vuelven a pedir (el plano no).
+      await tick('2026-11-10T08:01:00Z');
+      await flushReads({}, 'kafe', '2026-11-10');
+
+      expect(text('h1')).toBe('Hoy, martes 10 de noviembre');
+      expect(text('app-home-week .day.is-today .dhead b')).toBe('Mar 10');
+    });
+
+    it('nextShiftBeyondTheWeekIsReadWhenTheClockMovesOn', async () => {
+      // Domingo 15, 19:50 en Los Ángeles: el próximo turno es la cena de hoy.
+      clock = new Date('2026-11-16T03:50:00Z');
+      harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/panel/kafe/inicio');
+      expectPlan().flush(PLAN);
+      await settle();
+      await flushReads({ today: [], pending: [] }, 'kafe', '2026-11-15');
+      page = harness.routeNativeElement as HTMLElement;
+
+      // 20:01: el próximo turno es el del lunes 16, fuera de la semana: esa carga no está en el resumen y se pide.
+      await tick('2026-11-16T04:01:00Z');
+      expectDay('2026-11-16').flush([
+        reservation({ id: 20, date: '2026-11-16', shiftId: COMIDA.id, tableId: 1 }),
+      ]);
+      await settle();
+
+      expect(figures()[3].value).toBe('Mañana · Comida 13:00');
+      expect(figures()[4].value).toBe('8 / 9');
+    });
+
+    it('leavingThePageStopsTheClock', async () => {
+      await open();
+      expect(vi.getTimerCount()).toBe(1);
+
+      TestBed.resetTestingModule();
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 
   describe('pendientes', () => {
@@ -1331,7 +1418,7 @@ describe('HomePage', () => {
       expect(days().length).toBe(7);
     });
 
-    it('weekErrorWhenClosuresFail', async () => {
+    it('weekIsShownWhenClosuresFail', async () => {
       harness = await RouterTestingHarness.create();
       await harness.navigateByUrl('/panel/kafe/inicio');
       expectPlan().flush(PLAN);
@@ -1339,13 +1426,15 @@ describe('HomePage', () => {
       expectDay(TODAY).flush(TODAY_ROWS);
       expectPending().flush(PENDING_ROWS);
       expectClosures(TODAY).flush(null, { status: 500, statusText: 'Server Error' });
-      flushWeek({});
+      flushWeek({ closures: ['2026-11-15'] });
       await settle();
       page = harness.routeNativeElement as HTMLElement;
 
-      // Sin los cierres no se sabe qué días abren: la tarjeta lo dice en vez de quedarse en "Cargando…".
-      expect(text('app-home-week [role="alert"]')).toContain('No se pudo cargar la semana');
-      expect(days().length).toBe(0);
+      // Los cierres de la semana ya vienen en el resumen: sin la lectura de cierres la semana se pinta igual.
+      expect(days().length).toBe(7);
+      expect(day('Dom 15').classList).toContain('closed');
+      expect(text('app-home-week')).not.toContain('No se pudo cargar la semana');
+      expect(page.querySelector('app-home-week [role="alert"]')).toBeNull();
     });
 
     /**

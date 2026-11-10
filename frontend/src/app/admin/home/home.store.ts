@@ -1,7 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { Observable, Subscription } from 'rxjs';
+import { Observable, Subscription, interval } from 'rxjs';
 import { AdminReservation } from '../../core/api/models/admin-reservation';
 import { PlanResponse } from '../../core/api/models/plan-response';
 import { WeekSummaryDay } from '../../core/api/models/week-summary-day';
@@ -38,6 +39,9 @@ type FailureKey = HomePart | 'next';
 /** Días de la semana: de lunes a domingo. */
 const WEEK_DAYS = 7;
 
+/** Cada cuánto se pone al día la hora de Inicio. */
+const CLOCK_TICK_MS = 60_000;
+
 /**
  * Estado de `/panel/:slug/inicio`: el plano, las reservas de hoy, las pendientes, los cierres y la semana. Cada lectura es
  * independiente: si una falla, solo su tarjeta lo dice. `load` cancela todo lo del plano anterior. Confirmar y
@@ -66,7 +70,7 @@ export class HomeStore implements ActionHost {
   /** Fecha de las reservas que hay en `nextRows`: si el próximo turno cambia de día no se enseñan las del anterior. */
   private nextRowsDate: string | null = null;
   private readonly failures = new Set<FailureKey>();
-  /** Instante de la última lectura: "hoy" y "ahora" se calculan con él, así `refresh` los pone al día. */
+  /** Instante de la última lectura o del último minuto: "hoy" y "ahora" se calculan con él, así `refresh` y `tick` los ponen al día. */
   private readonly clock = signal(this.now());
 
   readonly status = signal<HomeStatus>('loading');
@@ -138,21 +142,22 @@ export class HomeStore implements ActionHost {
   });
 
   /**
-   * Una tarjeta por día de la semana; `null` mientras falte algo para pintarla: el resumen de la semana, las reservas
-   * de hoy o los cierres. Los demás días salen del resumen del servidor; hoy, de `todayRows` (la lista de hoy ya las
-   * tiene), con el cierre que diga el resumen.
+   * Una tarjeta por día de la semana; `null` mientras falte algo para pintarla: el resumen de la semana o las reservas
+   * de hoy. Los demás días salen del resumen del servidor; hoy, de `todayRows` (la lista de hoy ya las tiene), con el
+   * cierre que diga el resumen: no hace falta la lectura de cierres.
    */
   readonly week = computed<DayTile[] | null>(() => {
     const plan = this.plan();
     const todayRows = this.todayRows();
     const days = this.summaryDays();
-    const closuresKnown = !this.partLoading().has('closures') && !this.partFailed().has('closures');
-    if (!plan || todayRows === null || days === null || !closuresKnown) {
+    if (!plan || todayRows === null || days === null) {
       return null;
     }
     const today = this.today();
     const shifts = plan.shifts ?? [];
-    const closedDays = new Set([...days.values()].filter((day) => day.closed).map((day) => day.date ?? ''));
+    const closedDays = new Set(
+      [...days.values()].filter((day) => day.closed).map((day) => day.date ?? ''),
+    );
     return this.weekDates().map((date) => {
       const day = days.get(date) ?? { date, closed: false, shifts: [] };
       return date === today
@@ -177,7 +182,9 @@ export class HomeStore implements ActionHost {
     }
     if (this.weekDates().includes(next.date) && !this.partFailed().has('week')) {
       const days = this.summaryDays();
-      return days === null ? null : summaryShiftLoad(days.get(next.date), next.shift, this.tableCount());
+      return days === null
+        ? null
+        : summaryShiftLoad(days.get(next.date), next.shift, this.tableCount());
     }
     const rows = this.nextRows();
     return rows === null ? null : shiftLoad(rows, next.shift, this.tableCount());
@@ -185,6 +192,9 @@ export class HomeStore implements ActionHost {
 
   constructor() {
     this.actions.attach(this);
+    interval(CLOCK_TICK_MS)
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.tick());
     inject(DestroyRef).onDestroy(() => {
       this.planRequest?.unsubscribe();
       this.planReload?.unsubscribe();
@@ -249,6 +259,25 @@ export class HomeStore implements ActionHost {
       () => this.readNextRows(),
     );
     this.readWeek();
+  }
+
+  /**
+   * Pone al día "hoy" y "ahora" sin pedir nada, para que con Inicio abierto el próximo turno y su cuenta atrás avancen.
+   * Si con eso cambia el día (pasó la medianoche) las lecturas son de ayer: se vuelven a pedir. Si solo cambia el día
+   * del próximo turno (empezó el último de hoy), se lee su carga si no viene ya en el resumen de la semana.
+   */
+  private tick(): void {
+    const day = this.today();
+    const nextDate = this.next()?.date;
+    this.clock.set(this.now());
+    if (this.status() !== 'ready') {
+      return;
+    }
+    if (this.today() !== day) {
+      this.refresh();
+    } else if (this.next()?.date !== nextDate && !this.partLoading().has('closures')) {
+      this.readNextRows();
+    }
   }
 
   /** Publica el plano (borrador → publicado). Un fallo deja su motivo en `publishError`. */

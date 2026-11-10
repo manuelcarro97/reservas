@@ -302,14 +302,22 @@ describe('AdminShellComponent', () => {
   it('brandGoesToPanel', async () => {
     await open('/panel/planos');
 
+    // Va directo al Inicio del plano actual: pasar por la entrada del panel dejaría una entrada duplicada en el historial.
+    expect(host.querySelector('header a.brand')!.getAttribute('href')).toBe('/panel/kafe/inicio');
+  });
+
+  it('brandGoesToPanelWithoutPlans', async () => {
+    await open('/panel/planos', { ...ME, plans: [] });
+
+    // Sin plano no hay Inicio al que ir: la entrada del panel.
     expect(host.querySelector('header a.brand')!.getAttribute('href')).toBe('/panel');
   });
 
   it('brandKeepsThePlanYouAreIn', async () => {
     await open('/panel/tapas/turnos');
 
-    // Tapas no es el primero: la entrada del panel lleva a su Inicio gracias a `?plano=`.
-    expect(host.querySelector('header a.brand')!.getAttribute('href')).toBe('/panel?plano=tapas');
+    // Tapas no es el primero: la marca lleva a su Inicio.
+    expect(host.querySelector('header a.brand')!.getAttribute('href')).toBe('/panel/tapas/inicio');
   });
 
   it('currentTabIsHomeOnItsPage', async () => {
